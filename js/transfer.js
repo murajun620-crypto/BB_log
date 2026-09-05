@@ -42,7 +42,7 @@ function csvCell(value) {
 }
 export function gameCSV(game, events) {
   const summary = aggregate(game, events);
-  const header = ['Date', 'Team', 'Opponent', 'Number', 'Player', 'PTS', 'FGM', 'FGA', 'FG%', '2PM', '2PA', '2P%', '3PM', '3PA', '3P%', 'FTM', 'FTA', 'FT%', 'OREB', 'DREB', 'REB', 'AST', 'STL', 'BLK', 'TO', 'PF'];
+  const header = ['Date', 'Team', 'Opponent', 'Number', 'Player', 'PTS', 'FGM', 'FGA', 'FG%', '2PM', '2PA', '2P%', '3PM', '3PA', '3P%', 'FTM', 'FTA', 'FT%', 'OR', 'DR', 'REB', 'AST', 'STL', 'BLK', 'TO', 'F'];
   const line = (p, s) => [game.date, game.teamName, game.opponentName, p.number, p.name, s.PTS, s.FGM, s.FGA, percent(s.FGM, s.FGA), s.P2M, s.P2A, percent(s.P2M, s.P2A), s.P3M, s.P3A, percent(s.P3M, s.P3A), s.FTM, s.FTA, percent(s.FTM, s.FTA), s.OREB, s.DREB, s.REB, s.AST, s.STL, s.BLK, s.TO, s.PF];
   const rows = [header, ...game.roster.map(p => line(p, summary.players[p.id])), line({ number: '', name: 'TEAM TOTAL' }, summary.team), [], ['Period', game.teamName, game.opponentName], ...summary.periods.map(p => [p.label, p.home, p.away])];
   return '\uFEFF' + rows.map(row => row.map(csvCell).join(',')).join('\r\n');

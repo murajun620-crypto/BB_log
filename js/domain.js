@@ -2,10 +2,10 @@ export const STAT_DEFS = [
   ['2PM', '2P ○', '2ポイント成功', 2, 'made'], ['2PX', '2P ×', '2ポイント失敗', 0, 'miss'],
   ['3PM', '3P ○', '3ポイント成功', 3, 'made'], ['3PX', '3P ×', '3ポイント失敗', 0, 'miss'],
   ['FTM', 'FT ○', 'フリースロー成功', 1, 'made'], ['FTX', 'FT ×', 'フリースロー失敗', 0, 'miss'],
-  ['OREB', 'OREB', 'オフェンスリバウンド', 0, 'other'], ['DREB', 'DREB', 'ディフェンスリバウンド', 0, 'other'],
+  ['OREB', 'OR', 'オフェンスリバウンド', 0, 'other'], ['DREB', 'DR', 'ディフェンスリバウンド', 0, 'other'],
   ['AST', 'AST', 'アシスト', 0, 'other'], ['STL', 'STL', 'スティール', 0, 'other'],
   ['BLK', 'BLK', 'ブロック', 0, 'other'], ['TO', 'TO', 'ターンオーバー', 0, 'other'],
-  ['PF', 'PF', 'ファウル', 0, 'foul'],
+  ['PF', 'F', 'ファウル', 0, 'foul'],
 ].map(([type, label, name, points, tone]) => ({ type, label, name, points, tone }));
 export const STATS = Object.fromEntries(STAT_DEFS.map(s => [s.type, s]));
 export const uid = () => crypto.randomUUID();

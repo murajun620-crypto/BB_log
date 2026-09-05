@@ -64,8 +64,10 @@ export function saveTeam(team, expectedRevision = null) {
     const store = tx.objectStore('teams');
     const request = store.get(team.id);
     request.onsuccess = () => {
-      if ((request.result?.revision ?? null) !== expectedRevision) return fail(new ConflictError());
-      store.put(team); tx.objectStore('settings').delete('teamDraft'); result(team);
+      try {
+        if ((request.result?.revision ?? null) !== expectedRevision) return fail(new ConflictError());
+        store.put(team); tx.objectStore('settings').delete('teamDraft'); result(team);
+      } catch (error) { fail(error); }
     };
   });
 }
@@ -80,11 +82,33 @@ export function commitGame(game, event = null) {
     const store = tx.objectStore('games');
     const request = store.get(game.id);
     request.onsuccess = () => {
-      if (!request.result || request.result.revision !== game.revision) return fail(new ConflictError());
-      const saved = { ...game, revision: game.revision + 1, updatedAt: new Date().toISOString() };
-      store.put(saved);
-      if (event) tx.objectStore('events').put(event);
-      result(saved);
+      try {
+        if (!request.result || request.result.revision !== game.revision) return fail(new ConflictError());
+        const saved = { ...game, revision: game.revision + 1, updatedAt: new Date().toISOString() };
+        store.put(saved);
+        if (event) tx.objectStore('events').put(event);
+        result(saved);
+      } catch (error) { fail(error); }
+    };
+  });
+}
+export function deleteGame(game) {
+  return checkedWrite(['games', 'events'], (tx, result, fail) => {
+    const games = tx.objectStore('games');
+    const request = games.get(game.id);
+    request.onsuccess = () => {
+      try {
+        if (!request.result || request.result.revision !== game.revision) return fail(new ConflictError());
+        const events = tx.objectStore('events');
+        const cursorRequest = events.index('gameId').openCursor(IDBKeyRange.only(game.id));
+        cursorRequest.onsuccess = () => {
+          try {
+            const cursor = cursorRequest.result;
+            if (cursor) { cursor.delete(); cursor.continue(); return; }
+            games.delete(game.id); result(game.id);
+          } catch (error) { fail(error); }
+        };
+      } catch (error) { fail(error); }
     };
   });
 }
