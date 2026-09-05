@@ -1,0 +1,12 @@
+{
+  "name": "courtside-log",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Offline-first basketball stats recorder",
+  "scripts": {
+    "start": "node scripts/serve.mjs",
+    "test": "node --test tests/*.test.mjs",
+    "test:e2e": "node tests/browser.mjs"
+  }
+}
