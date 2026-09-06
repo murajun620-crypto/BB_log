@@ -1,5 +1,5 @@
 // Bump this version whenever any app-shell asset changes.
-const VERSION = 'v1.0.11';
+const VERSION = 'v1.0.12';
 const CACHE_PREFIX = 'courtside-shell-';
 // Include scope in the name so multiple GitHub Pages projects cannot clear each other's caches.
 const CACHE_BASE = `${CACHE_PREFIX}${encodeURIComponent(self.registration.scope)}-`;
@@ -22,6 +22,9 @@ self.addEventListener('activate', event => {
 });
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
+  // Reader owns the more specific /reader/ scope. Let its first visit reach its own app shell.
+  const readerPath = new URL('./reader/', self.registration.scope).pathname;
+  if (url.pathname.startsWith(readerPath)) return;
   if (event.request.method !== 'GET' || !event.request.url.startsWith(self.registration.scope) || url.origin !== self.location.origin) return;
   event.respondWith((async () => {
     const cache = await caches.open(CACHE_NAME);

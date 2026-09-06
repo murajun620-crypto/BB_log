@@ -244,13 +244,14 @@ async function shareStatsImage(playerId = null) {
   const result = await shareImage(canvas, filename, player ? `${player.name}のスタッツ` : `${g.teamName} vs ${g.opponentName}`);
   if (result === 'downloaded') toast('共有画像を保存しました。');
 }
-function gameShareMessage(g, suffix = 'CourtsideでBOX SCOREを見る') {
+function gameShareMessage(g, suffix = 'Courtside ReaderでBOX SCOREを見る') {
   const summary = aggregate(g, gameEvents(g));
   const date = String(g.date || '').replaceAll('-', '/');
   return `${date} ${g.teamName} vs ${g.opponentName}\n${g.teamName} ${summary.team.PTS} - ${summary.opponent} ${g.opponentName}\n${suffix}`;
 }
 function reportLink(payload) {
-  const link = new URL(location.href);
+  // Reader has its own app shell, so a received link never exposes recording controls.
+  const link = new URL('./reader/', location.href);
   link.hash = `share/${payload}`;
   return link.href;
 }

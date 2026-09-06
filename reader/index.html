@@ -1,0 +1,23 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#183d36">
+  <meta name="description" content="Courtsideの共有BOX SCOREを開く、読み取り専用ビューア。">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="CS Reader">
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" href="../icons/icon.svg" type="image/svg+xml">
+  <link rel="apple-touch-icon" href="../icons/apple-touch-icon.png">
+  <link rel="stylesheet" href="./css/reader.css">
+  <title>Courtside Reader</title>
+</head>
+<body>
+  <div id="app" aria-live="polite"><main class="loading"><span class="brand-mark">C</span><strong>COURTSIDE READER</strong><p>共有レポートを読み込み中…</p></main></div>
+  <dialog id="player-dialog" aria-labelledby="player-dialog-title"></dialog>
+  <noscript>このアプリを使うにはJavaScriptを有効にしてください。</noscript>
+  <script type="module" src="./js/reader.js"></script>
+</body>
+</html>

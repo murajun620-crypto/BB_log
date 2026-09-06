@@ -77,6 +77,7 @@ js/
 icons/
 manifest.webmanifest
 sw.js
+reader/
 .nojekyll
 ```
 
@@ -95,6 +96,15 @@ GitHubの設定手順については[GitHub Pagesの公開元設定](https://doc
 Safariとホーム画面アプリで保存領域が共有されない環境もあるため、初回キャッシュとデータの確認は**実際に利用するホーム画面アプリ側**で行ってください。必要に応じてSafari側からJSONを書き出して移行します。
 
 [Apple公式：iPhoneのSafariでWebサイトをアプリにする](https://support.apple.com/ja-jp/guide/iphone/iphea86e5236/ios)
+
+## Courtside Reader（共有リンク専用）
+
+LINEカードの「BOX SCOREを見る」は、公開URLの`/reader/`にある**Courtside Reader**を開きます。これは閲覧専用の独立PWAです。チーム登録、試合作成、スタッツ入力、端末内の試合データは持ちません。
+
+- 共有リンクに含まれた1試合分のBOX SCORE、ピリオド別得点、チーム成績、選手別スタッツを表示します。選手をタップすると詳細を確認できます。
+- 共有データはURLの`#share/...`部分だけに入り、WebサーバーやGitHub Pagesには送信されません。受信者はCourtside本体を使っていなくても閲覧できます。
+- Readerを一度オンラインで開けば、同じ共有リンクは通信がない状態でも開けます。SafariでReaderを開き、「ホーム画面に追加」すれば専用アプリとして使えます。
+- 旧形式の共有リンクは従来どおりCourtside本体で開けます。更新後に送る新しいリンクとLINEカードはReaderへ向かいます。
 
 ## データ保存と整合性
 
