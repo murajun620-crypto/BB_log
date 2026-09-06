@@ -24,9 +24,10 @@ export function parseBackup(text) {
   }
   const keys = new Set();
   for (const s of data.settings) {
-    if (!s || !['preferences', 'teamDraft', 'gameDraft'].includes(s.key) || keys.has(s.key)) throw new Error('設定データが不正です。');
+    if (!s || !['preferences', 'lineShare', 'teamDraft', 'gameDraft'].includes(s.key) || keys.has(s.key)) throw new Error('設定データが不正です。');
     keys.add(s.key);
     if (s.key === 'preferences' && (!s.value || !['system', 'light', 'dark'].includes(s.value.theme) || typeof s.value.continuous !== 'boolean' || (s.value.keepAwake !== undefined && typeof s.value.keepAwake !== 'boolean'))) throw new Error('表示設定が不正です。');
+    if (s.key === 'lineShare' && (!s.value || typeof s.value.liffId !== 'string' || (s.value.liffId && !/^\d{5,20}-[A-Za-z0-9_-]{4,80}$/.test(s.value.liffId)))) throw new Error('LINEカード共有の設定が不正です。');
     if (s.key === 'teamDraft') {
       if (!s.value || typeof s.value.name !== 'string' || !Array.isArray(s.value.players) || s.value.players.length > 60 || s.value.players.some(p => !p || typeof p.id !== 'string' || typeof p.number !== 'string' || typeof p.name !== 'string')) throw new Error('チーム下書きが不正です。');
     }

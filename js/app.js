@@ -2,14 +2,15 @@ import * as db from './db.js';
 import { uid, localDate, STATS, activeEvents, makePeriods, validateTeam, validateGame, lineup, eventLabel, aggregate } from './domain.js';
 import { backupObject, parseBackup, gameCSV, download, shareFile, shareUrl } from './transfer.js';
 import { boxScoreImage, playerStatsImage, safeFilename, shareImage } from './share-image.js';
-import { createSharedReport, createCompressedSharePayload, parseSharePayload, parseSharedReport, sharedReportFile } from './shared-report.js';
+import { createSharedReport, createCardSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport, sharedReportFile } from './shared-report.js';
+import { isLiffId, shareLineCard as shareWithLineCard } from './line-share.js';
 import * as view from './views.js';
 
 const app = document.querySelector('#app');
 const sheet = document.querySelector('#sheet');
 const toastNode = document.querySelector('#toast');
-const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, page: 'home', gameId: null, busy: false, lastError: '' };
-let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, resolvedShareHash = '', sharePayloadPromise = null;
+const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, theme: 'system' }, lineShare: { liffId: '' }, pwa: { ready: false, error: '', update: false }, page: 'home', gameId: null, busy: false, lastError: '' };
+let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, resolvedShareHash = '', sharePayloadPromise = null, cardPayloadPromise = null;
 const getSetting = key => state.data.settings.find(s => s.key === key)?.value;
 const game = () => state.data.games.find(g => g.id === state.gameId);
 const gameEvents = (g = game()) => state.data.events.filter(e => e.gameId === g?.id);
@@ -26,6 +27,8 @@ function applyTheme() {
 async function refresh() {
   state.data = await db.readAll();
   state.preferences = { continuous: false, keepAwake: false, theme: 'system', ...getSetting('preferences') };
+  const liffId = getSetting('lineShare')?.liffId;
+  state.lineShare = { liffId: isLiffId(liffId) ? liffId : '' };
   applyTheme();
 }
 async function syncWakeLock() {
@@ -243,6 +246,11 @@ function gameShareMessage(g, suffix = 'CourtsideでBOX SCOREを見る') {
   const date = String(g.date || '').replaceAll('-', '/');
   return `${date} ${g.teamName} vs ${g.opponentName}\n${g.teamName} ${summary.team.PTS} - ${summary.opponent} ${g.opponentName}\n${suffix}`;
 }
+function reportLink(payload) {
+  const link = new URL(location.href);
+  link.hash = `share/${payload}`;
+  return link.href;
+}
 async function shareGameReport() {
   const g = game();
   if (!g) throw new Error('試合が見つかりません。');
@@ -260,17 +268,31 @@ async function shareGameLink() {
   const prepared = sharePayloadPromise?.gameId === g.id ? sharePayloadPromise.promise : null;
   const payload = await (prepared || createCompressedSharePayload(g, gameEvents(g)));
   sharePayloadPromise = null;
-  const link = new URL(location.href);
-  link.hash = `share/${payload}`;
-  if (link.href.length > 14000) {
+  const link = reportLink(payload);
+  if (link.length > 14000) {
     toast('リンクが長いため、閲覧用ファイルで共有します。');
     await shareGameReport();
     return;
   }
-  const result = await shareUrl(link.href, `${g.teamName} vs ${g.opponentName}`, gameShareMessage(g));
+  const result = await shareUrl(link, `${g.teamName} vs ${g.opponentName}`, gameShareMessage(g));
   if (result === 'copied') toast('共有リンクをコピーしました。LINEに貼り付けてください。');
   if (result === 'copy-failed') toast('リンクをコピーできませんでした。共有メニューから送ってください。', true);
   if (sheet.open) closeSheet();
+}
+function showLineCardSetup() {
+  showSheet('LINEカード共有を設定', '<p class="confirm-body">LINEカードで共有するには、LINE Developersで作成したLIFF IDが必要です。設定にIDを保存すると、試合結果カードと「BOX SCOREを見る」ボタンをLINEへ送れます。</p><div class="confirm-actions"><button class="button secondary" data-action="close-sheet">閉じる</button><button class="button primary" data-action="open-line-settings">設定を開く</button></div>');
+}
+async function shareGameLineCard() {
+  const g = game();
+  if (!g) throw new Error('試合が見つかりません。');
+  if (!state.lineShare.liffId) return showLineCardSetup();
+  const prepared = cardPayloadPromise?.gameId === g.id ? cardPayloadPromise.promise : null;
+  const payload = await (prepared || createCardSharePayload(g, gameEvents(g)));
+  cardPayloadPromise = null;
+  const result = await shareWithLineCard({ liffId: state.lineShare.liffId, game: g, summary: aggregate(g, gameEvents(g)), url: reportLink(payload) });
+  if (result === 'login') toast('LINEへのログイン後、もう一度「LINEカードで共有」をタップしてください。');
+  if (result === 'shared') toast('LINEカードを共有しました。');
+  if (sheet.open && result !== 'login') closeSheet();
 }
 const handlers = {
   'close-sheet': closeSheet,
@@ -339,10 +361,16 @@ const handlers = {
   'shared-player-detail': button => showSheet('選手スタッツ', view.sharedPlayerDetail(sharedReport, button.dataset.id)),
   'share-options': () => {
     const g = game();
-    sharePayloadPromise = g ? { gameId: g.id, promise: createCompressedSharePayload(g, gameEvents(g)) } : null;
-    showSheet('スタッツを共有', `<button class="button primary full" data-action="share-link">${view.icon('share')}LINEへ共有</button><p class="help">日付・対戦チーム・スコアを本文に添えて、短いリンクを送ります。受信者はリンクをタップしてBOX SCOREを開き、選手をタップして詳細も確認できます。</p><button class="button secondary full spaced" data-action="share-report">${view.icon('download')}ファイルで共有</button><p class="help">リンクを使わず、閲覧用ファイルを送る方法です。受信者は「設定」から開きます。</p><button class="button secondary full spaced" data-action="share-box-image">${view.icon('download')}画像で共有</button>`);
+    const events = gameEvents(g);
+    sharePayloadPromise = g ? { gameId: g.id, promise: createCompressedSharePayload(g, events) } : null;
+    cardPayloadPromise = g ? { gameId: g.id, promise: createCardSharePayload(g, events) } : null;
+    const cardLabel = state.lineShare.liffId ? 'LINEカードで共有' : 'LINEカード共有を設定';
+    const cardHelp = state.lineShare.liffId ? '試合結果カードと「BOX SCOREを見る」ボタンを、LINEの送信先選択画面から送ります。' : '最初にLINEのLIFF IDを設定します。設定後は、URLを本文に並べないカードとして送れます。';
+    showSheet('スタッツを共有', `<button class="button primary full" data-action="share-line-card">${view.icon('share')}${cardLabel}</button><p class="help">${cardHelp}</p><button class="button secondary full spaced" data-action="share-link">${view.icon('share')}LINEへ共有</button><p class="help">日付・対戦チーム・スコアを本文に添えて、リンクを送ります。受信者はリンクをタップしてBOX SCOREを開き、選手をタップして詳細も確認できます。</p><button class="button secondary full spaced" data-action="share-report">${view.icon('download')}ファイルで共有</button><p class="help">リンクを使わず、閲覧用ファイルを送る方法です。受信者は「設定」から開きます。</p><button class="button secondary full spaced" data-action="share-box-image">${view.icon('download')}画像で共有</button>`);
   },
+  'share-line-card': () => shareGameLineCard(),
   'share-link': () => shareGameLink(),
+  'open-line-settings': () => { closeSheet(); location.hash = '#settings'; },
   'share-report': () => shareGameReport(),
   'share-box-image': async () => { await shareStatsImage(); if (sheet.open) closeSheet(); },
   'share-player-image': button => shareStatsImage(button.dataset.id),
@@ -419,6 +447,15 @@ document.addEventListener('submit', event => {
     const now = new Date().toISOString();
     const g = { id: uid(), teamId: t.id, teamName: t.name, opponentName: gameDraft.opponentName.trim(), date: gameDraft.date, format: gameDraft.format, regulationCount: periods.length, minutes: Number(gameDraft.minutes), periods, currentPeriodId: periods[0]?.id, roster: structuredClone(t.players.filter(p => gameDraft.participants.includes(p.id))), starters: gameDraft.starters, status: 'live', nextSeq: 1, revision: 0, createdAt: now, updatedAt: now };
     validateGame(g, []); await db.createGame(g); await refresh(); gameDraft = null; location.hash = `#live/${g.id}`;
+  });
+  if (form.id === 'line-share-form') busy(async () => {
+    const liffId = String(new FormData(form).get('liffId') || '').trim();
+    if (liffId && !isLiffId(liffId)) throw new Error('LIFF IDの形式を確認してください。例：1234567890-AbCdEfgh');
+    const value = { liffId };
+    await db.saveSetting('lineShare', value);
+    state.lineShare = value;
+    state.data.settings = state.data.settings.filter(setting => setting.key !== 'lineShare').concat({ key: 'lineShare', value });
+    render(); toast(liffId ? 'LINEカード共有を設定しました。' : 'LINEカード共有の設定を削除しました。');
   });
   if (form.id === 'live-member-form') busy(async () => {
     const g = game(); const team = state.data.teams.find(t => t.id === g?.teamId);

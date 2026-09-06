@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { STATS, aggregate, percent, lineup, validateGame, validateTeam, makePeriods, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
-import { createSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
+import { createSharedReport, createSharePayload, createCardSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
+import { createLineCardMessage, isLiffId } from '../js/line-share.js';
 
 const fixture = () => {
   const players = Array.from({ length: 6 }, (_, i) => ({ id: `player-${i}`, number: `${i + 4}`, name: `選手${i + 1}` }));
@@ -56,10 +57,10 @@ test('halves, custom periods and overtime contribute to per-period scores', () =
 });
 test('backup round trip preserves events, snapshots and settings', () => {
   const { team, game, events, add } = fixture(); add('3PM');
-  const data = { teams: [team], games: [game], events, settings: [{ key: 'preferences', value: { continuous: false, theme: 'dark' } }, { key: '_epoch', value: 23 }] };
+  const data = { teams: [team], games: [game], events, settings: [{ key: 'preferences', value: { continuous: false, theme: 'dark' } }, { key: 'lineShare', value: { liffId: '1234567890-AbCdEfgh' } }, { key: '_epoch', value: 23 }] };
   const restored = parseBackup(JSON.stringify(backupObject(data)));
   assert.deepEqual(restored.events, events); assert.deepEqual(restored.games, [game]);
-  assert.equal(restored.settings.length, 1);
+  assert.equal(restored.settings.length, 2);
 });
 test('corrupt, mismatched, duplicate, unsupported and invalid lineup backups are rejected', () => {
   const { team, game, events, add } = fixture(); add('3PM');
@@ -71,6 +72,7 @@ test('corrupt, mismatched, duplicate, unsupported and invalid lineup backups are
     d => { d.games[0].starters.pop(); }, d => { d.teams[0].players[0].id = '__proto__'; },
     d => { d.events[0].seq = d.games[0].nextSeq; }, d => { d.games[0].currentPeriodId = 'absent'; },
     d => { d.settings = [{ key: 'preferences', value: { theme: 'pink', continuous: false } }]; },
+    d => { d.settings = [{ key: 'lineShare', value: { liffId: 'not-a-liff-id' } }]; },
   ]) {
     const copy = structuredClone(original); corrupt(copy); assert.throws(() => parseBackup(JSON.stringify(copy)));
   }
@@ -98,13 +100,25 @@ test('private shared report contains aggregate stats without source IDs or event
   assert.equal(fromLink.team.PTS, 3); assert.equal(fromLink.opponentScore, 2); assert.equal(fromLink.players[0].stats.OREB, 1);
   await assert.rejects(() => parseSharePayload(`${payload}x`));
 });
-test('compressed share payload round trips and keeps legacy payloads readable', async () => {
+test('compressed share payloads round trip and keep legacy payloads readable', async () => {
   const { game, events, add } = fixture();
   add('3PM'); add('OREB'); add('OPP', { points: 2 });
   const payload = await createCompressedSharePayload(game, events);
   assert.match(payload, /^v[12]\./);
   const report = await parseSharePayload(payload);
   assert.equal(report.team.PTS, 3); assert.equal(report.opponentScore, 2); assert.equal(report.players[0].stats.OREB, 1);
+  const cardPayload = await createCardSharePayload(game, events);
+  assert.match(cardPayload, /^v[123]\./);
+  const cardReport = await parseSharePayload(cardPayload);
+  assert.deepEqual(cardReport, report);
+});
+test('LINE card contains score, tap action and valid LIFF IDs only', () => {
+  const { game, events, add } = fixture(); add('3PM'); add('OPP', { points: 2 });
+  const [card] = createLineCardMessage({ game, summary: aggregate(game, events), url: 'https://example.com/#share/v3.abc' });
+  assert.equal(card.type, 'flex'); assert.match(card.altText, /HOOPS 3 - 2 VISITORS/);
+  assert.equal(card.contents.footer.contents[0].action.uri, 'https://example.com/#share/v3.abc');
+  assert.throws(() => createLineCardMessage({ game, summary: aggregate(game, events), url: `https://example.com/${'x'.repeat(1000)}` }), /上限/);
+  assert.equal(isLiffId('1234567890-AbCdEfgh'), true); assert.equal(isLiffId('bad'), false);
 });
 test('duplicate jersey numbers and incomplete player data cannot be saved', () => {
   const { team } = fixture(); validateTeam(team);

@@ -1,6 +1,7 @@
 import { aggregate, blankStats, formatGame } from './domain.js';
 
 const STAT_KEYS = Object.keys(blankStats());
+const BASE_STAT_KEYS = ['P2M', 'P2A', 'P3M', 'P3A', 'FTM', 'FTA', 'OREB', 'DREB', 'AST', 'STL', 'BLK', 'TO', 'PF'];
 const MAX_FILE_SIZE = 1024 * 1024;
 const MAX_PAYLOAD_SIZE = 120000;
 
@@ -113,6 +114,26 @@ function compactBytes(game, events) {
   return new TextEncoder().encode(JSON.stringify(compactReport(game, events)));
 }
 
+function cardCompactReport(game, events) {
+  const report = createSharedReport(game, events).report;
+  return [
+    3,
+    game.date,
+    game.format,
+    game.regulationCount,
+    game.minutes,
+    game.status === 'finished' ? 1 : 0,
+    report.teamName,
+    report.opponentName,
+    report.periods.map(period => [period.home, period.away]),
+    report.players.map(player => [player.number, player.name, BASE_STAT_KEYS.map(key => player.stats[key])]),
+  ];
+}
+
+function cardCompactBytes(game, events) {
+  return new TextEncoder().encode(JSON.stringify(cardCompactReport(game, events)));
+}
+
 export function createSharePayload(game, events) {
   return `v1.${bytesToBase64(compactBytes(game, events))}`;
 }
@@ -143,17 +164,82 @@ export async function createCompressedSharePayload(game, events) {
   } catch { return createSharePayload(game, events); }
 }
 
+// Card links omit totals that can be recalculated from player stats.
+export async function createCardSharePayload(game, events) {
+  const bytes = cardCompactBytes(game, events);
+  if (!globalThis.CompressionStream) return createCompressedSharePayload(game, events);
+  try {
+    const compressed = await deflate(bytes);
+    return `v3.${bytesToBase64(compressed)}`;
+  } catch { return createCompressedSharePayload(game, events); }
+}
+
+function formatLabel(format, count, minutes) {
+  const prefix = format === 'quarters' ? '4Q' : format === 'halves' ? '2H' : `${count}P`;
+  return `${prefix} × ${minutes}分`;
+}
+
+function periodLabel(format, regulationCount, index) {
+  if (index >= regulationCount) return `OT${index - regulationCount + 1}`;
+  if (format === 'quarters') return `Q${index + 1}`;
+  if (format === 'halves') return `${index + 1}H`;
+  return `P${index + 1}`;
+}
+
+function expandBaseStats(values) {
+  ensure(Array.isArray(values) && values.length === BASE_STAT_KEYS.length);
+  const stats = Object.fromEntries(BASE_STAT_KEYS.map((key, index) => [key, values[index]]));
+  stats.FGM = stats.P2M + stats.P3M;
+  stats.FGA = stats.P2A + stats.P3A;
+  stats.PTS = stats.P2M * 2 + stats.P3M * 3 + stats.FTM;
+  stats.REB = stats.OREB + stats.DREB;
+  return stats;
+}
+
+function totalStats(players) {
+  const team = blankStats();
+  for (const player of players) for (const key of STAT_KEYS) team[key] += player.stats[key];
+  return team;
+}
+
+function parseCardCompact(compact) {
+  ensure(Array.isArray(compact) && compact.length === 10 && compact[0] === 3);
+  const [, date, format, regulationCount, minutes, status, teamName, opponentName, periodScores, compactPlayers] = compact;
+  ensure(['quarters', 'halves', 'custom'].includes(format) && Number.isInteger(regulationCount) && regulationCount >= 1 && regulationCount <= 12 && (format === 'custom' || regulationCount === (format === 'quarters' ? 4 : 2)) && Number.isFinite(minutes) && minutes >= 1 && minutes <= 60 && [0, 1].includes(status));
+  ensure(Array.isArray(periodScores) && periodScores.length >= regulationCount && periodScores.length <= 50 && Array.isArray(compactPlayers));
+  const players = compactPlayers.map((player, index) => ({
+    id: `p${index + 1}`,
+    number: player?.[0],
+    name: player?.[1],
+    stats: expandBaseStats(player?.[2]),
+  }));
+  const periods = periodScores.map((score, index) => ({ label: periodLabel(format, regulationCount, index), home: score?.[0], away: score?.[1] }));
+  const report = {
+    date,
+    format: formatLabel(format, regulationCount, minutes),
+    status: status ? 'finished' : 'live',
+    teamName,
+    opponentName,
+    opponentScore: periods.reduce((sum, period) => sum + period.away, 0),
+    periods,
+    team: totalStats(players),
+    players,
+  };
+  return parseSharedReport(JSON.stringify({ app: 'courtside-report', schemaVersion: 1, report }));
+}
+
 export async function parseSharePayload(payload) {
-  if (typeof payload !== 'string' || payload.length < 4 || payload.length > MAX_PAYLOAD_SIZE || !/^v[12]\./.test(payload)) throw new Error('共有リンクの形式が不正です。');
+  if (typeof payload !== 'string' || payload.length < 4 || payload.length > MAX_PAYLOAD_SIZE || !/^v[123]\./.test(payload)) throw new Error('共有リンクの形式が不正です。');
   let compact;
   try {
     let bytes = base64ToBytes(payload.slice(3));
-    if (payload.startsWith('v2.')) bytes = await inflate(bytes);
+    if (payload.startsWith('v2.') || payload.startsWith('v3.')) bytes = await inflate(bytes);
     compact = JSON.parse(new TextDecoder().decode(bytes));
   } catch (error) {
     if (error.message === 'このブラウザは圧縮リンクに対応していません。') throw error;
     throw new Error('共有リンクを読み取れませんでした。');
   }
+  if (payload.startsWith('v3.')) return parseCardCompact(compact);
   ensure(compact?.v === 1 && Array.isArray(compact.p) && Array.isArray(compact.r));
   const report = {
     date: compact.d,
