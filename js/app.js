@@ -173,9 +173,26 @@ function offerFollowup(event) {
     showSheet('REBあり？', `<p class="recorded-note">${view.icon('check')}シュートは保存済み</p><button class="button secondary full" data-action="close-sheet">なし・次のプレーへ</button><div class="two-columns spaced"><button class="stat-button other" data-action="follow-reb" data-type="OREB">OR</button><button class="stat-button other" data-action="follow-reb" data-type="DREB">DR</button></div>`);
   }
 }
+function memberForm(player = null) {
+  pending = { kind: 'member-form', playerId: player?.id || null };
+  showSheet(player ? '登録済み選手を追加' : '新しい選手を追加', `<form id="live-member-form" data-player-id="${view.esc(player?.id || '')}"><p class="help">${player ? '背番号や名前を変更すると、チームの現在の登録にも反映します。' : 'この選手をチームへ登録し、進行中の試合にも追加します。'}過去試合の表示は変更されません。</p><label>背番号<input name="number" inputmode="numeric" pattern="[0-9]{1,3}" maxlength="3" required value="${view.esc(player?.number || '')}" placeholder="例：12"></label><label class="spaced">名前<input name="name" maxlength="40" required value="${view.esc(player?.name || '')}" placeholder="選手名"></label><button class="button primary full spaced" type="submit">チームと試合に追加</button></form>`);
+}
+function addMemberMenu() {
+  const g = game(); const team = state.data.teams.find(t => t.id === g?.teamId);
+  if (!g || !team) return;
+  const current = new Set(g.roster.map(p => p.id));
+  const available = team.players.filter(p => !current.has(p.id));
+  const players = available.length ? `<p class="picker-label">登録済み選手</p><div class="player-grid">${available.map(p => `<button class="player-button" data-action="prepare-member" data-id="${p.id}"><strong>#${view.esc(p.number)}</strong><span>${view.esc(p.name)}</span></button>`).join('')}</div>` : '<p class="help">試合に未追加の登録済み選手はいません。</p>';
+  showSheet('メンバーを追加', `${players}<button class="button primary full spaced" data-action="prepare-member">＋ 新しい選手を登録して追加</button><p class="help">登録済み選手は背番号を確認・変更してから追加できます。</p>`, 'player-sheet');
+}
 function subStart() {
   const g = game();
-  if (g.starters.length !== 5) { showSheet('選手交代', '<p class="help">この試合は先発5人が未設定のため、交代管理はOFFです。スタッツは出場メンバー全員から選択できます。次の試合作成時に先発5人を設定してください。</p>'); return; }
+  if (g.roster.length < 5) { showSheet('選手交代', '<p class="help">交代管理には5人以上の出場メンバーが必要です。試合メニューの「メンバーを追加」から選手を追加してください。</p>'); return; }
+  if (g.starters.length !== 5) {
+    const choices = g.roster.map(p => `<label class="member-choice"><input type="checkbox" name="lineup" value="${p.id}" ${g.roster.length === 5 ? 'checked' : ''}><strong>#${view.esc(p.number)}</strong><span>${view.esc(p.name)}</span></label>`).join('');
+    showSheet('コート上の5人を設定', `<form id="live-lineup-form"><p class="help">現在コートにいる5人を選んでください。これまでのスタッツには影響しません。</p><div class="panel roster-select">${choices}</div><button class="button primary full spaced" type="submit">5人を設定して交代へ</button></form>`);
+    return;
+  }
   if (g.roster.length <= 5) { toast('交代できるベンチの選手がいません。'); return; }
   pending = { kind: 'sub-out' };
   showSheet('SUB · OUTを選択', view.pickerHTML(g, gameEvents(), null, { only: lineup(g, gameEvents()), instruction: 'コートを出る選手をタップ' }), 'player-sheet');
@@ -196,7 +213,7 @@ const handlers = {
     if (!pending) return;
     if (pending.kind === 'sub-out') {
       const out = button.dataset.id; pending = { kind: 'sub-in', out };
-      showSheet('SUB · INを選択', view.pickerHTML(game(), gameEvents(), null, { only: game().roster.filter(p => !lineup(game(), gameEvents()).includes(p.id)).map(p => p.id), instruction: 'コートに入る選手をタップ' }), 'player-sheet');
+      showSheet('SUB · INを選択', view.pickerHTML(game(), gameEvents(), null, { only: game().roster.filter(p => !lineup(game(), gameEvents()).includes(p.id)).map(p => p.id), plain: true, instruction: 'コートに入る選手をタップ' }), 'player-sheet');
     } else if (pending.kind === 'sub-in') {
       const out = pending.out;
       return busy(async () => { await record('SUB', null, { outPlayerId: out, inPlayerId: button.dataset.id }); closeSheet(); });
@@ -205,15 +222,11 @@ const handlers = {
       return busy(async () => { const event = await record(selection.type, button.dataset.id); closeSheet(); if (!selection.followup) offerFollowup(event); });
     }
   },
-  'pick-member': button => {
-    if (!pending || pending.kind !== 'add-member') return;
+  'prepare-member': button => {
     const g = game(); const team = state.data.teams.find(t => t.id === g?.teamId);
-    const player = team?.players.find(p => p.id === button.dataset.id);
-    if (!g || !player || g.roster.some(p => p.id === player.id)) return;
-    return busy(async () => {
-      await saveGameChange({ ...g, roster: [...g.roster, structuredClone(player)] });
-      closeSheet(); toast(`#${player.number} ${player.name}を出場メンバーに追加しました。`);
-    });
+    const player = team?.players.find(p => p.id === button.dataset.id) || null;
+    if (team && !button.dataset.id && team.players.length >= 60) return toast('チームには60人まで登録できます。');
+    memberForm(player);
   },
   opponent: button => busy(() => record('OPP', null, { points: Number(button.dataset.points) })),
   sub: subStart,
@@ -247,13 +260,7 @@ const handlers = {
     const g = game(); const label = `OT${g.periods.filter(p => p.overtime).length + 1}`;
     showSheet(`${label}を追加`, `<form id="ot-form"><p class="help">新しい延長ピリオドを追加し、入力先を切り替えます。</p><label>延長時間（分）<input type="number" name="minutes" value="5" min="1" max="60" step="0.5" required></label><button class="button primary full spaced" type="submit">${label}を追加して移動</button></form>`);
   },
-  'add-member': () => {
-    const g = game(); const team = state.data.teams.find(t => t.id === g?.teamId); const current = new Set(g?.roster.map(p => p.id));
-    const available = team?.players.filter(p => !current.has(p.id)) || [];
-    if (!available.length) { showSheet('メンバーを追加', '<p class="help">追加できる登録済み選手がいません。チーム画面で選手を登録した後、この試合に追加できます。</p>'); return; }
-    pending = { kind: 'add-member' };
-    showSheet('メンバーを追加', view.pickerHTML(g, gameEvents(), null, { players: available, showBench: true, action: 'pick-member', instruction: '追加する登録済み選手をタップ' }), 'player-sheet');
-  },
+  'add-member': addMemberMenu,
   'game-menu': () => showSheet('試合メニュー', `<div class="card-list"><a class="button secondary full" href="#box/${game().id}">BOX SCOREを表示</a><button class="button secondary full" data-action="add-member">メンバーを追加</button><button class="button secondary full" data-action="period-menu">ピリオド操作</button><button class="button secondary full" data-action="events">イベント履歴・編集</button><button class="button primary full" data-action="finish">試合を終了する</button><a class="button secondary full" href="#home">保存してホームへ</a></div><p class="help">追加した選手はベンチメンバーとして記録できます。すべての入力はその都度保存されています。</p>`),
   finish: () => confirm('試合を終了しますか？', 'BOX SCOREに結果をまとめます。終了後も履歴の編集や記録の再開ができます。', '試合を終了', async () => { const g = await saveGameChange({ ...game(), status: 'finished' }); closeSheet(); location.hash = `#box/${g.id}`; }),
   reopen: () => confirm('記録を再開しますか？', 'この試合を記録中に戻します。', '再開する', async () => { const g = await saveGameChange({ ...game(), status: 'live' }); closeSheet(); location.hash = `#live/${g.id}`; }),
@@ -321,6 +328,28 @@ document.addEventListener('submit', event => {
     const now = new Date().toISOString();
     const g = { id: uid(), teamId: t.id, teamName: t.name, opponentName: gameDraft.opponentName.trim(), date: gameDraft.date, format: gameDraft.format, regulationCount: periods.length, minutes: Number(gameDraft.minutes), periods, currentPeriodId: periods[0]?.id, roster: structuredClone(t.players.filter(p => gameDraft.participants.includes(p.id))), starters: gameDraft.starters, status: 'live', nextSeq: 1, revision: 0, createdAt: now, updatedAt: now };
     validateGame(g, []); await db.createGame(g); await refresh(); gameDraft = null; location.hash = `#live/${g.id}`;
+  });
+  if (form.id === 'live-member-form') busy(async () => {
+    const g = game(); const team = state.data.teams.find(t => t.id === g?.teamId);
+    if (!g || !team || g.status !== 'live') throw new Error('記録中の試合を開いてください。');
+    const values = new FormData(form);
+    const player = { id: form.dataset.playerId || uid(), number: String(values.get('number')).trim(), name: String(values.get('name')).trim() };
+    if (g.roster.some(candidate => candidate.id === player.id)) throw new Error('この選手はすでに試合へ追加されています。');
+    const exists = team.players.some(candidate => candidate.id === player.id);
+    const teamPlayers = exists ? team.players.map(candidate => candidate.id === player.id ? player : candidate) : [...team.players, player];
+    const previewTeam = { ...team, players: teamPlayers, revision: team.revision + 1 };
+    const previewGame = { ...g, roster: [...g.roster, structuredClone(player)], revision: g.revision + 1, updatedAt: new Date().toISOString() };
+    validateTeam(previewTeam); validateGame(previewGame, gameEvents(g));
+    const saved = await db.addPlayerToTeamAndGame(team, g, player);
+    state.data.teams = state.data.teams.map(candidate => candidate.id === saved.team.id ? saved.team : candidate);
+    state.data.games = state.data.games.map(candidate => candidate.id === saved.game.id ? saved.game : candidate);
+    closeSheet(); render(); toast(`#${player.number} ${player.name}をチームと試合に追加しました。`);
+  });
+  if (form.id === 'live-lineup-form') busy(async () => {
+    const selected = new FormData(form).getAll('lineup');
+    if (selected.length !== 5) throw new Error('コート上の選手を5人選択してください。');
+    await saveGameChange({ ...game(), starters: selected });
+    closeSheet(); toast('コート上の5人を設定しました。'); subStart();
   });
   if (form.id === 'event-form') busy(async () => {
     const values = new FormData(form); const old = gameEvents().find(e => e.id === form.dataset.id);

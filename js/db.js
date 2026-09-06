@@ -92,6 +92,36 @@ export function commitGame(game, event = null) {
     };
   });
 }
+export function addPlayerToTeamAndGame(team, game, player) {
+  return checkedWrite(['teams', 'games'], (tx, result, fail) => {
+    const teams = tx.objectStore('teams');
+    const games = tx.objectStore('games');
+    const teamRequest = teams.get(team.id);
+    const gameRequest = games.get(game.id);
+    let storedTeam, storedGame, remaining = 2;
+    const save = () => {
+      if (--remaining) return;
+      try {
+        if (!storedTeam || storedTeam.revision !== team.revision || !storedGame || storedGame.revision !== game.revision) return fail(new ConflictError());
+        const exists = team.players.some(candidate => candidate.id === player.id);
+        const savedTeam = {
+          ...team,
+          players: exists ? team.players.map(candidate => candidate.id === player.id ? player : candidate) : [...team.players, player],
+          revision: team.revision + 1,
+        };
+        const savedGame = {
+          ...game,
+          roster: [...game.roster, structuredClone(player)],
+          revision: game.revision + 1,
+          updatedAt: new Date().toISOString(),
+        };
+        teams.put(savedTeam); games.put(savedGame); result({ team: savedTeam, game: savedGame });
+      } catch (error) { fail(error); }
+    };
+    teamRequest.onsuccess = () => { storedTeam = teamRequest.result; save(); };
+    gameRequest.onsuccess = () => { storedGame = gameRequest.result; save(); };
+  });
+}
 export function deleteGame(game) {
   return checkedWrite(['games', 'events'], (tx, result, fail) => {
     const games = tx.objectStore('games');
