@@ -1,8 +1,8 @@
 import * as db from './db.js';
 import { uid, localDate, STATS, activeEvents, makePeriods, validateTeam, validateGame, lineup, eventLabel } from './domain.js';
-import { backupObject, parseBackup, gameCSV, download, shareFile } from './transfer.js';
+import { backupObject, parseBackup, gameCSV, download, shareFile, shareUrl } from './transfer.js';
 import { boxScoreImage, playerStatsImage, safeFilename, shareImage } from './share-image.js';
-import { createSharedReport, parseSharedReport, sharedReportFile } from './shared-report.js';
+import { createSharedReport, createSharePayload, parseSharePayload, parseSharedReport, sharedReportFile } from './shared-report.js';
 import * as view from './views.js';
 
 const app = document.querySelector('#app');
@@ -42,7 +42,12 @@ async function syncWakeLock() {
   } catch { wakeLock = null; }
 }
 function render() {
-  const [page = 'home', id] = location.hash.replace(/^#/, '').split('/');
+  const [requestedPage = 'home', id, ...rest] = location.hash.replace(/^#/, '').split('/');
+  const page = requestedPage === 'share' ? 'shared' : requestedPage;
+  if (requestedPage === 'share') {
+    try { sharedReport = parseSharePayload([id, ...rest].filter(Boolean).join('/')); }
+    catch (error) { sharedReport = null; state.page = 'home'; state.gameId = null; location.hash = '#home'; toast(error.message, true); return; }
+  }
   state.page = page; state.gameId = ['live', 'box'].includes(page) ? id : null;
   document.body.classList.toggle('in-game', page === 'live' && !!game() && game().status === 'live');
   let html;
@@ -228,6 +233,17 @@ async function shareGameReport() {
   if (result === 'downloaded') toast('閲覧用レポートを保存しました。共有先へ送ってください。');
   if (sheet.open) closeSheet();
 }
+async function shareGameLink() {
+  const g = game();
+  if (!g) throw new Error('試合が見つかりません。');
+  const payload = createSharePayload(g, gameEvents(g));
+  const link = new URL(location.href);
+  link.hash = `share/${payload}`;
+  const result = await shareUrl(link.href, `${g.teamName} vs ${g.opponentName}`, 'タップしてCourtsideの共有レポートを開く');
+  if (result === 'copied') toast('共有リンクをコピーしました。LINEに貼り付けてください。');
+  if (result === 'copy-failed') toast('リンクをコピーできませんでした。共有メニューから送ってください。', true);
+  if (sheet.open) closeSheet();
+}
 const handlers = {
   'close-sheet': closeSheet,
   confirm: () => busy(async () => { const fn = confirmAction; if (fn) await fn(); }),
@@ -293,7 +309,8 @@ const handlers = {
   reopen: () => confirm('記録を再開しますか？', 'この試合を記録中に戻します。', '再開する', async () => { const g = await saveGameChange({ ...game(), status: 'live' }); closeSheet(); location.hash = `#live/${g.id}`; }),
   'player-detail': button => showSheet('選手スタッツ', view.playerDetail(game(), gameEvents(), button.dataset.id)),
   'shared-player-detail': button => showSheet('選手スタッツ', view.sharedPlayerDetail(sharedReport, button.dataset.id)),
-  'share-options': () => showSheet('スタッツを共有', `<button class="button primary full" data-action="share-report">${view.icon('share')}閲覧用レポートを共有</button><p class="help">1試合の集計だけをファイルで送ります。受け取った人はCourtsideで選手詳細まで閲覧できます。イベント履歴やチーム登録は含みません。</p><button class="button secondary full spaced" data-action="share-box-image">${view.icon('download')}画像で共有</button>`),
+  'share-options': () => showSheet('スタッツを共有', `<button class="button primary full" data-action="share-link">${view.icon('share')}LINEへ共有</button><p class="help">リンクをタップすると、受け取った人はCourtsideのBOX SCOREを開けます。選手をタップして詳細も確認できます。</p><button class="button secondary full spaced" data-action="share-report">${view.icon('download')}ファイルで共有</button><p class="help">リンクを使わず、閲覧用ファイルを送る方法です。受信者は「設定」から開きます。</p><button class="button secondary full spaced" data-action="share-box-image">${view.icon('download')}画像で共有</button>`),
+  'share-link': () => shareGameLink(),
   'share-report': () => shareGameReport(),
   'share-box-image': async () => { await shareStatsImage(); if (sheet.open) closeSheet(); },
   'share-player-image': button => shareStatsImage(button.dataset.id),

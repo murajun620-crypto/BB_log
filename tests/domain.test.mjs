@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { STATS, aggregate, percent, lineup, validateGame, validateTeam, makePeriods, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
-import { createSharedReport, parseSharedReport } from '../js/shared-report.js';
+import { createSharedReport, createSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
 
 const fixture = () => {
   const players = Array.from({ length: 6 }, (_, i) => ({ id: `player-${i}`, number: `${i + 4}`, name: `選手${i + 1}` }));
@@ -93,6 +93,10 @@ test('private shared report contains aggregate stats without source IDs or event
   assert.equal(report.team.PTS, 3); assert.equal(report.opponentScore, 2); assert.equal(report.players[0].stats.OREB, 1);
   const corrupt = structuredClone(shared); corrupt.report.team.PTS = 99;
   assert.throws(() => parseSharedReport(JSON.stringify(corrupt)), /形式が不正/);
+  const payload = createSharePayload(game, events);
+  const fromLink = parseSharePayload(payload);
+  assert.equal(fromLink.team.PTS, 3); assert.equal(fromLink.opponentScore, 2); assert.equal(fromLink.players[0].stats.OREB, 1);
+  assert.throws(() => parseSharePayload(`${payload}x`));
 });
 test('duplicate jersey numbers and incomplete player data cannot be saved', () => {
   const { team } = fixture(); validateTeam(team);

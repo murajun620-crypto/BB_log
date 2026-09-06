@@ -2,6 +2,7 @@ import { aggregate, blankStats, formatGame } from './domain.js';
 
 const STAT_KEYS = Object.keys(blankStats());
 const MAX_FILE_SIZE = 1024 * 1024;
+const MAX_PAYLOAD_SIZE = 120000;
 
 const statsCopy = stats => Object.fromEntries(STAT_KEYS.map(key => [key, stats[key]]));
 
@@ -69,6 +70,63 @@ export function parseSharedReport(text) {
   ensure(report.periods.reduce((sum, period) => sum + period.home, 0) === report.team.PTS);
   ensure(report.periods.reduce((sum, period) => sum + period.away, 0) === report.opponentScore);
   return structuredClone(report);
+}
+
+function statsArray(stats) {
+  return STAT_KEYS.map(key => stats[key]);
+}
+
+function statsObject(values) {
+  ensure(Array.isArray(values) && values.length === STAT_KEYS.length);
+  return Object.fromEntries(STAT_KEYS.map((key, index) => [key, values[index]]));
+}
+
+function bytesToBase64(bytes) {
+  let binary = '';
+  const chunk = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunk) binary += String.fromCharCode(...bytes.subarray(index, index + chunk));
+  return btoa(binary).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
+}
+
+function base64ToBytes(value) {
+  const binary = atob(value.replaceAll('-', '+').replaceAll('_', '/') + '='.repeat((4 - value.length % 4) % 4));
+  return Uint8Array.from(binary, character => character.charCodeAt(0));
+}
+
+export function createSharePayload(game, events) {
+  const report = createSharedReport(game, events).report;
+  const compact = {
+    v: 1,
+    d: report.date,
+    f: report.format,
+    s: report.status,
+    t: report.teamName,
+    o: report.opponentName,
+    q: report.opponentScore,
+    p: report.periods.map(period => [period.label, period.home, period.away]),
+    a: statsArray(report.team),
+    r: report.players.map(player => [player.number, player.name, statsArray(player.stats)]),
+  };
+  return `v1.${bytesToBase64(new TextEncoder().encode(JSON.stringify(compact)))}`;
+}
+
+export function parseSharePayload(payload) {
+  if (typeof payload !== 'string' || payload.length < 4 || payload.length > MAX_PAYLOAD_SIZE || !payload.startsWith('v1.')) throw new Error('共有リンクの形式が不正です。');
+  let compact;
+  try { compact = JSON.parse(new TextDecoder().decode(base64ToBytes(payload.slice(3)))); } catch { throw new Error('共有リンクを読み取れませんでした。'); }
+  ensure(compact?.v === 1 && Array.isArray(compact.p) && Array.isArray(compact.r));
+  const report = {
+    date: compact.d,
+    format: compact.f,
+    status: compact.s,
+    teamName: compact.t,
+    opponentName: compact.o,
+    opponentScore: compact.q,
+    periods: compact.p.map(period => ({ label: period[0], home: period[1], away: period[2] })),
+    team: statsObject(compact.a),
+    players: compact.r.map((player, index) => ({ id: `p${index + 1}`, number: player[0], name: player[1], stats: statsObject(player[2]) })),
+  };
+  return parseSharedReport(JSON.stringify({ app: 'courtside-report', schemaVersion: 1, report }));
 }
 
 export function sharedReportFile(data, filename) {

@@ -72,3 +72,28 @@ export async function shareFile(file, title, message = '') {
   downloadFile(file);
   return 'downloaded';
 }
+async function copyText(value) {
+  try {
+    if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(value); return true; }
+  } catch {}
+  const textarea = document.createElement('textarea');
+  textarea.value = value; textarea.setAttribute('readonly', '');
+  textarea.style.position = 'fixed'; textarea.style.opacity = '0';
+  document.body.append(textarea); textarea.select();
+  let copied = false;
+  try { copied = document.execCommand('copy'); } catch {}
+  textarea.remove();
+  return copied;
+}
+export async function shareUrl(url, title, message = '') {
+  if (navigator.share) {
+    try {
+      await navigator.share({ title, text: message, url });
+      return 'shared';
+    } catch (error) {
+      if (error.name === 'AbortError') return 'cancelled';
+      throw error;
+    }
+  }
+  return (await copyText(url)) ? 'copied' : 'copy-failed';
+}
