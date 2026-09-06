@@ -9,6 +9,9 @@ import * as view from './views.js';
 const app = document.querySelector('#app');
 const sheet = document.querySelector('#sheet');
 const toastNode = document.querySelector('#toast');
+// LIFF IDs are public client identifiers rather than secrets. This lets every
+// installed copy of the published app open the LINE card share flow immediately.
+const DEFAULT_LINE_LIFF_ID = '2011471812-TxdJwwfB';
 const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, theme: 'system' }, lineShare: { liffId: '' }, pwa: { ready: false, error: '', update: false }, page: 'home', gameId: null, busy: false, lastError: '' };
 let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, resolvedShareHash = '', sharePayloadPromise = null, cardPayloadPromise = null;
 const getSetting = key => state.data.settings.find(s => s.key === key)?.value;
@@ -28,7 +31,7 @@ async function refresh() {
   state.data = await db.readAll();
   state.preferences = { continuous: false, keepAwake: false, theme: 'system', ...getSetting('preferences') };
   const liffId = getSetting('lineShare')?.liffId;
-  state.lineShare = { liffId: isLiffId(liffId) ? liffId : '' };
+  state.lineShare = { liffId: isLiffId(liffId) ? liffId : DEFAULT_LINE_LIFF_ID };
   applyTheme();
 }
 async function syncWakeLock() {
