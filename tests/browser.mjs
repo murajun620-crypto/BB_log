@@ -141,9 +141,9 @@ try {
   });
   await page.getByRole('button', { name: '共有', exact: true }).click();
   await page.getByRole('button', { name: 'LINEへ共有', exact: true }).click();
-  await page.waitForFunction(() => window.sharedShare?.url.includes('#share/v1.'));
+  await page.waitForFunction(() => window.sharedShare?.url.includes('#share/v'));
   const sharedLink = await page.evaluate(() => window.sharedShare);
-  assert.ok(sharedLink.message.includes('共有レポート')); assert.ok(sharedLink.url.length < 16000);
+  assert.match(sharedLink.message, /\d{4}\/\d{2}\/\d{2}/); assert.ok(sharedLink.message.includes('TOKYO HOOPS')); assert.ok(sharedLink.message.includes('EAST SIDE')); assert.ok(sharedLink.url.length < 16000);
   const dataBeforeSharedView = await snapshot();
   await route(new URL(sharedLink.url).hash);
   await page.getByRole('heading', { name: '共有レポート', exact: true }).waitFor();

@@ -1,15 +1,15 @@
 import * as db from './db.js';
-import { uid, localDate, STATS, activeEvents, makePeriods, validateTeam, validateGame, lineup, eventLabel } from './domain.js';
+import { uid, localDate, STATS, activeEvents, makePeriods, validateTeam, validateGame, lineup, eventLabel, aggregate } from './domain.js';
 import { backupObject, parseBackup, gameCSV, download, shareFile, shareUrl } from './transfer.js';
 import { boxScoreImage, playerStatsImage, safeFilename, shareImage } from './share-image.js';
-import { createSharedReport, createSharePayload, parseSharePayload, parseSharedReport, sharedReportFile } from './shared-report.js';
+import { createSharedReport, createCompressedSharePayload, parseSharePayload, parseSharedReport, sharedReportFile } from './shared-report.js';
 import * as view from './views.js';
 
 const app = document.querySelector('#app');
 const sheet = document.querySelector('#sheet');
 const toastNode = document.querySelector('#toast');
 const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, page: 'home', gameId: null, busy: false, lastError: '' };
-let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null;
+let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, resolvedShareHash = '', sharePayloadPromise = null;
 const getSetting = key => state.data.settings.find(s => s.key === key)?.value;
 const game = () => state.data.games.find(g => g.id === state.gameId);
 const gameEvents = (g = game()) => state.data.events.filter(e => e.gameId === g?.id);
@@ -42,12 +42,28 @@ async function syncWakeLock() {
   } catch { wakeLock = null; }
 }
 function render() {
-  const [requestedPage = 'home', id, ...rest] = location.hash.replace(/^#/, '').split('/');
+  const currentHash = location.hash;
+  const [requestedPage = 'home', id, ...rest] = currentHash.replace(/^#/, '').split('/');
   const page = requestedPage === 'share' ? 'shared' : requestedPage;
-  if (requestedPage === 'share') {
-    try { sharedReport = parseSharePayload([id, ...rest].filter(Boolean).join('/')); }
-    catch (error) { sharedReport = null; state.page = 'home'; state.gameId = null; location.hash = '#home'; toast(error.message, true); return; }
+  if (requestedPage === 'share' && resolvedShareHash !== currentHash) {
+    resolvedShareHash = currentHash;
+    sharedReport = null;
+    app.innerHTML = '<main class="loading"><h1>共有レポート</h1><p>読み込み中…</p></main>';
+    void (async () => {
+      try {
+        sharedReport = await parseSharePayload([id, ...rest].filter(Boolean).join('/'));
+        if (location.hash === currentHash) render();
+      } catch (error) {
+        if (location.hash !== currentHash) return;
+        resolvedShareHash = '';
+        sharedReport = null;
+        location.hash = '#home';
+        toast(error.message, true);
+      }
+    })();
+    return;
   }
+  if (requestedPage === 'share' && !sharedReport) return;
   state.page = page; state.gameId = ['live', 'box'].includes(page) ? id : null;
   document.body.classList.toggle('in-game', page === 'live' && !!game() && game().status === 'live');
   let html;
@@ -222,13 +238,18 @@ async function shareStatsImage(playerId = null) {
   const result = await shareImage(canvas, filename, player ? `${player.name}のスタッツ` : `${g.teamName} vs ${g.opponentName}`);
   if (result === 'downloaded') toast('共有画像を保存しました。');
 }
+function gameShareMessage(g, suffix = 'CourtsideでBOX SCOREを見る') {
+  const summary = aggregate(g, gameEvents(g));
+  const date = String(g.date || '').replaceAll('-', '/');
+  return `${date} ${g.teamName} vs ${g.opponentName}\n${g.teamName} ${summary.team.PTS} - ${summary.opponent} ${g.opponentName}\n${suffix}`;
+}
 async function shareGameReport() {
   const g = game();
   if (!g) throw new Error('試合が見つかりません。');
   const data = createSharedReport(g, gameEvents(g));
   const filename = `${safeFilename(`courtside-report-${g.date}-${g.teamName}-vs-${g.opponentName}`)}.json`;
   const file = sharedReportFile(data, filename);
-  const message = 'Courtsideの「設定」→「共有レポートを開く」から閲覧できます。';
+  const message = gameShareMessage(g, 'Courtsideの「設定」→「共有レポートを開く」から閲覧できます。');
   const result = await shareFile(file, `${g.teamName} vs ${g.opponentName}`, message);
   if (result === 'downloaded') toast('閲覧用レポートを保存しました。共有先へ送ってください。');
   if (sheet.open) closeSheet();
@@ -236,7 +257,9 @@ async function shareGameReport() {
 async function shareGameLink() {
   const g = game();
   if (!g) throw new Error('試合が見つかりません。');
-  const payload = createSharePayload(g, gameEvents(g));
+  const prepared = sharePayloadPromise?.gameId === g.id ? sharePayloadPromise.promise : null;
+  const payload = await (prepared || createCompressedSharePayload(g, gameEvents(g)));
+  sharePayloadPromise = null;
   const link = new URL(location.href);
   link.hash = `share/${payload}`;
   if (link.href.length > 14000) {
@@ -244,7 +267,7 @@ async function shareGameLink() {
     await shareGameReport();
     return;
   }
-  const result = await shareUrl(link.href, `${g.teamName} vs ${g.opponentName}`, 'タップしてCourtsideの共有レポートを開く');
+  const result = await shareUrl(link.href, `${g.teamName} vs ${g.opponentName}`, gameShareMessage(g));
   if (result === 'copied') toast('共有リンクをコピーしました。LINEに貼り付けてください。');
   if (result === 'copy-failed') toast('リンクをコピーできませんでした。共有メニューから送ってください。', true);
   if (sheet.open) closeSheet();
@@ -314,7 +337,11 @@ const handlers = {
   reopen: () => confirm('記録を再開しますか？', 'この試合を記録中に戻します。', '再開する', async () => { const g = await saveGameChange({ ...game(), status: 'live' }); closeSheet(); location.hash = `#live/${g.id}`; }),
   'player-detail': button => showSheet('選手スタッツ', view.playerDetail(game(), gameEvents(), button.dataset.id)),
   'shared-player-detail': button => showSheet('選手スタッツ', view.sharedPlayerDetail(sharedReport, button.dataset.id)),
-  'share-options': () => showSheet('スタッツを共有', `<button class="button primary full" data-action="share-link">${view.icon('share')}LINEへ共有</button><p class="help">リンクをタップすると、受け取った人はCourtsideのBOX SCOREを開けます。選手をタップして詳細も確認できます。</p><button class="button secondary full spaced" data-action="share-report">${view.icon('download')}ファイルで共有</button><p class="help">リンクを使わず、閲覧用ファイルを送る方法です。受信者は「設定」から開きます。</p><button class="button secondary full spaced" data-action="share-box-image">${view.icon('download')}画像で共有</button>`),
+  'share-options': () => {
+    const g = game();
+    sharePayloadPromise = g ? { gameId: g.id, promise: createCompressedSharePayload(g, gameEvents(g)) } : null;
+    showSheet('スタッツを共有', `<button class="button primary full" data-action="share-link">${view.icon('share')}LINEへ共有</button><p class="help">日付・対戦チーム・スコアを本文に添えて、短いリンクを送ります。受信者はリンクをタップしてBOX SCOREを開き、選手をタップして詳細も確認できます。</p><button class="button secondary full spaced" data-action="share-report">${view.icon('download')}ファイルで共有</button><p class="help">リンクを使わず、閲覧用ファイルを送る方法です。受信者は「設定」から開きます。</p><button class="button secondary full spaced" data-action="share-box-image">${view.icon('download')}画像で共有</button>`);
+  },
   'share-link': () => shareGameLink(),
   'share-report': () => shareGameReport(),
   'share-box-image': async () => { await shareStatsImage(); if (sheet.open) closeSheet(); },
@@ -429,7 +456,7 @@ document.addEventListener('submit', event => {
 });
 sheet.addEventListener('cancel', event => { if (state.busy) event.preventDefault(); else { pending = null; confirmAction = null; } });
 sheet.addEventListener('click', event => { if (event.target === sheet && !state.busy) { const r = sheet.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) closeSheet(); } });
-window.addEventListener('hashchange', () => { closeSheet(); state.lastError = ''; render(); window.scrollTo(0, 0); });
+window.addEventListener('hashchange', () => { resolvedShareHash = ''; closeSheet(); state.lastError = ''; render(); window.scrollTo(0, 0); });
 document.addEventListener('visibilitychange', () => { void syncWakeLock(); });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 function renderStatus() {

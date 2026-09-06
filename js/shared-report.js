@@ -93,9 +93,9 @@ function base64ToBytes(value) {
   return Uint8Array.from(binary, character => character.charCodeAt(0));
 }
 
-export function createSharePayload(game, events) {
+function compactReport(game, events) {
   const report = createSharedReport(game, events).report;
-  const compact = {
+  return {
     v: 1,
     d: report.date,
     f: report.format,
@@ -107,13 +107,53 @@ export function createSharePayload(game, events) {
     a: statsArray(report.team),
     r: report.players.map(player => [player.number, player.name, statsArray(player.stats)]),
   };
-  return `v1.${bytesToBase64(new TextEncoder().encode(JSON.stringify(compact)))}`;
 }
 
-export function parseSharePayload(payload) {
-  if (typeof payload !== 'string' || payload.length < 4 || payload.length > MAX_PAYLOAD_SIZE || !payload.startsWith('v1.')) throw new Error('共有リンクの形式が不正です。');
+function compactBytes(game, events) {
+  return new TextEncoder().encode(JSON.stringify(compactReport(game, events)));
+}
+
+export function createSharePayload(game, events) {
+  return `v1.${bytesToBase64(compactBytes(game, events))}`;
+}
+
+async function deflate(bytes) {
+  const stream = new CompressionStream('deflate');
+  const output = new Response(stream.readable).arrayBuffer();
+  const writer = stream.writable.getWriter();
+  await writer.write(bytes); await writer.close();
+  return new Uint8Array(await output);
+}
+
+async function inflate(bytes) {
+  if (!globalThis.DecompressionStream) throw new Error('このブラウザは圧縮リンクに対応していません。');
+  const stream = new DecompressionStream('deflate');
+  const output = new Response(stream.readable).arrayBuffer();
+  const writer = stream.writable.getWriter();
+  await writer.write(bytes); await writer.close();
+  return new Uint8Array(await output);
+}
+
+export async function createCompressedSharePayload(game, events) {
+  const bytes = compactBytes(game, events);
+  if (!globalThis.CompressionStream) return createSharePayload(game, events);
+  try {
+    const compressed = await deflate(bytes);
+    return compressed.length < bytes.length ? `v2.${bytesToBase64(compressed)}` : createSharePayload(game, events);
+  } catch { return createSharePayload(game, events); }
+}
+
+export async function parseSharePayload(payload) {
+  if (typeof payload !== 'string' || payload.length < 4 || payload.length > MAX_PAYLOAD_SIZE || !/^v[12]\./.test(payload)) throw new Error('共有リンクの形式が不正です。');
   let compact;
-  try { compact = JSON.parse(new TextDecoder().decode(base64ToBytes(payload.slice(3)))); } catch { throw new Error('共有リンクを読み取れませんでした。'); }
+  try {
+    let bytes = base64ToBytes(payload.slice(3));
+    if (payload.startsWith('v2.')) bytes = await inflate(bytes);
+    compact = JSON.parse(new TextDecoder().decode(bytes));
+  } catch (error) {
+    if (error.message === 'このブラウザは圧縮リンクに対応していません。') throw error;
+    throw new Error('共有リンクを読み取れませんでした。');
+  }
   ensure(compact?.v === 1 && Array.isArray(compact.p) && Array.isArray(compact.r));
   const report = {
     date: compact.d,

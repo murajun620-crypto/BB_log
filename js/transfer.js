@@ -95,5 +95,6 @@ export async function shareUrl(url, title, message = '') {
       throw error;
     }
   }
-  return (await copyText(url)) ? 'copied' : 'copy-failed';
+  const clipboardText = message ? `${message}\n${url}` : url;
+  return (await copyText(clipboardText)) ? 'copied' : 'copy-failed';
 }

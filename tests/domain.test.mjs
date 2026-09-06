@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { STATS, aggregate, percent, lineup, validateGame, validateTeam, makePeriods, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
-import { createSharedReport, createSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
+import { createSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
 
 const fixture = () => {
   const players = Array.from({ length: 6 }, (_, i) => ({ id: `player-${i}`, number: `${i + 4}`, name: `選手${i + 1}` }));
@@ -84,7 +84,7 @@ test('CSV includes every shooting metric, Japanese BOM, totals and safe escaping
   assert.ok(csv.includes('"\'=HYPERLINK(""bad"")"')); assert.ok(csv.includes('"相手,チーム"'));
   assert.ok(csv.includes('"TEAM TOTAL"')); assert.ok(csv.includes('"Period"'));
 });
-test('private shared report contains aggregate stats without source IDs or event logs', () => {
+test('private shared report contains aggregate stats without source IDs or event logs', async () => {
   const { game, events, add } = fixture(); add('3PM'); add('OREB'); add('OPP', { points: 2 });
   const shared = createSharedReport(game, events);
   const text = JSON.stringify(shared);
@@ -94,9 +94,17 @@ test('private shared report contains aggregate stats without source IDs or event
   const corrupt = structuredClone(shared); corrupt.report.team.PTS = 99;
   assert.throws(() => parseSharedReport(JSON.stringify(corrupt)), /形式が不正/);
   const payload = createSharePayload(game, events);
-  const fromLink = parseSharePayload(payload);
+  const fromLink = await parseSharePayload(payload);
   assert.equal(fromLink.team.PTS, 3); assert.equal(fromLink.opponentScore, 2); assert.equal(fromLink.players[0].stats.OREB, 1);
-  assert.throws(() => parseSharePayload(`${payload}x`));
+  await assert.rejects(() => parseSharePayload(`${payload}x`));
+});
+test('compressed share payload round trips and keeps legacy payloads readable', async () => {
+  const { game, events, add } = fixture();
+  add('3PM'); add('OREB'); add('OPP', { points: 2 });
+  const payload = await createCompressedSharePayload(game, events);
+  assert.match(payload, /^v[12]\./);
+  const report = await parseSharePayload(payload);
+  assert.equal(report.team.PTS, 3); assert.equal(report.opponentScore, 2); assert.equal(report.players[0].stats.OREB, 1);
 });
 test('duplicate jersey numbers and incomplete player data cannot be saved', () => {
   const { team } = fixture(); validateTeam(team);
