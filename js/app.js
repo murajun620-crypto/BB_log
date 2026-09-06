@@ -1,14 +1,15 @@
 import * as db from './db.js';
 import { uid, localDate, STATS, activeEvents, makePeriods, validateTeam, validateGame, lineup, eventLabel } from './domain.js';
-import { backupObject, parseBackup, gameCSV, download } from './transfer.js';
+import { backupObject, parseBackup, gameCSV, download, shareFile } from './transfer.js';
 import { boxScoreImage, playerStatsImage, safeFilename, shareImage } from './share-image.js';
+import { createSharedReport, parseSharedReport, sharedReportFile } from './shared-report.js';
 import * as view from './views.js';
 
 const app = document.querySelector('#app');
 const sheet = document.querySelector('#sheet');
 const toastNode = document.querySelector('#toast');
 const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, page: 'home', gameId: null, busy: false, lastError: '' };
-let teamDraft, gameDraft, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null;
+let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null;
 const getSetting = key => state.data.settings.find(s => s.key === key)?.value;
 const game = () => state.data.games.find(g => g.id === state.gameId);
 const gameEvents = (g = game()) => state.data.events.filter(e => e.gameId === g?.id);
@@ -64,6 +65,10 @@ function render() {
     html = view.gameFormView(state, gameDraft);
   } else if (page === 'history') html = view.historyView(state);
   else if (page === 'settings') html = view.settingsView(state);
+  else if (page === 'shared') {
+    if (!sharedReport) { location.hash = '#settings'; return; }
+    html = view.sharedReportView(state, sharedReport);
+  }
   else if (page === 'live' || page === 'box') {
     const g = game();
     if (!g) { location.hash = '#history'; return; }
@@ -212,6 +217,17 @@ async function shareStatsImage(playerId = null) {
   const result = await shareImage(canvas, filename, player ? `${player.name}のスタッツ` : `${g.teamName} vs ${g.opponentName}`);
   if (result === 'downloaded') toast('共有画像を保存しました。');
 }
+async function shareGameReport() {
+  const g = game();
+  if (!g) throw new Error('試合が見つかりません。');
+  const data = createSharedReport(g, gameEvents(g));
+  const filename = `${safeFilename(`courtside-report-${g.date}-${g.teamName}-vs-${g.opponentName}`)}.json`;
+  const file = sharedReportFile(data, filename);
+  const message = 'Courtsideの「設定」→「共有レポートを開く」から閲覧できます。';
+  const result = await shareFile(file, `${g.teamName} vs ${g.opponentName}`, message);
+  if (result === 'downloaded') toast('閲覧用レポートを保存しました。共有先へ送ってください。');
+  if (sheet.open) closeSheet();
+}
 const handlers = {
   'close-sheet': closeSheet,
   confirm: () => busy(async () => { const fn = confirmAction; if (fn) await fn(); }),
@@ -276,7 +292,10 @@ const handlers = {
   finish: () => confirm('試合を終了しますか？', 'BOX SCOREに結果をまとめます。終了後も履歴の編集や記録の再開ができます。', '試合を終了', async () => { const g = await saveGameChange({ ...game(), status: 'finished' }); closeSheet(); location.hash = `#box/${g.id}`; }),
   reopen: () => confirm('記録を再開しますか？', 'この試合を記録中に戻します。', '再開する', async () => { const g = await saveGameChange({ ...game(), status: 'live' }); closeSheet(); location.hash = `#live/${g.id}`; }),
   'player-detail': button => showSheet('選手スタッツ', view.playerDetail(game(), gameEvents(), button.dataset.id)),
-  'share-box-image': () => shareStatsImage(),
+  'shared-player-detail': button => showSheet('選手スタッツ', view.sharedPlayerDetail(sharedReport, button.dataset.id)),
+  'share-options': () => showSheet('スタッツを共有', `<button class="button primary full" data-action="share-report">${view.icon('share')}閲覧用レポートを共有</button><p class="help">1試合の集計だけをファイルで送ります。受け取った人はCourtsideで選手詳細まで閲覧できます。イベント履歴やチーム登録は含みません。</p><button class="button secondary full spaced" data-action="share-box-image">${view.icon('download')}画像で共有</button>`),
+  'share-report': () => shareGameReport(),
+  'share-box-image': async () => { await shareStatsImage(); if (sheet.open) closeSheet(); },
   'share-player-image': button => shareStatsImage(button.dataset.id),
   csv: () => { download(gameCSV(game(), gameEvents()), `courtside-${game().date}-${game().id.slice(0, 8)}.csv`, 'text/csv;charset=utf-8'); toast('CSVを書き出しました。'); },
   'export-json': () => busy(async () => { await draftQueue; await refresh(); teamDraft = null; gameDraft = null; download(JSON.stringify(backupObject(state.data), null, 2), `courtside-backup-${localDate()}.json`, 'application/json'); toast('バックアップを書き出しました。'); render(); }),
@@ -322,6 +341,16 @@ document.addEventListener('change', event => {
         await draftQueue; await db.replaceAll(restored); await refresh(); teamDraft = null; gameDraft = null;
         closeSheet(); render(); toast('全データを復元しました。');
       }, true);
+    });
+  }
+  if (el.id === 'shared-report-file') {
+    const file = el.files[0]; el.value = ''; if (!file) return;
+    busy(async () => {
+      if (file.size > 1024 * 1024) throw new Error('共有レポートは1MB以下にしてください。');
+      sharedReport = parseSharedReport(await file.text());
+      if (sheet.open) closeSheet();
+      if (location.hash === '#shared') render(); else location.hash = '#shared';
+      toast('共有レポートを開きました。');
     });
   }
 });

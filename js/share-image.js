@@ -1,4 +1,5 @@
 import { aggregate, formatGame, percent } from './domain.js';
+import { shareFile } from './transfer.js';
 
 const WIDTH = 900;
 const PAD = 48;
@@ -215,22 +216,7 @@ function canvasFile(canvas, filename) {
 
 export async function shareImage(canvas, filename, title) {
   const file = canvasFile(canvas, filename);
-  if (navigator.share && navigator.canShare?.({ files: [file] })) {
-    try {
-      await navigator.share({ title, files: [file] });
-      return 'shared';
-    } catch (error) {
-      if (error.name === 'AbortError') return 'cancelled';
-      throw error;
-    }
-  }
-  const url = URL.createObjectURL(file);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = filename;
-  link.click();
-  setTimeout(() => URL.revokeObjectURL(url), 1000);
-  return 'downloaded';
+  return shareFile(file, title);
 }
 
 export function safeFilename(value) {

@@ -48,9 +48,27 @@ export function gameCSV(game, events) {
   return '\uFEFF' + rows.map(row => row.map(csvCell).join(',')).join('\r\n');
 }
 export function download(content, name, type) {
-  const blob = new Blob([content], { type });
+  downloadFile(new File([content], name, { type }));
+}
+export function downloadFile(file) {
+  const blob = file;
   const url = URL.createObjectURL(blob);
-  const a = document.createElement('a'); a.href = url; a.download = name;
+  const a = document.createElement('a'); a.href = url; a.download = file.name;
   document.body.append(a); a.click(); a.remove();
   setTimeout(() => URL.revokeObjectURL(url), 60000);
+}
+export async function shareFile(file, title, message = '') {
+  let canShare = false;
+  try { canShare = !!navigator.share && !!navigator.canShare?.({ files: [file] }); } catch { canShare = false; }
+  if (canShare) {
+    try {
+      await navigator.share({ title, text: message, files: [file] });
+      return 'shared';
+    } catch (error) {
+      if (error.name === 'AbortError') return 'cancelled';
+      throw error;
+    }
+  }
+  downloadFile(file);
+  return 'downloaded';
 }

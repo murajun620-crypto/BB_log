@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { STATS, aggregate, percent, lineup, validateGame, validateTeam, makePeriods, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
+import { createSharedReport, parseSharedReport } from '../js/shared-report.js';
 
 const fixture = () => {
   const players = Array.from({ length: 6 }, (_, i) => ({ id: `player-${i}`, number: `${i + 4}`, name: `選手${i + 1}` }));
@@ -82,6 +83,16 @@ test('CSV includes every shooting metric, Japanese BOM, totals and safe escaping
   assert.ok(csv.startsWith('\uFEFF')); assert.ok(csv.includes('"2PM","2PA","2P%"'));
   assert.ok(csv.includes('"\'=HYPERLINK(""bad"")"')); assert.ok(csv.includes('"相手,チーム"'));
   assert.ok(csv.includes('"TEAM TOTAL"')); assert.ok(csv.includes('"Period"'));
+});
+test('private shared report contains aggregate stats without source IDs or event logs', () => {
+  const { game, events, add } = fixture(); add('3PM'); add('OREB'); add('OPP', { points: 2 });
+  const shared = createSharedReport(game, events);
+  const text = JSON.stringify(shared);
+  assert.equal(text.includes(game.id), false); assert.equal(text.includes(game.roster[0].id), false); assert.equal(text.includes('events'), false);
+  const report = parseSharedReport(text);
+  assert.equal(report.team.PTS, 3); assert.equal(report.opponentScore, 2); assert.equal(report.players[0].stats.OREB, 1);
+  const corrupt = structuredClone(shared); corrupt.report.team.PTS = 99;
+  assert.throws(() => parseSharedReport(JSON.stringify(corrupt)), /形式が不正/);
 });
 test('duplicate jersey numbers and incomplete player data cannot be saved', () => {
   const { team } = fixture(); validateTeam(team);
