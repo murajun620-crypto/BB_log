@@ -239,6 +239,11 @@ async function shareGameLink() {
   const payload = createSharePayload(g, gameEvents(g));
   const link = new URL(location.href);
   link.hash = `share/${payload}`;
+  if (link.href.length > 14000) {
+    toast('リンクが長いため、閲覧用ファイルで共有します。');
+    await shareGameReport();
+    return;
+  }
   const result = await shareUrl(link.href, `${g.teamName} vs ${g.opponentName}`, 'タップしてCourtsideの共有レポートを開く');
   if (result === 'copied') toast('共有リンクをコピーしました。LINEに貼り付けてください。');
   if (result === 'copy-failed') toast('リンクをコピーできませんでした。共有メニューから送ってください。', true);
