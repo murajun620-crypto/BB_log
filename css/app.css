@@ -64,6 +64,9 @@ h3 { font-size: 16px; font-weight: 650; }
 .connection.ready i { background: #7a9c65; }
 .page { padding: 18px 22px calc(98px + env(safe-area-inset-bottom)); }
 .page-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 24px; }
+.heading-actions { display: flex; gap: 6px; flex: 0 0 auto; }
+.heading-actions .button { padding-left: 10px; padding-right: 10px; }
+.heading-actions .icon { width: 18px; height: 18px; }
 .eyebrow { color: var(--muted); font-size: 10px; font-weight: 700; letter-spacing: 1.8px; margin-bottom: 8px; }
 .brand, .sidebar-note { display: none; }
 .navigation { position: fixed; z-index: 10; bottom: 0; left: 0; right: 0; display: flex; justify-content: space-around; background: var(--surface); border-top: 1px solid var(--line); padding: 9px 12px calc(8px + env(safe-area-inset-bottom)); }
@@ -254,6 +257,7 @@ body.in-game { overscroll-behavior-y: none; }
 .detail-stats > div { background: var(--bg); border-radius: 10px; padding: 12px; text-align: center; }
 .detail-stats span { display: block; font-size: 10px; color: var(--muted); }
 .detail-stats strong { font-size: 23px; }
+.share-help { margin-top: 10px; color: var(--muted); font-size: 11px; line-height: 1.7; text-align: center; }
 dialog { position: fixed; top: auto; bottom: 0; max-width: 520px; width: 100%; max-height: 88vh; max-height: 88dvh; margin: 0 auto; padding: 0 20px max(24px, env(safe-area-inset-bottom)); border: 0; border-radius: 23px 23px 0 0; background: var(--surface); color: var(--text); overscroll-behavior: contain; }
 dialog::backdrop { background: #07170f70; backdrop-filter: blur(3px); }
 .sheet-handle { width: 35px; height: 4px; background: var(--line); border-radius: 8px; margin: 10px auto 4px; }

@@ -1,6 +1,7 @@
 import * as db from './db.js';
 import { uid, localDate, STATS, activeEvents, makePeriods, validateTeam, validateGame, lineup, eventLabel } from './domain.js';
 import { backupObject, parseBackup, gameCSV, download } from './transfer.js';
+import { boxScoreImage, playerStatsImage, safeFilename, shareImage } from './share-image.js';
 import * as view from './views.js';
 
 const app = document.querySelector('#app');
@@ -201,6 +202,16 @@ function periodMenu() {
   const g = game(); const index = g.periods.findIndex(p => p.id === g.currentPeriodId);
   showSheet('ピリオド操作', `<p class="help">現在：${view.esc(g.periods[index].label)}。変更しても記録済みイベントのピリオドは変わりません。</p><div class="card-list"><button class="button secondary full" data-action="change-period" data-index="${index - 1}" ${index === 0 ? 'disabled' : ''}>前のピリオドへ${index > 0 ? ` · ${view.esc(g.periods[index - 1].label)}` : ''}</button><button class="button primary full" data-action="change-period" data-index="${index + 1}" ${index === g.periods.length - 1 ? 'disabled' : ''}>次のピリオドへ${index < g.periods.length - 1 ? ` · ${view.esc(g.periods[index + 1].label)}` : ''}</button><button class="button secondary full" data-action="add-ot" ${g.periods.length >= 50 ? 'disabled' : ''}>＋ OTを追加</button></div>`);
 }
+async function shareStatsImage(playerId = null) {
+  const g = game();
+  if (!g) throw new Error('試合が見つかりません。');
+  const player = playerId ? g.roster.find(candidate => candidate.id === playerId) : null;
+  const canvas = player ? playerStatsImage(g, gameEvents(g), player.id) : boxScoreImage(g, gameEvents(g));
+  const subject = player ? `#${player.number}-${player.name}` : 'box-score';
+  const filename = `${safeFilename(`courtside-${g.date}-${subject}`)}.png`;
+  const result = await shareImage(canvas, filename, player ? `${player.name}のスタッツ` : `${g.teamName} vs ${g.opponentName}`);
+  if (result === 'downloaded') toast('共有画像を保存しました。');
+}
 const handlers = {
   'close-sheet': closeSheet,
   confirm: () => busy(async () => { const fn = confirmAction; if (fn) await fn(); }),
@@ -265,6 +276,8 @@ const handlers = {
   finish: () => confirm('試合を終了しますか？', 'BOX SCOREに結果をまとめます。終了後も履歴の編集や記録の再開ができます。', '試合を終了', async () => { const g = await saveGameChange({ ...game(), status: 'finished' }); closeSheet(); location.hash = `#box/${g.id}`; }),
   reopen: () => confirm('記録を再開しますか？', 'この試合を記録中に戻します。', '再開する', async () => { const g = await saveGameChange({ ...game(), status: 'live' }); closeSheet(); location.hash = `#live/${g.id}`; }),
   'player-detail': button => showSheet('選手スタッツ', view.playerDetail(game(), gameEvents(), button.dataset.id)),
+  'share-box-image': () => shareStatsImage(),
+  'share-player-image': button => shareStatsImage(button.dataset.id),
   csv: () => { download(gameCSV(game(), gameEvents()), `courtside-${game().date}-${game().id.slice(0, 8)}.csv`, 'text/csv;charset=utf-8'); toast('CSVを書き出しました。'); },
   'export-json': () => busy(async () => { await draftQueue; await refresh(); teamDraft = null; gameDraft = null; download(JSON.stringify(backupObject(state.data), null, 2), `courtside-backup-${localDate()}.json`, 'application/json'); toast('バックアップを書き出しました。'); render(); }),
   persist: async () => { const result = await navigator.storage?.persist?.(); document.querySelector('#persist-status').textContent = result ? 'このブラウザで保存領域の保持が許可されています。JSONバックアップも続けてください。' : '保持の許可はブラウザが判断します。現在も端末内への保存は有効です。JSONバックアップをご利用ください。'; },

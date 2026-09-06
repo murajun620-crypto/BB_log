@@ -31,7 +31,7 @@ try {
   await page.waitForFunction(async () => !!(await navigator.serviceWorker.getRegistration())?.active && !!navigator.serviceWorker.controller);
   await page.screenshot({ path: `${output}/home.png`, fullPage: true });
   const cache = await page.evaluate(async () => { const names = await caches.keys(); return (await (await caches.open(names[0])).keys()).map(r => r.url); });
-  assert.equal(cache.length, 14); step('app shell and all 14 offline assets cached');
+  assert.equal(cache.length, 15); step('app shell and all 15 offline assets cached');
   await route('#team/new');
   await page.locator('[name=name]').fill('TOKYO HOOPS');
   const numbers = ['4', '5', '7', '8', '12', '23', '30']; const names = ['山田', '田中', '鈴木', '佐藤', '高橋', '伊藤', '中村'];
@@ -133,7 +133,24 @@ try {
   await page.locator('#event-form [name=eventType]').selectOption('FTX'); await page.getByRole('button', { name: '変更を保存' }).click(); await ready(); assert.deepEqual(await score(), [13, 6]);
   await page.getByRole('link', { name: 'BOX SCORE', exact: true }).click(); await page.locator('.box-table').waitFor();
   assert.equal(await page.locator('.total-row .pts-cell').textContent(), '13');
-  await page.locator('.box-table button').first().click(); await page.locator('.detail-stats').waitFor(); await dismiss();
+  await page.evaluate(() => {
+    window.sharedImage = null;
+    Object.defineProperty(navigator, 'canShare', { configurable: true, value: data => data.files?.[0]?.type === 'image/png' });
+    Object.defineProperty(navigator, 'share', { configurable: true, value: async data => { window.sharedImage = { name: data.files[0].name, size: data.files[0].size, type: data.files[0].type }; } });
+  });
+  await page.getByRole('button', { name: '共有', exact: true }).click();
+  await page.waitForFunction(() => window.sharedImage?.size > 10000);
+  assert.equal((await page.evaluate(() => window.sharedImage)).type, 'image/png');
+  await page.evaluate(() => {
+    Object.defineProperty(navigator, 'canShare', { configurable: true, value: undefined });
+    Object.defineProperty(navigator, 'share', { configurable: true, value: undefined });
+  });
+  const [boxImage] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: '共有', exact: true }).click()]);
+  const boxPNG = await readFile(await boxImage.path()); assert.equal(boxPNG.subarray(0, 8).toString('hex'), '89504e470d0a1a0a'); assert.ok(boxPNG.length > 10000); await boxImage.saveAs(`${output}/share-box.png`);
+  await page.locator('.box-table button').first().click(); await page.locator('.detail-stats').waitFor();
+  const [playerImage] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'この選手を画像で共有', exact: true }).click()]);
+  const playerPNG = await readFile(await playerImage.path()); assert.equal(playerPNG.subarray(0, 8).toString('hex'), '89504e470d0a1a0a'); assert.ok(playerPNG.length > 10000); await playerImage.saveAs(`${output}/share-player.png`); await dismiss();
+  step('box score and player stats render as shareable PNG images offline');
   const [csv] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'CSV', exact: true }).click()]);
   assert.ok((await readFile(await csv.path(), 'utf8')).includes('TEAM TOTAL'));
   await page.getByRole('button', { name: '試合を終了する', exact: true }).click(); await page.getByRole('button', { name: '試合を終了', exact: true }).click(); await ready();

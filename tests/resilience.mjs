@@ -6,11 +6,12 @@ import { startTestServer } from './test-server.mjs';
 const require = createRequire(import.meta.url);
 const { chromium } = process.env.PLAYWRIGHT_PATH ? require(process.env.PLAYWRIGHT_PATH) : require('playwright');
 const profile = `test-results/persistent-${Date.now()}`;
+const executable = process.env.BROWSER_EXECUTABLE ? { executablePath: process.env.BROWSER_EXECUTABLE } : {};
 await mkdir(profile, { recursive: true });
 const server = await startTestServer('/BB_log/');
 let context;
 try {
-  context = await chromium.launchPersistentContext(profile, { headless: true, viewport: { width: 390, height: 844 } });
+  context = await chromium.launchPersistentContext(profile, { headless: true, viewport: { width: 390, height: 844 }, ...executable });
   let page = context.pages()[0];
   await page.goto(server.url); await page.waitForFunction(() => !!navigator.serviceWorker.controller);
   const seed = await page.evaluate(async () => {
@@ -26,7 +27,7 @@ try {
   });
   await context.close(); context = null;
   server.setAvailable(false);
-  context = await chromium.launchPersistentContext(profile, { headless: true, viewport: { width: 390, height: 844 }, offline: true });
+  context = await chromium.launchPersistentContext(profile, { headless: true, viewport: { width: 390, height: 844 }, offline: true, ...executable });
   page = context.pages()[0]; await page.goto(`${server.url}#live/${seed.gameId}`);
   await page.locator('.stat-grid').waitFor();
   assert.deepEqual((await page.locator('.score-numbers b').allTextContents()).map(Number), [3, 0]);
@@ -61,7 +62,7 @@ try {
   assert.ok(page.url().endsWith(`#live/${seed.gameId}`));
   const names = await page.evaluate(() => caches.keys()); assert.equal(names.length, 2);
   await context.close(); context = null;
-  context = await chromium.launchPersistentContext(profile, { headless: true });
+  context = await chromium.launchPersistentContext(profile, { headless: true, ...executable });
   page = context.pages()[0]; await page.goto(server.url);
   await page.waitForFunction(async () => { const keys = await caches.keys(); return keys.length === 1 && keys[0].endsWith('v-update-test'); });
   assert.equal((await page.evaluate(async () => (await (await import('./js/db.js')).readAll()).games.length)), 1);
