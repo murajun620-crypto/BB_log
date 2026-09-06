@@ -6,8 +6,8 @@ import * as view from './views.js';
 const app = document.querySelector('#app');
 const sheet = document.querySelector('#sheet');
 const toastNode = document.querySelector('#toast');
-const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, page: 'home', gameId: null, busy: false, lastError: '' };
-let teamDraft, gameDraft, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve();
+const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, page: 'home', gameId: null, busy: false, lastError: '' };
+let teamDraft, gameDraft, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null;
 const getSetting = key => state.data.settings.find(s => s.key === key)?.value;
 const game = () => state.data.games.find(g => g.id === state.gameId);
 const gameEvents = (g = game()) => state.data.events.filter(e => e.gameId === g?.id);
@@ -23,8 +23,21 @@ function applyTheme() {
 }
 async function refresh() {
   state.data = await db.readAll();
-  state.preferences = { continuous: false, theme: 'system', ...getSetting('preferences') };
+  state.preferences = { continuous: false, keepAwake: false, theme: 'system', ...getSetting('preferences') };
   applyTheme();
+}
+async function syncWakeLock() {
+  const shouldStayAwake = state.preferences.keepAwake && state.page === 'live' && game()?.status === 'live' && document.visibilityState === 'visible';
+  if (!shouldStayAwake) {
+    if (wakeLock && !wakeLock.released) await wakeLock.release().catch(() => {});
+    wakeLock = null;
+    return;
+  }
+  if (!('wakeLock' in navigator) || (wakeLock && !wakeLock.released)) return;
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    wakeLock.addEventListener('release', () => { wakeLock = null; });
+  } catch { wakeLock = null; }
 }
 function render() {
   const [page = 'home', id] = location.hash.replace(/^#/, '').split('/');
@@ -57,6 +70,15 @@ function render() {
     html = page === 'live' ? view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
+  if (page === 'settings' && !app.querySelector('#keepAwake')) {
+    const continuous = app.querySelector('#continuous');
+    if (continuous) {
+      const row = document.createElement('label'); row.className = 'setting-row';
+      row.innerHTML = `<span><strong>試合中は画面をスリープさせない</strong><small>試合画面を開いている間だけ自動ロックを防ぎます。電池を消費します。</small></span><input type="checkbox" role="switch" id="keepAwake" ${state.preferences.keepAwake ? 'checked' : ''}>`;
+      continuous.closest('.setting-row')?.after(row);
+    }
+  }
+  void syncWakeLock();
   if (state.lastError && page === 'live') {
     const status = app.querySelector('.save-state');
     if (status) { status.textContent = '直前の操作は未保存'; status.classList.add('failed'); }
@@ -264,11 +286,12 @@ document.addEventListener('change', event => {
     }
     persistDraft('gameDraft', gameDraft);
   }
-  if (el.id === 'continuous' || el.id === 'theme') busy(async () => {
-    const preferences = { ...state.preferences, [el.id === 'continuous' ? 'continuous' : 'theme']: el.id === 'continuous' ? el.checked : el.value };
+  if (el.id === 'continuous' || el.id === 'keepAwake' || el.id === 'theme') busy(async () => {
+    const key = el.id === 'continuous' ? 'continuous' : el.id === 'keepAwake' ? 'keepAwake' : 'theme';
+    const preferences = { ...state.preferences, [key]: key === 'theme' ? el.value : el.checked };
     await db.saveSetting('preferences', preferences); state.preferences = preferences;
     state.data.settings = state.data.settings.filter(s => s.key !== 'preferences').concat({ key: 'preferences', value: preferences });
-    applyTheme(); toast('設定を保存しました。');
+    applyTheme(); toast('設定を保存しました。'); render();
   });
   if (el.id === 'restore-file') {
     const file = el.files[0]; el.value = ''; if (!file) return;
@@ -314,6 +337,7 @@ document.addEventListener('submit', event => {
 sheet.addEventListener('cancel', event => { if (state.busy) event.preventDefault(); else { pending = null; confirmAction = null; } });
 sheet.addEventListener('click', event => { if (event.target === sheet && !state.busy) { const r = sheet.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) closeSheet(); } });
 window.addEventListener('hashchange', () => { closeSheet(); state.lastError = ''; render(); window.scrollTo(0, 0); });
+document.addEventListener('visibilitychange', () => { void syncWakeLock(); });
 matchMedia('(prefers-color-scheme: dark)').addEventListener('change', applyTheme);
 function renderStatus() {
   if (['home', 'settings', 'history', 'teams'].includes(state.page)) render();

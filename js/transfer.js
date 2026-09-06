@@ -26,7 +26,7 @@ export function parseBackup(text) {
   for (const s of data.settings) {
     if (!s || !['preferences', 'teamDraft', 'gameDraft'].includes(s.key) || keys.has(s.key)) throw new Error('設定データが不正です。');
     keys.add(s.key);
-    if (s.key === 'preferences' && (!s.value || !['system', 'light', 'dark'].includes(s.value.theme) || typeof s.value.continuous !== 'boolean')) throw new Error('表示設定が不正です。');
+    if (s.key === 'preferences' && (!s.value || !['system', 'light', 'dark'].includes(s.value.theme) || typeof s.value.continuous !== 'boolean' || (s.value.keepAwake !== undefined && typeof s.value.keepAwake !== 'boolean'))) throw new Error('表示設定が不正です。');
     if (s.key === 'teamDraft') {
       if (!s.value || typeof s.value.name !== 'string' || !Array.isArray(s.value.players) || s.value.players.length > 60 || s.value.players.some(p => !p || typeof p.id !== 'string' || typeof p.number !== 'string' || typeof p.name !== 'string')) throw new Error('チーム下書きが不正です。');
     }
