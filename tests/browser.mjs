@@ -31,7 +31,7 @@ try {
   await page.waitForFunction(async () => !!(await navigator.serviceWorker.getRegistration())?.active && !!navigator.serviceWorker.controller);
   await page.screenshot({ path: `${output}/home.png`, fullPage: true });
   const cache = await page.evaluate(async () => { const names = await caches.keys(); return (await (await caches.open(names[0])).keys()).map(r => r.url); });
-  assert.equal(cache.length, 17); step('app shell and all 17 offline assets cached');
+  assert.equal(cache.length, 16); step('app shell and all 16 offline assets cached');
   await route('#team/new');
   await page.locator('[name=name]').fill('TOKYO HOOPS');
   const numbers = ['4', '5', '7', '8', '12', '23', '30']; const names = ['山田', '田中', '鈴木', '佐藤', '高橋', '伊藤', '中村'];
@@ -114,8 +114,6 @@ try {
   step('concurrent-tab stale writes rejected without overwriting score');
   await route('#settings'); await page.locator('#continuous').check(); await ready();
   await page.locator('#theme').selectOption('dark'); await ready();
-  await page.locator('#line-liff-id').fill('1234567890-AbCdEfgh');
-  await page.getByRole('button', { name: 'LINEカード共有を保存', exact: true }).click(); await ready();
   await route(liveHash); await choose('2PM'); await page.getByRole('heading', { name: 'ASTあり？' }).waitFor();
   assert.equal(await page.locator('#sheet [data-action=pick-player]').filter({ hasText: '#4山田' }).count(), 0);
   await page.locator('#sheet [data-action=pick-player]').filter({ hasText: '#5田中' }).click(); await ready();
@@ -138,64 +136,11 @@ try {
   await page.evaluate(() => {
     window.sharedShare = null;
     window.sharedFile = null;
-    window.lineCard = null;
-    window.liffInit = null;
-    window.liffLogin = null;
-    window.liff = {
-      init: async config => { window.liffInit = config; },
-      isLoggedIn: () => false,
-      login: options => { window.liffLogin = options; },
-      isApiAvailable: name => name === 'shareTargetPicker',
-      shareTargetPicker: async messages => { window.lineCard = messages; return { status: 'success' }; },
-    };
     Object.defineProperty(navigator, 'canShare', { configurable: true, value: data => ['image/png', 'application/json'].includes(data.files?.[0]?.type) });
     Object.defineProperty(navigator, 'share', { configurable: true, value: async data => { const file = data.files?.[0]; window.sharedShare = { url: data.url || '', message: data.text || '' }; if (file) window.sharedFile = { name: file.name, size: file.size, type: file.type, text: file.type === 'application/json' ? await file.text() : null, message: data.text || '' }; } });
   });
   await page.getByRole('button', { name: '共有', exact: true }).click();
-  await page.getByRole('button', { name: 'LINEカードで共有', exact: true }).click();
-  await page.waitForFunction(() => window.liffLogin?.redirectUri?.includes('#line-share/'));
-  assert.ok((await page.evaluate(() => window.liffLogin.redirectUri)).startsWith(`${new URL(base).origin}/`));
-  await page.evaluate(() => {
-    window.liff.isLoggedIn = () => true;
-    window.liffLogin = null;
-  });
-  await page.getByRole('button', { name: 'LINEカードで共有', exact: true }).click();
-  await page.waitForFunction(() => window.lineCard?.[0]?.type === 'flex');
-  const lineCard = await page.evaluate(() => ({ card: window.lineCard[0], init: window.liffInit }));
-  assert.equal(lineCard.init.liffId, '1234567890-AbCdEfgh'); assert.match(lineCard.card.altText, /TOKYO HOOPS 13 - 6 EAST SIDE/); assert.ok(lineCard.card.contents.footer.contents[0].action.uri.includes('#share/v3.'));
-  const cardPayload = await page.evaluate(() => window.lineCard[0].contents.footer.contents[0].action.uri.split('#share/')[1]);
-  const externalContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
-  await externalContext.addInitScript(() => {
-    window.lineCard = null;
-    window.liff = {
-      init: async () => {},
-      isLoggedIn: () => true,
-      isApiAvailable: name => name === 'shareTargetPicker',
-      shareTargetPicker: async messages => { window.lineCard = messages; return { status: 'success' }; },
-    };
-  });
-  const externalPage = await externalContext.newPage();
-  await externalPage.goto(`${base}#line-share/1234567890-AbCdEfgh/${cardPayload}`);
-  await externalPage.waitForFunction(() => window.lineCard?.[0]?.type === 'flex');
-  assert.match((await externalPage.evaluate(() => window.lineCard[0].altText)), /TOKYO HOOPS 13 - 6 EAST SIDE/);
-  await externalPage.getByRole('heading', { name: 'LINEカードを共有しました', exact: true }).waitFor();
-  await externalContext.close();
-  const loginContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
-  await loginContext.addInitScript(() => {
-    window.liffLogin = null;
-    window.liff = {
-      init: async () => {},
-      isLoggedIn: () => false,
-      login: options => { window.liffLogin = options; },
-    };
-  });
-  const loginPage = await loginContext.newPage();
-  await loginPage.goto(`${base}#line-share/1234567890-AbCdEfgh/${cardPayload}`);
-  await loginPage.waitForFunction(() => window.liffLogin?.redirectUri?.includes('#line-share/'));
-  assert.ok((await loginPage.evaluate(() => window.liffLogin.redirectUri)).includes('/#line-share/'));
-  await loginContext.close();
-  step('LINE login redirect preserves the share route without looping back to the LIFF URL');
-  await page.getByRole('button', { name: '共有', exact: true }).click();
+  step('LINE sharing uses the standard system share sheet');
   await page.getByRole('button', { name: 'LINEへ共有', exact: true }).click();
   await page.waitForFunction(() => window.sharedShare?.url.includes('#share/v'));
   const sharedLink = await page.evaluate(() => window.sharedShare);

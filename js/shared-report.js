@@ -114,26 +114,6 @@ function compactBytes(game, events) {
   return new TextEncoder().encode(JSON.stringify(compactReport(game, events)));
 }
 
-function cardCompactReport(game, events) {
-  const report = createSharedReport(game, events).report;
-  return [
-    3,
-    game.date,
-    game.format,
-    game.regulationCount,
-    game.minutes,
-    game.status === 'finished' ? 1 : 0,
-    report.teamName,
-    report.opponentName,
-    report.periods.map(period => [period.home, period.away]),
-    report.players.map(player => [player.number, player.name, BASE_STAT_KEYS.map(key => player.stats[key])]),
-  ];
-}
-
-function cardCompactBytes(game, events) {
-  return new TextEncoder().encode(JSON.stringify(cardCompactReport(game, events)));
-}
-
 export function createSharePayload(game, events) {
   return `v1.${bytesToBase64(compactBytes(game, events))}`;
 }
@@ -162,16 +142,6 @@ export async function createCompressedSharePayload(game, events) {
     const compressed = await deflate(bytes);
     return compressed.length < bytes.length ? `v2.${bytesToBase64(compressed)}` : createSharePayload(game, events);
   } catch { return createSharePayload(game, events); }
-}
-
-// Card links omit totals that can be recalculated from player stats.
-export async function createCardSharePayload(game, events) {
-  const bytes = cardCompactBytes(game, events);
-  if (!globalThis.CompressionStream) return createCompressedSharePayload(game, events);
-  try {
-    const compressed = await deflate(bytes);
-    return `v3.${bytesToBase64(compressed)}`;
-  } catch { return createCompressedSharePayload(game, events); }
 }
 
 function formatLabel(format, count, minutes) {
