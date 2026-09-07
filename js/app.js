@@ -68,6 +68,7 @@ function render() {
           summary: { team: { PTS: report.team.PTS }, opponent: report.opponentScore },
           url: reportLink(payload),
           payload,
+          redirectUri: location.href,
         });
         if (location.hash !== currentHash) return;
         if (result === 'login') return;
@@ -322,7 +323,7 @@ async function shareGameLineCard() {
   const prepared = cardPayloadPromise?.gameId === g.id ? cardPayloadPromise.promise : null;
   const payload = await (prepared || createCardSharePayload(g, gameEvents(g)));
   cardPayloadPromise = null;
-  const result = await shareWithLineCard({ liffId: state.lineShare.liffId, game: g, summary: aggregate(g, gameEvents(g)), url: reportLink(payload), payload });
+  const result = await shareWithLineCard({ liffId: state.lineShare.liffId, game: g, summary: aggregate(g, gameEvents(g)), url: reportLink(payload), payload, launchInLiff: true });
   if (result === 'login') toast('LINEへのログイン後、もう一度「LINEカードで共有」をタップしてください。');
   if (result === 'shared') toast('LINEカードを共有しました。');
   if (sheet.open && result !== 'login') closeSheet();

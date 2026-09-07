@@ -92,13 +92,13 @@ function loadLiff() {
   return sdkPromise;
 }
 
-export async function shareLineCard({ liffId, game, summary, url, payload, redirectUri = location.href }) {
+export async function shareLineCard({ liffId, game, summary, url, payload, launchInLiff = false, redirectUri = location.href }) {
   if (!isLiffId(liffId)) throw new Error('設定でLINEのLIFF IDを入力してください。');
   const messages = createLineCardMessage({ game, summary, url });
   const liff = await loadLiff();
   await liff.init({ liffId });
   if (!liff.isLoggedIn()) {
-    if (validPayload(payload)) {
+    if (launchInLiff && validPayload(payload)) {
       location.href = lineShareLiffUrl({ liffId, payload });
       return 'login';
     }

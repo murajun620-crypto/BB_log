@@ -171,7 +171,21 @@ try {
   assert.match((await externalPage.evaluate(() => window.lineCard[0].altText)), /TOKYO HOOPS 13 - 6 EAST SIDE/);
   await externalPage.getByRole('heading', { name: 'LINEカードを共有しました', exact: true }).waitFor();
   await externalContext.close();
-  step('LINE login redirect restores the card from its URL payload in an empty browser context');
+  const loginContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await loginContext.addInitScript(() => {
+    window.liffLogin = null;
+    window.liff = {
+      init: async () => {},
+      isLoggedIn: () => false,
+      login: options => { window.liffLogin = options; },
+    };
+  });
+  const loginPage = await loginContext.newPage();
+  await loginPage.goto(`${base}#line-share/1234567890-AbCdEfgh/${cardPayload}`);
+  await loginPage.waitForFunction(() => window.liffLogin?.redirectUri?.includes('#line-share/'));
+  assert.ok((await loginPage.evaluate(() => window.liffLogin.redirectUri)).includes('/#line-share/'));
+  await loginContext.close();
+  step('LINE login redirect preserves the share route without looping back to the LIFF URL');
   await page.getByRole('button', { name: '共有', exact: true }).click();
   await page.getByRole('button', { name: 'LINEへ共有', exact: true }).click();
   await page.waitForFunction(() => window.sharedShare?.url.includes('#share/v'));

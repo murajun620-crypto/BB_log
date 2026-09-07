@@ -1,36 +1,34 @@
 # Project Status
 
-バスケットボールの試合記録・共有を行うPWA。`Documents/Github/BB_log` がGitHub同期対象の正規リポジトリで、`main` と `origin/main` が同期している。
+バスケットボールの試合記録・共有を行うオフライン対応PWA。正規リポジトリは `Documents/Github/BB_log` で、`main` と `origin/main` を同期して運用する。GitHub Pages公開先は `https://murajun620-crypto.github.io/BB_log/`。
 
 # Recent Changes
 
-- LIFFログイン後に別ブラウザへ遷移しても、URLフラグメント内の共有ペイロードからLINEカードを復元・送信できるようにした。
-- 初回未認証時は共有ペイロード付きのLIFF URLへ遷移し、LINE側の認証遷移でデータを保持するようにした。
-- 共有状態の引き継ぎ方式を、認証前のLIFF URL遷移に変更した。実機LINEでの初回認証・送信確認が次の確認事項。
-- `AGENTS.md` に、プッシュ後のGitHub Pages公開確認を追加した。
-- ルートCourtsideのリリース番号は、設定画面・`package.json`・`sw.js`で同じ番号に保つ。
+- LINEカード共有のLIFF認証フローを修正。初回だけ共有ペイロード付きLIFF URLを開き、LIFFから戻った後は現在の `#line-share/...` URLをログイン復帰先にする。未認証時にLIFF URLへ戻り続けるループを防止した。
+- リリース番号を `1.0.16` に統一（設定画面、`package.json`、`package-lock.json`、`sw.js`）。
+- ブラウザテストに、認証後の共有URL保持とループ防止の確認を追加。
 
 # Current Issues
 
-- `Documents/ChatGPT/BB_log_` はGit管理を無効化した退避フォルダー。以後の開発対象にしない。
-- 初回のLIFF認証でエラーが出た可能性がある。LIFF ID・エンドポイントURL・Fullサイズ・openid Scope・シェアターゲットピッカーONはコンソールで確認済み。実機で表示されたエラー文が未確認のため、再発時はエラー画面を保存する。
+- 実機LINEで、初回または未認証時に「接続できません。ネット接続を確認してください」相当の表示が出た後、ブラウザのCourtsideが空になる現象が報告されている。今回の原因候補（LIFF遷移ループ）は修正済みだが、実機で再確認が必要。
+- LIFF設定は確認済み：ID `2011471812-TxdJwwfB`、エンドポイントはGitHub Pages、Full、Scope `openid`、シェアターゲットピッカーON。LINE Login設定のコールバックURL欄は空だが、現在のLIFF実装では通常のLIFFログインを使用している。
+- `Documents/ChatGPT/BB_log_` は退避フォルダーで、開発対象外。
 
 # Next Tasks
 
-1. 正規リポジトリ `Documents/Github/BB_log` を開いて作業する。
-2. 変更後は `AGENTS.md` の方針に従い、確認・テスト後にコミットして `origin` へプッシュする。
-3. 既存のPWA実装とテストを確認しながら、次の機能改善に進む。
-4. iPhoneのホーム画面PWAと実機LINEで、初回ログインを含むLINEカード共有を確認する。
+1. 公開版が `1.0.16` へ更新された後、実機LINEで「LINEカードへ共有」を再試行する。
+2. 再発時はLINEの正確なエラー文と、戻った時のURL（アドレスバーの `#line-share/...` を含むか）を確認する。
+3. 実機でカード送信まで成功したら、通常機能の変更へ戻る。
 
 # Important Decisions
 
-- このファイルは過去ログではなく、次のセッションが判断に使う現在状態を簡潔に記録する。
-- 重要な実装・設計変更や作業終了時には、古い情報を置き換えて更新する。
-- 長期的な開発ルールやコーディング規約は、必要になった時点で `AGENTS.md` に分離する。
-- LINEカード共有の試合データはサーバーへ送らず、LIFFログインをまたぐURLフラグメント内のペイロードから再構築する。
+- カード共有データはサーバーへ送らず、URLフラグメント内の圧縮ペイロードから復元する。
+- LIFF URL起動は初回共有時だけ。認証後の共有ルートでは `liff.login({ redirectUri: location.href })` を使い、共有状態を同じURLへ戻す。
+- ファイル変更後は原則コミット・プッシュし、GitHub Pagesの公開更新を確認する。長期ルールは `AGENTS.md` に置く。
 
 # Environment / Testing Notes
 
-- Windows環境。Node.js/npmを使用し、詳細な実行・テスト手順は正規リポジトリの `README.md` と `package.json` を参照する。
-- Playwright同梱ブラウザがないPCでは、既存Chromeを `BROWSER_EXECUTABLE` に指定してブラウザテストを実行できる。
-- GitHub同期を前提に、自宅PC・職場PCの両方で作業する。
+- Windows。正規リポジトリで作業する。
+- ユニットテスト：`node tests/domain.test.mjs`。
+- ブラウザテスト：既存Chromeを `BROWSER_EXECUTABLE` に指定して `tests/browser.mjs` を実行。今回、全シナリオ通過。
+- GitHub Pagesの公開反映は、`sw.js?commit=<hash>` がHTTP 200で `v1.0.16` を返すこと、および公開 `app.js` に最新LIFF処理が含まれることを確認する。
