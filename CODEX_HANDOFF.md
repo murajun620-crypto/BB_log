@@ -9,12 +9,14 @@
 # Current Issues
 
 - `Documents/ChatGPT/BB_log_` はGit管理を無効化した退避フォルダー。以後の開発対象にしない。
+- ホーム画面PWAからのLINEカード共有では、LIFFログイン後に外部ブラウザへ戻るため、共有元の端末内試合データにアクセスできず空画面になる。LIFF起動前に共有ペイロードを引き継げる設計へ変更が必要。
 
 # Next Tasks
 
 1. 正規リポジトリ `Documents/Github/BB_log` を開いて作業する。
 2. 変更後は `AGENTS.md` の方針に従い、確認・テスト後にコミットして `origin` へプッシュする。
 3. 既存のPWA実装とテストを確認しながら、次の機能改善に進む。
+4. LINEカード共有を、ホーム画面PWAからでもログイン・送信できるよう修正し、実機LINEで確認する。
 
 # Important Decisions
 
