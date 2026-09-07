@@ -6,8 +6,20 @@ export function isLiffId(value) {
   return typeof value === 'string' && /^\d{5,20}-[A-Za-z0-9_-]{4,80}$/.test(value);
 }
 
+function validPayload(value) {
+  return typeof value === 'string' && /^v[123]\.[A-Za-z0-9_-]+$/.test(value);
+}
+
+export function lineShareLiffUrl({ liffId, payload }) {
+  if (!isLiffId(liffId) || !validPayload(payload)) throw new Error('LINEカード共有のリンクを作成できませんでした。');
+  const url = new URL(`https://liff.line.me/${liffId}`);
+  url.hash = `line-share/${liffId}/${payload}`;
+  if (url.href.length > MAX_CARD_URL_LENGTH) throw new Error('この試合はLINEカードのリンク上限を超えています。通常のLINE共有またはファイル共有を使ってください。');
+  return url.href;
+}
+
 export function lineShareRedirectUri({ liffId, payload, locationHref = location.href }) {
-  if (!isLiffId(liffId) || typeof payload !== 'string' || !/^v[123]\.[A-Za-z0-9_-]+$/.test(payload)) throw new Error('LINEカード共有のリンクを作成できませんでした。');
+  if (!isLiffId(liffId) || !validPayload(payload)) throw new Error('LINEカード共有のリンクを作成できませんでした。');
   const url = new URL(locationHref);
   url.hash = `line-share/${liffId}/${payload}`;
   if (url.href.length > MAX_CARD_URL_LENGTH) throw new Error('この試合はLINEカードのリンク上限を超えています。通常のLINE共有またはファイル共有を使ってください。');
@@ -80,12 +92,16 @@ function loadLiff() {
   return sdkPromise;
 }
 
-export async function shareLineCard({ liffId, game, summary, url, redirectUri = location.href }) {
+export async function shareLineCard({ liffId, game, summary, url, payload, redirectUri = location.href }) {
   if (!isLiffId(liffId)) throw new Error('設定でLINEのLIFF IDを入力してください。');
   const messages = createLineCardMessage({ game, summary, url });
   const liff = await loadLiff();
   await liff.init({ liffId });
   if (!liff.isLoggedIn()) {
+    if (validPayload(payload)) {
+      location.href = lineShareLiffUrl({ liffId, payload });
+      return 'login';
+    }
     liff.login({ redirectUri });
     return 'login';
   }

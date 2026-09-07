@@ -5,6 +5,7 @@
 # Recent Changes
 
 - LIFFログイン後に別ブラウザへ遷移しても、URLフラグメント内の共有ペイロードからLINEカードを復元・送信できるようにした。
+- 初回未認証時は共有ペイロード付きのLIFF URLへ遷移し、LINE側の認証遷移でデータを保持するようにした。
 - `AGENTS.md` に、プッシュ後のGitHub Pages公開確認を追加した。
 - ルートCourtsideのリリース番号は、設定画面・`package.json`・`sw.js`で同じ番号に保つ。
 

@@ -3,7 +3,7 @@ import { uid, localDate, STATS, activeEvents, makePeriods, validateTeam, validat
 import { backupObject, parseBackup, gameCSV, download, shareFile, shareUrl } from './transfer.js';
 import { boxScoreImage, playerStatsImage, safeFilename, shareImage } from './share-image.js';
 import { createSharedReport, createCardSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport, sharedReportFile } from './shared-report.js';
-import { isLiffId, lineShareRedirectUri, shareLineCard as shareWithLineCard } from './line-share.js';
+import { isLiffId, shareLineCard as shareWithLineCard } from './line-share.js';
 import * as view from './views.js';
 
 const app = document.querySelector('#app');
@@ -67,7 +67,7 @@ function render() {
           game: { date: report.date, teamName: report.teamName, opponentName: report.opponentName, status: report.status, formatLabel: report.format },
           summary: { team: { PTS: report.team.PTS }, opponent: report.opponentScore },
           url: reportLink(payload),
-          redirectUri: lineShareRedirectUri({ liffId: id, payload }),
+          payload,
         });
         if (location.hash !== currentHash) return;
         if (result === 'login') return;
@@ -322,7 +322,7 @@ async function shareGameLineCard() {
   const prepared = cardPayloadPromise?.gameId === g.id ? cardPayloadPromise.promise : null;
   const payload = await (prepared || createCardSharePayload(g, gameEvents(g)));
   cardPayloadPromise = null;
-  const result = await shareWithLineCard({ liffId: state.lineShare.liffId, game: g, summary: aggregate(g, gameEvents(g)), url: reportLink(payload), redirectUri: lineShareRedirectUri({ liffId: state.lineShare.liffId, payload }) });
+  const result = await shareWithLineCard({ liffId: state.lineShare.liffId, game: g, summary: aggregate(g, gameEvents(g)), url: reportLink(payload), payload });
   if (result === 'login') toast('LINEへのログイン後、もう一度「LINEカードで共有」をタップしてください。');
   if (result === 'shared') toast('LINEカードを共有しました。');
   if (sheet.open && result !== 'login') closeSheet();
