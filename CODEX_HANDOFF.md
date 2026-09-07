@@ -4,11 +4,11 @@
 
 # Recent Changes
 
-- Codex間の開発コンテキスト引き継ぎ用ファイルを正規リポジトリへ移行する準備をした。
+- Codex間の開発コンテキスト引き継ぎ用ファイルを正規リポジトリへ追加した。
 
 # Current Issues
 
-- `Documents/ChatGPT/BB_log_` は引き継ぎファイルだけを持つ不要な別クローン。以後の開発対象にしない。
+- `Documents/ChatGPT/BB_log_` はGit管理を無効化した退避フォルダー。以後の開発対象にしない。
 
 # Next Tasks
 
