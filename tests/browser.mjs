@@ -140,9 +140,11 @@ try {
     window.sharedFile = null;
     window.lineCard = null;
     window.liffInit = null;
+    window.liffLogin = null;
     window.liff = {
       init: async config => { window.liffInit = config; },
-      isLoggedIn: () => true,
+      isLoggedIn: () => false,
+      login: options => { window.liffLogin = options; },
       isApiAvailable: name => name === 'shareTargetPicker',
       shareTargetPicker: async messages => { window.lineCard = messages; return { status: 'success' }; },
     };
@@ -150,6 +152,13 @@ try {
     Object.defineProperty(navigator, 'share', { configurable: true, value: async data => { const file = data.files?.[0]; window.sharedShare = { url: data.url || '', message: data.text || '' }; if (file) window.sharedFile = { name: file.name, size: file.size, type: file.type, text: file.type === 'application/json' ? await file.text() : null, message: data.text || '' }; } });
   });
   await page.getByRole('button', { name: '共有', exact: true }).click();
+  await page.getByRole('button', { name: 'LINEカードで共有', exact: true }).click();
+  await page.waitForFunction(() => window.liffLogin?.redirectUri?.includes('#line-share/'));
+  assert.ok((await page.evaluate(() => window.liffLogin.redirectUri)).startsWith(`${new URL(base).origin}/`));
+  await page.evaluate(() => {
+    window.liff.isLoggedIn = () => true;
+    window.liffLogin = null;
+  });
   await page.getByRole('button', { name: 'LINEカードで共有', exact: true }).click();
   await page.waitForFunction(() => window.lineCard?.[0]?.type === 'flex');
   const lineCard = await page.evaluate(() => ({ card: window.lineCard[0], init: window.liffInit }));
