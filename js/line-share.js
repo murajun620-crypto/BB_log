@@ -6,8 +6,22 @@ export function isLiffId(value) {
   return typeof value === 'string' && /^\d{5,20}-[A-Za-z0-9_-]{4,80}$/.test(value);
 }
 
+export function lineShareRedirectUri({ liffId, payload, locationHref = location.href }) {
+  if (!isLiffId(liffId) || typeof payload !== 'string' || !/^v[123]\.[A-Za-z0-9_-]+$/.test(payload)) throw new Error('LINEカード共有のリンクを作成できませんでした。');
+  const url = new URL(locationHref);
+  url.hash = `line-share/${liffId}/${payload}`;
+  if (url.href.length > MAX_CARD_URL_LENGTH) throw new Error('この試合はLINEカードのリンク上限を超えています。通常のLINE共有またはファイル共有を使ってください。');
+  return url.href;
+}
+
 function text(value, max = 500) {
   return String(value ?? '').slice(0, max);
+}
+
+function formatLabel(game) {
+  if (typeof game.formatLabel === 'string' && game.formatLabel) return text(game.formatLabel, 40);
+  const format = game.format === 'quarters' ? '4Q' : game.format === 'halves' ? '2H' : `${game.regulationCount}P`;
+  return `${format} × ${game.minutes}分`;
 }
 
 export function createLineCardMessage({ game, summary, url }) {
@@ -42,7 +56,7 @@ export function createLineCardMessage({ game, summary, url }) {
             ],
           },
           { type: 'separator', margin: 'lg', color: '#E7ECE9' },
-          { type: 'text', text: `${game.status === 'finished' ? 'FINAL' : '記録時点'} · ${text(game.format === 'quarters' ? '4Q' : game.format === 'halves' ? '2H' : `${game.regulationCount}P`)} × ${game.minutes}分`, color: '#65736E', size: 'xs', margin: 'lg', align: 'center' },
+          { type: 'text', text: `${game.status === 'finished' ? 'FINAL' : '記録時点'} · ${formatLabel(game)}`, color: '#65736E', size: 'xs', margin: 'lg', align: 'center' },
         ],
       },
       footer: {
@@ -66,13 +80,13 @@ function loadLiff() {
   return sdkPromise;
 }
 
-export async function shareLineCard({ liffId, game, summary, url }) {
+export async function shareLineCard({ liffId, game, summary, url, redirectUri = location.href }) {
   if (!isLiffId(liffId)) throw new Error('設定でLINEのLIFF IDを入力してください。');
   const messages = createLineCardMessage({ game, summary, url });
   const liff = await loadLiff();
-  await liff.init({ liffId, withLoginOnExternalBrowser: true });
+  await liff.init({ liffId });
   if (!liff.isLoggedIn()) {
-    liff.login({ redirectUri: location.href });
+    liff.login({ redirectUri });
     return 'login';
   }
   if (!liff.isApiAvailable?.('shareTargetPicker') || typeof liff.shareTargetPicker !== 'function') throw new Error('この環境ではLINEカード共有を開けません。LINEアプリから開くか、通常のLINE共有を使ってください。');

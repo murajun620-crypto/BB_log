@@ -154,6 +154,38 @@ try {
   await page.waitForFunction(() => window.lineCard?.[0]?.type === 'flex');
   const lineCard = await page.evaluate(() => ({ card: window.lineCard[0], init: window.liffInit }));
   assert.equal(lineCard.init.liffId, '1234567890-AbCdEfgh'); assert.match(lineCard.card.altText, /TOKYO HOOPS 13 - 6 EAST SIDE/); assert.ok(lineCard.card.contents.footer.contents[0].action.uri.includes('#share/v3.'));
+  await page.evaluate(() => {
+    window.liffLogin = null;
+    window.liff = {
+      init: async () => {},
+      isLoggedIn: () => false,
+      login: config => { window.liffLogin = config; },
+      isApiAvailable: name => name === 'shareTargetPicker',
+    };
+  });
+  await page.getByRole('button', { name: '共有', exact: true }).click();
+  await page.getByRole('button', { name: 'LINEカードで共有', exact: true }).click();
+  await page.waitForFunction(() => window.liffLogin?.redirectUri?.includes('#line-share/'));
+  const loginRedirect = await page.evaluate(() => window.liffLogin.redirectUri);
+  assert.match(loginRedirect, /#line-share\/1234567890-AbCdEfgh\/v3\./);
+  await dismiss();
+  const externalContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true });
+  await externalContext.addInitScript(() => {
+    window.lineCard = null;
+    window.liff = {
+      init: async () => {},
+      isLoggedIn: () => true,
+      isApiAvailable: name => name === 'shareTargetPicker',
+      shareTargetPicker: async messages => { window.lineCard = messages; return { status: 'success' }; },
+    };
+  });
+  const externalPage = await externalContext.newPage();
+  await externalPage.goto(loginRedirect);
+  await externalPage.waitForFunction(() => window.lineCard?.[0]?.type === 'flex');
+  assert.match((await externalPage.evaluate(() => window.lineCard[0].altText)), /TOKYO HOOPS 13 - 6 EAST SIDE/);
+  await externalPage.getByRole('heading', { name: 'LINEカードを共有しました', exact: true }).waitFor();
+  await externalContext.close();
+  step('LINE login redirect restores the card from its URL payload in an empty browser context');
   await page.getByRole('button', { name: '共有', exact: true }).click();
   await page.getByRole('button', { name: 'LINEへ共有', exact: true }).click();
   await page.waitForFunction(() => window.sharedShare?.url.includes('#share/v'));

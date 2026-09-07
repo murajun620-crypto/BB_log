@@ -3,7 +3,7 @@ import { uid, localDate, STATS, activeEvents, makePeriods, validateTeam, validat
 import { backupObject, parseBackup, gameCSV, download, shareFile, shareUrl } from './transfer.js';
 import { boxScoreImage, playerStatsImage, safeFilename, shareImage } from './share-image.js';
 import { createSharedReport, createCardSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport, sharedReportFile } from './shared-report.js';
-import { isLiffId, shareLineCard as shareWithLineCard } from './line-share.js';
+import { isLiffId, lineShareRedirectUri, shareLineCard as shareWithLineCard } from './line-share.js';
 import * as view from './views.js';
 
 const app = document.querySelector('#app');
@@ -13,7 +13,7 @@ const toastNode = document.querySelector('#toast');
 // installed copy of the published app open the LINE card share flow immediately.
 const DEFAULT_LINE_LIFF_ID = '2011471812-TxdJwwfB';
 const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, theme: 'system' }, lineShare: { liffId: '' }, pwa: { ready: false, error: '', update: false }, page: 'home', gameId: null, busy: false, lastError: '' };
-let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, resolvedShareHash = '', sharePayloadPromise = null, cardPayloadPromise = null;
+let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, resolvedShareHash = '', resolvedLineShareHash = '', sharePayloadPromise = null, cardPayloadPromise = null;
 const getSetting = key => state.data.settings.find(s => s.key === key)?.value;
 const game = () => state.data.games.find(g => g.id === state.gameId);
 const gameEvents = (g = game()) => state.data.events.filter(e => e.gameId === g?.id);
@@ -50,6 +50,35 @@ async function syncWakeLock() {
 function render() {
   const currentHash = location.hash;
   const [requestedPage = 'home', id, ...rest] = currentHash.replace(/^#/, '').split('/');
+  if (requestedPage === 'line-share') {
+    const payload = rest.filter(Boolean).join('/');
+    if (!isLiffId(id) || !payload) {
+      app.innerHTML = '<main class="page"><div class="empty-state"><h1>LINEカード共有を開けません</h1><p>リンクを確認して、元のCourtsideからもう一度お試しください。</p></div></main>';
+      return;
+    }
+    if (resolvedLineShareHash === currentHash) return;
+    resolvedLineShareHash = currentHash;
+    app.innerHTML = '<main class="page"><div class="empty-state"><h1>LINEカードを準備中…</h1><p>送信先を選ぶ画面が開くまで、この画面を閉じないでください。</p></div></main>';
+    void (async () => {
+      try {
+        const report = await parseSharePayload(payload);
+        const result = await shareWithLineCard({
+          liffId: id,
+          game: { date: report.date, teamName: report.teamName, opponentName: report.opponentName, status: report.status, formatLabel: report.format },
+          summary: { team: { PTS: report.team.PTS }, opponent: report.opponentScore },
+          url: reportLink(payload),
+          redirectUri: lineShareRedirectUri({ liffId: id, payload }),
+        });
+        if (location.hash !== currentHash) return;
+        if (result === 'login') return;
+        app.innerHTML = `<main class="page"><div class="empty-state"><h1>${result === 'shared' ? 'LINEカードを共有しました' : 'LINEカード共有をキャンセルしました'}</h1><p>${result === 'shared' ? '元のCourtsideに戻ると、試合の記録を続けられます。' : '元のCourtsideに戻って、必要ならもう一度お試しください。'}</p></div></main>`;
+      } catch (error) {
+        if (location.hash !== currentHash) return;
+        app.innerHTML = `<main class="page"><div class="empty-state"><h1>LINEカード共有を開けません</h1><p>${view.esc(error.message)}</p><p>元のCourtsideに戻って、もう一度お試しください。</p></div></main>`;
+      }
+    })();
+    return;
+  }
   const page = requestedPage === 'share' ? 'shared' : requestedPage;
   if (requestedPage === 'share' && resolvedShareHash !== currentHash) {
     resolvedShareHash = currentHash;
@@ -293,7 +322,7 @@ async function shareGameLineCard() {
   const prepared = cardPayloadPromise?.gameId === g.id ? cardPayloadPromise.promise : null;
   const payload = await (prepared || createCardSharePayload(g, gameEvents(g)));
   cardPayloadPromise = null;
-  const result = await shareWithLineCard({ liffId: state.lineShare.liffId, game: g, summary: aggregate(g, gameEvents(g)), url: reportLink(payload) });
+  const result = await shareWithLineCard({ liffId: state.lineShare.liffId, game: g, summary: aggregate(g, gameEvents(g)), url: reportLink(payload), redirectUri: lineShareRedirectUri({ liffId: state.lineShare.liffId, payload }) });
   if (result === 'login') toast('LINEへのログイン後、もう一度「LINEカードで共有」をタップしてください。');
   if (result === 'shared') toast('LINEカードを共有しました。');
   if (sheet.open && result !== 'login') closeSheet();
