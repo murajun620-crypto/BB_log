@@ -52,6 +52,11 @@ test('unprotected snapshots contain only allowlisted fields and expired links ca
   try {
     const report = fixture().report;
     report.report.tournamentName = '○○カップ';
+    report.report.games = [{
+      date: report.report.date, format: report.report.format, status: report.report.status, gameCount: 1,
+      teamName: report.report.teamName, opponentName: 'TEST AWAY', opponentScore: report.report.opponentScore,
+      periods: report.report.periods, team: report.report.team, players: report.report.players,
+    }];
     report.report.events = ['private-event']; report.report.players[0].privateId = 'private-id';
     const response = await req(env, '/v1/shares', 'POST', { report, days: 7 }, testToken);
     const a = await response.json();
@@ -60,6 +65,7 @@ test('unprotected snapshots contain only allowlisted fields and expired links ca
     const text = await open.text();
     assert.equal(text.includes('private-'), false); assert.equal(text.includes('internal-player-id'), false);
     assert.equal(JSON.parse(text).report.tournamentName, '○○カップ');
+    assert.equal(JSON.parse(text).report.games[0].opponentName, 'TEST AWAY');
     env.DB.sqlite.prepare('UPDATE shares SET expires_at = ? WHERE id = ?').run(Date.now() - 1, a.id);
     assert.equal((await req(env, `/v1/shares/${a.id}/open`, 'POST', {})).status, 404);
     await worker.scheduled({}, env);

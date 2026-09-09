@@ -49,6 +49,10 @@ test('selected games aggregate team and player stats by stable player identity',
   assert.equal(report.players.find(p => p.id === 'player-1').stats.PTS, 2);
   const shared = parseSharedReport(JSON.stringify(createAggregateSharedReport([first.game, second], [...first.events, ...events], '夏季総体')));
   assert.equal(shared.gameCount, 2); assert.equal(shared.format, '2試合合計'); assert.deepEqual(shared.periods, [{ label: '合計', home: 5, away: 4 }]);
+  assert.equal(shared.games.length, 2);
+  assert.deepEqual(shared.games.map(game => game.opponentScore), [0, 4]);
+  assert.equal(shared.games[0].players.find(player => player.id === 'p1').stats.PTS, 3);
+  assert.equal(shared.games[1].players.find(player => player.id === 'p2').stats.PTS, 2);
   assert.equal(shared.tournamentName, '夏季総体');
 });
 test('substitutions support undo; deleting a prerequisite substitution is rejected', () => {

@@ -6,6 +6,8 @@ const playerDialog = document.querySelector('#player-dialog');
 let report = null;
 let requestNumber = 0;
 let displayMode = 'total';
+let selectedGameIndex = null;
+let playerDisplay = 'total';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const percent = (made, attempts) => attempts ? `${(made / attempts * 100).toFixed(1)}%` : '—';
@@ -13,7 +15,7 @@ const statLabel = key => ({ OREB: 'OR', DREB: 'DR', PF: 'F' }[key] || key);
 const formatDate = date => String(date || '').replaceAll('-', '.');
 
 const average = (value, games) => (value / games).toFixed(1);
-const metric = (value, games) => displayMode === 'average' ? average(value, games) : value;
+const metric = (value, games) => displayMode === 'average' && games > 1 ? average(value, games) : value;
 const modeText = () => displayMode === 'average' ? '平均' : '合計';
 function shooting(stats, games = 1) {
   return `<div class="shooting-grid">${[['FG', 'FGM', 'FGA'], ['2P', 'P2M', 'P2A'], ['3P', 'P3M', 'P3A'], ['FT', 'FTM', 'FTA']].map(([label, made, attempts]) => `<div><span>${label}</span><strong>${stats[made]}<small>/${stats[attempts]}</small></strong><b>${percent(stats[made], stats[attempts])}</b>${games > 1 ? `<em class="shooting-average">平均 ${average(stats[made], games)}/${average(stats[attempts], games)}</em>` : ''}</div>`).join('')}</div>`;
@@ -28,9 +30,17 @@ function playerCard(player, games = 1) {
 }
 
 function reportView(data) {
-  const status = data.status === 'live' ? '記録時点' : 'FINAL';
+  const detailGames = Array.isArray(data.games) && data.games.length === data.gameCount ? data.games : [];
+  const currentGame = selectedGameIndex === null ? null : detailGames[selectedGameIndex];
+  const view = currentGame || data;
+  const gameCount = currentGame ? 1 : data.gameCount;
+  const status = view.status === 'live' ? '記録時点' : 'FINAL';
   const mode = modeText();
-  return `<main class="reader-shell"><header class="reader-header"><div class="identity"><span class="brand-mark">C</span><div><strong>COURTSIDE</strong><span>READER</span></div></div><span class="read-only">閲覧専用</span></header><section class="intro-line"><span>${data.tournamentName ? esc(data.tournamentName) : 'SHARED BOX SCORE'}</span><span>${esc(formatDate(data.date))} · ${esc(data.format)}</span></section><section class="score-card"><div class="score-status">${status}</div><div class="team home"><span>HOME</span><h1>${esc(data.teamName)}</h1></div><div class="score"><strong>${metric(data.team.PTS, data.gameCount)}</strong><span>–</span><strong>${metric(data.opponentScore, data.gameCount)}</strong></div><div class="team away"><span>OPPONENT</span><h2>${esc(data.opponentName)}</h2></div>${data.gameCount > 1 ? `<p class="score-average">${mode === 'average' ? '合計' : '1試合平均'} ${mode === 'average' ? `${data.team.PTS} – ${data.opponentScore}` : `${average(data.team.PTS, data.gameCount)} – ${average(data.opponentScore, data.gameCount)}`}</p>` : ''}</section><section class="period-card" aria-label="ピリオドごとの得点"><div class="period-row period-title"><span>PERIOD</span><b>${esc(data.teamName)}</b><b>${esc(data.opponentName)}</b></div>${data.periods.map(period => `<div class="period-row"><span>${esc(period.label)}</span><b>${period.home}</b><b>${period.away}</b></div>`).join('')}</section><section class="section"><div class="section-title"><div><span>TEAM</span><h2>シューティング</h2></div>${data.gameCount > 1 ? '<p>成功数/試投数：合計・平均</p>' : ''}</div>${shooting(data.team, data.gameCount)}<div class="rebound-total"><span>OR <b>${metric(data.team.OREB, data.gameCount)}</b></span><span>DR <b>${metric(data.team.DREB, data.gameCount)}</b></span><span>REB <b>${metric(data.team.REB, data.gameCount)}</b></span></div></section><section class="section"><div class="section-title"><div><span>BOX SCORE</span><h2>選手スタッツ</h2></div>${data.gameCount > 1 ? `<button class="mode-toggle" data-action="toggle-stat-mode" aria-label="合計と平均を切り替え">合計 / 平均：${mode}</button>` : '<p>選手をタップで詳細</p>'}</div><div class="player-list">${data.players.map(player => playerCard(player, data.gameCount)).join('')}<div class="player-card total-card"><span class="player-name"><b>TEAM</b><strong>チーム合計</strong></span><span class="player-stats">${statCells(data.team, data.gameCount)}</span></div></div></section><footer class="reader-footer">この画面は共有された${data.gameCount > 1 ? `${data.gameCount}試合の集計` : '試合結果'}だけを表示しています。チームや試合の記録は保存しません。</footer></main>`;
+  const scoreCard = `<section class="score-card"><div class="score-status">${status}</div><div class="team home"><span>HOME</span><h1>${esc(view.teamName)}</h1></div><div class="score"><strong>${metric(view.team.PTS, gameCount)}</strong><span>–</span><strong>${metric(view.opponentScore, gameCount)}</strong></div><div class="team away"><span>OPPONENT</span><h2>${esc(view.opponentName)}</h2></div>${!currentGame && gameCount > 1 ? `<p class="score-average">${mode === 'average' ? '合計' : '1試合平均'} ${mode === 'average' ? `${view.team.PTS} – ${view.opponentScore}` : `${average(view.team.PTS, gameCount)} – ${average(view.opponentScore, gameCount)}`}</p>` : ''}</section>`;
+  const periodCard = `<section class="period-card" aria-label="ピリオドごとの得点"><div class="period-row period-title"><span>PERIOD</span><b>${esc(view.teamName)}</b><b>${esc(view.opponentName)}</b></div>${view.periods.map(period => `<div class="period-row"><span>${esc(period.label)}</span><b>${period.home}</b><b>${period.away}</b></div>`).join('')}</section>`;
+  const gameScores = detailGames.length > 1 ? `<section class="section game-score-section"><div class="section-title"><div><span>GAMES</span><h2>各試合のスコア</h2></div>${currentGame ? '<button class="mode-toggle" data-action="select-game" data-game-index="-1">全試合集計</button>' : '<p>タップで各試合を表示</p>'}</div><div class="game-score-list">${detailGames.map((game, index) => `<button class="game-score-card ${index === selectedGameIndex ? 'selected' : ''}" type="button" data-action="select-game" data-game-index="${index}"><span class="game-score-info"><b>${esc(formatDate(game.date))}</b><small>${esc(game.teamName)} vs. ${esc(game.opponentName)}</small></span><strong>${game.team.PTS}<span>–</span>${game.opponentScore}</strong><span class="game-score-arrow">›</span></button>`).join('')}</div></section>` : '';
+  const scoreBlock = currentGame ? `${scoreCard}${periodCard}` : detailGames.length > 1 ? gameScores : `${scoreCard}${periodCard}`;
+  return `<main class="reader-shell"><header class="reader-header"><div class="identity"><span class="brand-mark">C</span><div><strong>COURTSIDE</strong><span>READER</span></div></div><span class="read-only">閲覧専用</span></header><section class="intro-line"><span>${data.tournamentName ? esc(data.tournamentName) : 'SHARED BOX SCORE'}</span><span>${esc(formatDate(view.date))} · ${esc(view.format)}</span></section>${scoreBlock}<section class="section"><div class="section-title"><div><span>TEAM</span><h2>シューティング</h2></div>${gameCount > 1 ? '<p>成功数/試投数：合計・平均</p>' : ''}</div>${shooting(view.team, gameCount)}<div class="rebound-total"><span>OR <b>${metric(view.team.OREB, gameCount)}</b></span><span>DR <b>${metric(view.team.DREB, gameCount)}</b></span><span>REB <b>${metric(view.team.REB, gameCount)}</b></span></div></section><section class="section"><div class="section-title"><div><span>BOX SCORE</span><h2>選手スタッツ</h2></div>${gameCount > 1 ? `<button class="mode-toggle" data-action="toggle-stat-mode" aria-label="合計と平均を切り替え">合計 / 平均：${mode}</button>` : '<p>選手をタップで詳細</p>'}</div><div class="player-list">${view.players.map(player => playerCard(player, gameCount)).join('')}<div class="player-card total-card"><span class="player-name"><b>TEAM</b><strong>チーム合計</strong></span><span class="player-stats">${statCells(view.team, gameCount)}</span></div></div></section><footer class="reader-footer">この画面は共有された${currentGame ? '試合結果' : data.gameCount > 1 ? `${data.gameCount}試合の集計` : '試合結果'}だけを表示しています。チームや試合の記録は保存しません。</footer></main>`;
 }
 
 function landingView() {
@@ -70,6 +80,8 @@ async function render(password = '') {
     const parsed = short ? await openCloudShare(short[1], password) : await parseSharePayload(payload);
     if (sequence !== requestNumber) return;
     report = parsed;
+    selectedGameIndex = null;
+    playerDisplay = displayMode;
     app.innerHTML = reportView(parsed);
   } catch (error) {
     if (sequence !== requestNumber) return;
@@ -91,9 +103,18 @@ async function render(password = '') {
 }
 
 function openPlayer(playerId) {
-  const player = report?.players.find(item => item.id === playerId);
+  if (!report) return;
+  const detailGames = Array.isArray(report.games) && report.games.length === report.gameCount ? report.games : [];
+  const gameIndex = /^\d+$/.test(playerDisplay) ? Number(playerDisplay) : null;
+  const selectedGame = gameIndex !== null ? detailGames[gameIndex] : selectedGameIndex === null ? null : detailGames[selectedGameIndex];
+  const source = selectedGame || report;
+  const player = source.players.find(item => item.id === playerId);
   if (!player) return;
-  playerDialog.innerHTML = `<div class="dialog-handle"></div><button class="dialog-close" type="button" data-close-dialog aria-label="閉じる">×</button>${report.gameCount > 1 ? `<div class="detail-mode-row"><span>表示</span><button class="mode-toggle" data-action="toggle-player-mode" data-player-id="${esc(playerId)}" aria-label="合計と平均を切り替え">合計 / 平均：${modeText()}</button></div>` : ''}<p class="dialog-context">${esc(report.teamName)} vs ${esc(report.opponentName)} · ${report.gameCount > 1 ? `${report.gameCount}試合合計` : esc(formatDate(report.date))}</p><div class="player-detail"><span class="jersey">${esc(player.number)}</span><div><h2 id="player-dialog-title">${esc(player.name)}</h2><p><b>${metric(player.stats.PTS, report.gameCount)}</b> PTS</p></div></div>${shooting(player.stats, report.gameCount)}<div class="detail-stats">${['OREB', 'DREB', 'REB', 'AST', 'STL', 'BLK', 'TO', 'PF'].map(key => `<span><small>${statLabel(key)}</small><b>${metric(player.stats[key], report.gameCount)}</b></span>`).join('')}</div>`;
+  const selectedCount = selectedGame ? 1 : report.gameCount;
+  const playerValue = value => playerDisplay === 'average' && !selectedGame ? average(value, report.gameCount) : value;
+  const options = detailGames.length > 1 ? `<div class="detail-mode-row"><span>表示する試合</span><select data-action="select-player-game" data-player-id="${esc(playerId)}" aria-label="選手スタッツの対象試合"><option value="total" ${playerDisplay === 'total' ? 'selected' : ''}>全試合集計</option><option value="average" ${playerDisplay === 'average' ? 'selected' : ''}>1試合平均</option>${detailGames.map((game, index) => `<option value="${index}" ${String(gameIndex) === String(index) ? 'selected' : ''}>${index + 1}試合目：${esc(formatDate(game.date))} vs. ${esc(game.opponentName)}</option>`).join('')}</select></div>` : '';
+  const context = selectedGame ? `${selectedGame.teamName} vs ${selectedGame.opponentName} · ${formatDate(selectedGame.date)}` : `${report.teamName} vs ${report.opponentName} · ${report.gameCount > 1 ? '全試合集計' : formatDate(report.date)}`;
+  playerDialog.innerHTML = `<div class="dialog-handle"></div><button class="dialog-close" type="button" data-close-dialog aria-label="閉じる">×</button>${options}<p class="dialog-context">${esc(context)}</p><div class="player-detail"><span class="jersey">${esc(player.number)}</span><div><h2 id="player-dialog-title">${esc(player.name)}</h2><p><b>${playerValue(player.stats.PTS)}</b> PTS</p></div></div>${shooting(player.stats, selectedCount)}<div class="detail-stats">${['OREB', 'DREB', 'REB', 'AST', 'STL', 'BLK', 'TO', 'PF'].map(key => `<span><small>${statLabel(key)}</small><b>${playerValue(player.stats[key])}</b></span>`).join('')}</div>`;
   if (typeof playerDialog.showModal === 'function') playerDialog.showModal();
   else playerDialog.setAttribute('open', '');
 }
@@ -101,10 +122,20 @@ function openPlayer(playerId) {
 document.addEventListener('click', event => {
   const toggle = event.target.closest('[data-action]');
   if (toggle?.dataset.action === 'toggle-stat-mode') { displayMode = displayMode === 'average' ? 'total' : 'average'; if (report) app.innerHTML = reportView(report); return; }
-  if (toggle?.dataset.action === 'toggle-player-mode') { displayMode = displayMode === 'average' ? 'total' : 'average'; openPlayer(toggle.dataset.playerId); return; }
+  if (toggle?.dataset.action === 'select-game') {
+    const index = Number(toggle.dataset.gameIndex);
+    selectedGameIndex = index < 0 ? null : Number.isInteger(index) ? index : null;
+    playerDisplay = selectedGameIndex === null ? displayMode : String(selectedGameIndex);
+    if (report) app.innerHTML = reportView(report);
+    return;
+  }
   const player = event.target.closest('[data-player-id]');
-  if (player) openPlayer(player.dataset.playerId);
+  if (player) { playerDisplay = selectedGameIndex === null ? displayMode : String(selectedGameIndex); openPlayer(player.dataset.playerId); }
   if (event.target.closest('[data-close-dialog]')) playerDialog.close();
+});
+document.addEventListener('change', event => {
+  const select = event.target.closest('[data-action="select-player-game"]');
+  if (select) { playerDisplay = select.value; openPlayer(select.dataset.playerId); }
 });
 playerDialog.addEventListener('click', event => {
   if (event.target === playerDialog) playerDialog.close();

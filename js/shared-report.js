@@ -35,6 +35,21 @@ export function createSharedReport(game, events) {
 export function createAggregateSharedReport(games, events, tournamentName = '') {
   const summary = aggregateGames(games, events);
   const date = [...games].map(game => game.date).sort().at(-1) || new Date().toISOString().slice(0, 10);
+  const gameReports = games.map(game => {
+    const gameSummary = aggregate(game, events.filter(event => event.gameId === game.id));
+    return {
+      date: game.date,
+      format: formatGame(game),
+      status: game.status,
+      gameCount: 1,
+      teamName: game.teamName,
+      opponentName: game.opponentName,
+      opponentScore: gameSummary.opponent,
+      periods: gameSummary.periods.map(period => ({ label: period.label, home: period.home, away: period.away })),
+      team: statsCopy(gameSummary.team),
+      players: summary.players.map((player, index) => ({ id: `p${index + 1}`, number: player.number, name: player.name, stats: statsCopy(gameSummary.players[player.id] || blankStats()) })),
+    };
+  });
   return {
     app: 'courtside-report',
     schemaVersion: 1,
@@ -45,6 +60,7 @@ export function createAggregateSharedReport(games, events, tournamentName = '') 
       status: games.some(game => game.status === 'live') ? 'live' : 'finished',
       gameCount: games.length,
       tournamentName: String(tournamentName || '').trim(),
+      games: gameReports,
       teamName: summary.teamName,
       opponentName: '相手合計',
       opponentScore: summary.opponent,
@@ -69,6 +85,18 @@ function validateStats(stats) {
   ensure(stats.FGM <= stats.FGA && stats.P2M <= stats.P2A && stats.P3M <= stats.P3A && stats.FTM <= stats.FTA);
   ensure(stats.REB === stats.OREB + stats.DREB && stats.PTS === stats.P2M * 2 + stats.P3M * 3 + stats.FTM);
 }
+function validDate(value) {
+  const parsedDate = new Date(`${value}T00:00:00Z`);
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(parsedDate.valueOf()) && parsedDate.toISOString().slice(0, 10) === value;
+}
+function validatePlayers(players) {
+  ensure(Array.isArray(players) && players.length >= 1 && players.length <= 60);
+  ensure(new Set(players.map(player => player?.id)).size === players.length);
+  for (const player of players) {
+    ensure(player && /^p\d{1,2}$/.test(player.id) && /^\d{1,3}$/.test(player.number) && validText(player.name, 40));
+    validateStats(player.stats);
+  }
+}
 
 export function parseSharedReport(text) {
   if (typeof text !== 'string' || text.length > MAX_FILE_SIZE) throw new Error('共有レポートは1MB以下にしてください。');
@@ -90,6 +118,23 @@ export function parseSharedReport(text) {
   for (const player of report.players) {
     ensure(player && /^p\d{1,2}$/.test(player.id) && /^\d{1,3}$/.test(player.number) && validText(player.name, 40));
     validateStats(player.stats);
+  }
+  if (report.games !== undefined) {
+    ensure(Array.isArray(report.games) && report.games.length === (report.gameCount || 1) && report.games.length <= 999);
+    for (const detail of report.games) {
+      ensure(detail && validDate(detail.date) && validText(detail.format, 40) && ['live', 'finished'].includes(detail.status));
+      ensure(validText(detail.teamName, 40) && validText(detail.opponentName, 40));
+      ensure(Number.isSafeInteger(detail.opponentScore) && detail.opponentScore >= 0 && detail.opponentScore <= 999999);
+      ensure(Array.isArray(detail.periods) && detail.periods.length >= 1 && detail.periods.length <= 50);
+      for (const period of detail.periods) ensure(period && validText(period.label, 12) && Number.isSafeInteger(period.home) && period.home >= 0 && period.home <= 999999 && Number.isSafeInteger(period.away) && period.away >= 0 && period.away <= 999999);
+      ensure(detail.team && typeof detail.team === 'object');
+      validateStats(detail.team);
+      validatePlayers(detail.players);
+      ensure(detail.players.length === report.players.length && detail.players.every((player, index) => player.id === report.players[index].id));
+      for (const key of STAT_KEYS) ensure(detail.players.reduce((sum, player) => sum + player.stats[key], 0) === detail.team[key]);
+      ensure(detail.periods.reduce((sum, period) => sum + period.home, 0) === detail.team.PTS);
+      ensure(detail.periods.reduce((sum, period) => sum + period.away, 0) === detail.opponentScore);
+    }
   }
   validateStats(report.team);
   for (const key of STAT_KEYS) ensure(report.players.reduce((sum, player) => sum + player.stats[key], 0) === report.team[key]);
