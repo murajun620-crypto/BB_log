@@ -1,6 +1,6 @@
 # Project Status
 
-バスケットボールの試合記録・共有を行うオフライン対応PWA。正規リポジトリは `Documents/Github/BB_log`、公開先は `https://murajun620-crypto.github.io/BB_log/`。アプリは1.0.26。
+バスケットボールの試合記録・共有を行うオフライン対応PWA。正規リポジトリは `Documents/Github/BB_log`、公開先は `https://murajun620-crypto.github.io/BB_log/`。アプリは1.0.27。
 
 # Recent Changes
 
@@ -14,6 +14,7 @@
 - 複数試合共有で単一試合用の未定義データを参照していたエラーを修正。設定画面に更新適用ボタンを追加した。
 - 集計画面上部に試合ごとのスコア一覧を表示し、各試合からBOX SCOREへ移動できるようにした。
 - 複数試合の共有データに各試合の詳細スタッツを含め、Readerでも試合別スコア・ピリオド・選手スタッツを切り替えられるようにした。選手詳細は全試合集計・1試合平均・各試合を選択できる。
+- Readerをライトモード固定にし、選手詳細の試合選択を修正。Readerから本体アプリへ戻るボタンを追加した。
 - 起動時に `pwa` 状態の初期化が抜けていた不具合を修正。更新後の「s.pwa.ready」エラーを防止。
 - Worker secrets `PUBLISHER_TOKEN` / `PASSWORD_PEPPER` はCloudflareへ登録済み。管理キーの控えはローカルの無視ファイル `cloudflare/.publisher-token` にあり、GitHubへは送らない。
 - ローカルAPI・ブラウザ・回帰テストは通過。公開後の実環境はこの環境からQUIC/TLSエラーが出るため、ユーザー環境で疎通確認が必要。

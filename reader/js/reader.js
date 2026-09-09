@@ -17,6 +17,24 @@ const formatDate = date => String(date || '').replaceAll('-', '.');
 const average = (value, games) => (value / games).toFixed(1);
 const metric = (value, games) => displayMode === 'average' && games > 1 ? average(value, games) : value;
 const modeText = () => displayMode === 'average' ? '平均' : '合計';
+function ensureReaderBackButton() {
+  const header = app.querySelector('.reader-header');
+  if (!header || header.querySelector('.reader-app-link')) return;
+  const actions = document.createElement('div');
+  actions.className = 'reader-header-actions';
+  const link = document.createElement('a');
+  link.className = 'reader-app-link';
+  link.href = '../';
+  link.textContent = 'アプリに戻る';
+  actions.append(link);
+  const readOnly = header.querySelector('.read-only');
+  if (readOnly) { readOnly.remove(); actions.append(readOnly); }
+  header.append(actions);
+}
+function renderApp(html) {
+  app.innerHTML = html;
+  ensureReaderBackButton();
+}
 function shooting(stats, games = 1) {
   return `<div class="shooting-grid">${[['FG', 'FGM', 'FGA'], ['2P', 'P2M', 'P2A'], ['3P', 'P3M', 'P3A'], ['FT', 'FTM', 'FTA']].map(([label, made, attempts]) => `<div><span>${label}</span><strong>${stats[made]}<small>/${stats[attempts]}</small></strong><b>${percent(stats[made], stats[attempts])}</b>${games > 1 ? `<em class="shooting-average">平均 ${average(stats[made], games)}/${average(stats[attempts], games)}</em>` : ''}</div>`).join('')}</div>`;
 }
@@ -72,7 +90,7 @@ async function render(password = '') {
   const short = location.hash.match(/^#s\/([A-Za-z0-9_-]{22})$/);
   report = null;
   if (!payload && !short) {
-    app.innerHTML = location.hash ? errorView('共有リンクの形式が不正です。') : landingView();
+    renderApp(location.hash ? errorView('共有リンクの形式が不正です。') : landingView());
     return;
   }
   app.innerHTML = loadingView();
@@ -82,7 +100,7 @@ async function render(password = '') {
     report = parsed;
     selectedGameIndex = null;
     playerDisplay = displayMode;
-    app.innerHTML = reportView(parsed);
+    renderApp(reportView(parsed));
   } catch (error) {
     if (sequence !== requestNumber) return;
     if (['password_required', 'wrong_password'].includes(error.code)) {
@@ -96,7 +114,7 @@ async function render(password = '') {
       document.querySelector('#share-password').focus();
       return;
     }
-    app.innerHTML = errorView(error?.message || '共有レポートを読み取れませんでした。');
+    renderApp(errorView(error?.message || '共有レポートを読み取れませんでした。'));
     app.querySelector('.error-card').insertAdjacentHTML('beforeend', '<button id="retry-share" type="button">再試行</button>');
     document.querySelector('#retry-share').addEventListener('click', () => void render());
   }
@@ -115,18 +133,19 @@ function openPlayer(playerId) {
   const options = detailGames.length > 1 ? `<div class="detail-mode-row"><span>表示する試合</span><select data-action="select-player-game" data-player-id="${esc(playerId)}" aria-label="選手スタッツの対象試合"><option value="total" ${playerDisplay === 'total' ? 'selected' : ''}>全試合集計</option><option value="average" ${playerDisplay === 'average' ? 'selected' : ''}>1試合平均</option>${detailGames.map((game, index) => `<option value="${index}" ${String(gameIndex) === String(index) ? 'selected' : ''}>${index + 1}試合目：${esc(formatDate(game.date))} vs. ${esc(game.opponentName)}</option>`).join('')}</select></div>` : '';
   const context = selectedGame ? `${selectedGame.teamName} vs ${selectedGame.opponentName} · ${formatDate(selectedGame.date)}` : `${report.teamName} vs ${report.opponentName} · ${report.gameCount > 1 ? '全試合集計' : formatDate(report.date)}`;
   playerDialog.innerHTML = `<div class="dialog-handle"></div><button class="dialog-close" type="button" data-close-dialog aria-label="閉じる">×</button>${options}<p class="dialog-context">${esc(context)}</p><div class="player-detail"><span class="jersey">${esc(player.number)}</span><div><h2 id="player-dialog-title">${esc(player.name)}</h2><p><b>${playerValue(player.stats.PTS)}</b> PTS</p></div></div>${shooting(player.stats, selectedCount)}<div class="detail-stats">${['OREB', 'DREB', 'REB', 'AST', 'STL', 'BLK', 'TO', 'PF'].map(key => `<span><small>${statLabel(key)}</small><b>${playerValue(player.stats[key])}</b></span>`).join('')}</div>`;
-  if (typeof playerDialog.showModal === 'function') playerDialog.showModal();
-  else playerDialog.setAttribute('open', '');
+  if (!playerDialog.open && typeof playerDialog.showModal === 'function') playerDialog.showModal();
+  else if (!playerDialog.open) playerDialog.setAttribute('open', '');
 }
 
 document.addEventListener('click', event => {
   const toggle = event.target.closest('[data-action]');
-  if (toggle?.dataset.action === 'toggle-stat-mode') { displayMode = displayMode === 'average' ? 'total' : 'average'; if (report) app.innerHTML = reportView(report); return; }
+  if (toggle?.dataset.action === 'select-player-game') return;
+  if (toggle?.dataset.action === 'toggle-stat-mode') { displayMode = displayMode === 'average' ? 'total' : 'average'; if (report) renderApp(reportView(report)); return; }
   if (toggle?.dataset.action === 'select-game') {
     const index = Number(toggle.dataset.gameIndex);
     selectedGameIndex = index < 0 ? null : Number.isInteger(index) ? index : null;
     playerDisplay = selectedGameIndex === null ? displayMode : String(selectedGameIndex);
-    if (report) app.innerHTML = reportView(report);
+    if (report) renderApp(reportView(report));
     return;
   }
   const player = event.target.closest('[data-player-id]');
