@@ -137,3 +137,47 @@ dialog::backdrop { background: rgba(14, 28, 23, .48); }
 
 /* Reader is intentionally light even when the device uses dark appearance. */
 @media (prefers-color-scheme: dark) { :root { color-scheme: light; --bg: #eef3f0; --surface: #ffffff; --surface-subtle: #e6eeea; --text: #17221e; --muted: #65716c; --line: #d6dfd9; --accent: #17634f; --accent-dark: #123e35; --accent-soft: #d9eee5; --shadow: 0 10px 35px rgba(21, 44, 36, .09); } .brand-mark { color: #fff; background: var(--accent-dark); } .identity { color: var(--accent-dark); } .score-card, .landing-card { color: #f8fffb; background: var(--accent-dark); } .total-card { background: var(--surface-subtle); } }
+
+/* Keep the Reader report layout aligned with the main app's BOX SCORE view. */
+.report-card { margin-top: 12px; padding: 18px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface); }
+.game-meta { display: flex; align-items: center; justify-content: space-between; gap: 8px; color: var(--muted); font-size: 11px; }
+.report-status { flex: 0 0 auto; padding: 5px 8px; border-radius: 99px; color: var(--accent); background: var(--accent-soft); font-size: 10px; font-weight: 800; }
+.report-hint { color: var(--muted); font-size: 10px; }
+.report-score { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; padding: 22px 0; }
+.report-score > div:last-child { text-align: right; }
+.report-score h2 { margin: 0; overflow-wrap: anywhere; font-size: 12px; }
+.report-score > div > span { display: block; margin-bottom: 5px; color: var(--muted); font-size: 8px; letter-spacing: .7px; }
+.report-score > strong { display: flex; align-items: center; gap: 10px; font-size: 33px; letter-spacing: -1.5px; font-variant-numeric: tabular-nums; }
+.report-score > strong > span { color: var(--muted); font-size: 20px; }
+.period-scores { display: flex; flex-wrap: wrap; gap: 4px; padding-top: 12px; border-top: 1px solid var(--line); }
+.period-scores > div { display: grid; flex: 1 0 30px; gap: 6px; text-align: center; font-size: 12px; }
+.period-scores > div:first-child { flex: 1.5 0 48px; text-align: left; font-size: 10px; }
+.period-scores span { color: var(--muted); font-size: 10px; }
+.section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 32px; margin: 24px 0 12px; }
+.section-heading h2 { margin: 0; font-size: 19px; letter-spacing: -.02em; }
+.section-heading > span { color: var(--muted); font-size: 11px; }
+.panel { padding: 0; }
+.box-table-wrap { overflow: hidden; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.box-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-variant-numeric: tabular-nums; }
+.box-table th, .box-table td { padding: 12px 0; border-bottom: 1px solid var(--line); text-align: center; font-size: 13px; }
+.box-table th:first-child { width: 30%; padding-left: 10px; text-align: left; }
+.box-table thead th { padding: 12px 0; color: var(--muted); font-size: 8px; font-weight: 650; }
+.box-table button { display: flex; flex-direction: column; justify-content: center; width: 100%; min-height: 44px; padding: 5px 0; border: 0; color: inherit; background: transparent; text-align: left; cursor: pointer; }
+.box-table button b { font-size: 12px; }
+.box-table button span { width: 100%; overflow: hidden; color: var(--muted); font-size: 10px; font-weight: 400; text-overflow: ellipsis; white-space: nowrap; }
+.box-table .pts-cell { color: var(--accent); font-weight: 750; }
+.box-table .total-row { background: var(--accent-soft); font-weight: 750; }
+.box-table tbody tr:last-child > * { border-bottom: 0; }
+.aggregate-game-scores { display: grid; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.aggregate-game-score { display: flex; align-items: center; gap: 10px; width: 100%; min-height: 58px; padding: 9px 10px 9px 12px; border: 1px solid var(--line); border-radius: 12px; color: var(--text); background: var(--surface); text-align: left; cursor: pointer; }
+.aggregate-game-score:active, .aggregate-game-score.selected { border-color: var(--accent); background: var(--accent-soft); }
+.aggregate-game-score .game-score { flex: 0 0 auto; font-size: 20px; }
+.aggregate-game-score .game-score-arrow { flex: 0 0 auto; }
+.reader-shell > .rebound-total { margin-bottom: 4px; }
+.player-detail { margin: 6px 0 25px; }
+.player-detail .jersey { min-width: 52px; height: auto; padding: 8px 12px; color: var(--accent); background: var(--accent-soft); }
+.player-detail h2 { flex: 1; overflow-wrap: anywhere; }
+.player-detail p b { color: var(--text); }
+.detail-stats > span { min-height: 55px; padding: 12px; background: var(--bg); }
+.detail-stats > span b { font-size: 23px; }
+dialog { width: 100%; max-width: 680px; margin: 0 auto; }
