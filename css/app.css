@@ -98,7 +98,15 @@ h3 { font-size: 16px; font-weight: 650; }
 .history-select:has(input:checked) { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); }
 .history-select input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); }
 .history-select input:disabled { opacity: .35; }
-.aggregate-game-list { display: grid; gap: 4px; margin: 17px 0 0; padding: 12px 0 0 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
+.aggregate-game-scores { display: grid; gap: 8px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
+.aggregate-game-score { display: flex; align-items: center; gap: 10px; min-height: 58px; padding: 9px 10px 9px 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); color: var(--text); }
+.aggregate-game-score:active { border-color: var(--accent); background: var(--accent-soft); }
+.aggregate-game-info { min-width: 0; flex: 1; }
+.aggregate-game-info b, .aggregate-game-info small { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.aggregate-game-info b { color: var(--muted); font-size: 10px; font-weight: 650; }
+.aggregate-game-info small { margin-top: 3px; color: var(--text); font-size: 12px; }
+.aggregate-game-score .game-score { flex: 0 0 auto; font-size: 20px; }
+.aggregate-game-score > .icon { width: 16px; flex: 0 0 auto; color: var(--muted); }
 .delete-game-button { display: inline-flex; align-items: center; justify-content: center; background: var(--surface); color: var(--muted); border: 1px solid var(--line); border-radius: 15px; }
 .delete-game-button:active { color: var(--danger); background: var(--danger-soft); }
 .game-card { display: block; border: 1px solid var(--line); background: var(--surface); padding: 17px; border-radius: 15px; }
