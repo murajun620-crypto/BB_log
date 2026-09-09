@@ -17,24 +17,8 @@ const formatDate = date => String(date || '').replaceAll('-', '.');
 const average = (value, games) => (value / games).toFixed(1);
 const metric = (value, games) => displayMode === 'average' && games > 1 ? average(value, games) : value;
 const modeText = () => displayMode === 'average' ? '平均' : '合計';
-function ensureReaderBackButton() {
-  const header = app.querySelector('.reader-header');
-  if (!header || header.querySelector('.reader-app-link')) return;
-  const actions = document.createElement('div');
-  actions.className = 'reader-header-actions';
-  const link = document.createElement('button');
-  link.type = 'button';
-  link.className = 'reader-app-link';
-  link.textContent = '前の画面に戻る';
-  link.addEventListener('click', () => { if (history.length > 1) history.back(); else location.href = '../'; });
-  actions.append(link);
-  const readOnly = header.querySelector('.read-only');
-  if (readOnly) { readOnly.remove(); actions.append(readOnly); }
-  header.append(actions);
-}
 function renderApp(html) {
   app.innerHTML = html;
-  ensureReaderBackButton();
 }
 function shooting(stats, games = 1) {
   return `<div class="shooting-grid">${[['FG', 'FGM', 'FGA'], ['2P', 'P2M', 'P2A'], ['3P', 'P3M', 'P3A'], ['FT', 'FTM', 'FTA']].map(([label, made, attempts]) => `<div><span>${label}</span><strong>${stats[made]}<small>/${stats[attempts]}</small></strong><b>${percent(stats[made], stats[attempts])}</b>${games > 1 ? `<em class="shooting-average">平均 ${average(stats[made], games)}/${average(stats[attempts], games)}</em>` : ''}</div>`).join('')}</div>`;

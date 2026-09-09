@@ -20,8 +20,6 @@ button:focus-visible { outline: 3px solid #2a8c70; outline-offset: 3px; }
 
 .reader-shell, .landing, .loading { width: min(100%, 680px); min-height: 100svh; margin: 0 auto; padding: max(18px, env(safe-area-inset-top)) 16px max(32px, env(safe-area-inset-bottom)); }
 .reader-header { display: flex; align-items: center; justify-content: space-between; min-height: 40px; }
-.reader-header-actions { display: flex; align-items: center; gap: 7px; }
-.reader-app-link { display: inline-flex; align-items: center; min-height: 30px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 99px; color: var(--accent); background: var(--surface); font-size: 11px; font-weight: 800; text-decoration: none; white-space: nowrap; }
 .identity { display: flex; align-items: center; gap: 9px; color: var(--accent-dark); letter-spacing: .09em; }
 .identity strong, .identity span { display: block; font-size: 11px; line-height: 1.1; }
 .identity strong { font-weight: 800; }
