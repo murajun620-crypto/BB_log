@@ -105,7 +105,7 @@ function render() {
     html = page === 'live' ? view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.0.0 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.0.1 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game())));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -267,7 +267,7 @@ function gameShareMessage(g, suffix = 'Courtside ReaderでBOX SCOREを見る') {
 function startShotZone(type, playerId) {
   const player = game()?.roster.find(candidate => candidate.id === playerId);
   pending = { kind: 'advanced-shot', type, playerId };
-  showSheet(`${STATS[type].label} · 位置`, view.shotZonePicker(player?.name || '選手', STATS[type].name), 'player-sheet');
+  showSheet(`${STATS[type].label} · 位置`, view.shotZonePicker(player?.name || '選手', STATS[type]), 'player-sheet');
 }
 function aggregateShareContext() {
   const games = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -440,6 +440,13 @@ document.addEventListener('click', event => {
   if (!button || button.disabled || state.busy) return;
   const fn = handlers[button.dataset.action];
   if (fn) Promise.resolve().then(() => fn(button)).catch(reportError);
+});
+document.addEventListener('keydown', event => {
+  if (!['Enter', ' '].includes(event.key)) return;
+  const zone = event.target.closest?.('[data-action="shot-zone"]');
+  if (!zone) return;
+  event.preventDefault();
+  zone.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 });
 document.addEventListener('input', event => {
   if (event.target.closest('#team-form')) { readTeamForm(); persistDraft('teamDraft', teamDraft); }

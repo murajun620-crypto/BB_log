@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { STATS, aggregate, aggregateGames, percent, lineup, validateGame, validateTeam, makePeriods, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
+import { shotZonePicker } from '../js/views.js';
 
 const fixture = () => {
   const players = Array.from({ length: 6 }, (_, i) => ({ id: `player-${i}`, number: `${i + 4}`, name: `選手${i + 1}` }));
@@ -43,6 +44,16 @@ test('advanced shot zones validate and survive file and link sharing', async () 
   assert.deepEqual((await parseSharePayload(payload)).shots, shared.shots);
   const invalid = structuredClone(events); invalid[0].shotZone = 'not-a-zone';
   assert.throws(() => validateGame(game, invalid), /シュート位置/);
+});
+test('shot court map enables only matching two- or three-point zones', () => {
+  const twoPoint = shotZonePicker('選手1', STATS['2PM']);
+  const threePoint = shotZonePicker('選手1', STATS['3PM']);
+  assert.equal((twoPoint.match(/data-action="shot-zone"/g) || []).length, 8);
+  assert.equal((threePoint.match(/data-action="shot-zone"/g) || []).length, 5);
+  assert.match(twoPoint, /shot-map-zone three-point disabled/);
+  assert.match(threePoint, /shot-map-zone two-point disabled/);
+  assert.match(twoPoint, /data-zone="rim"/);
+  assert.match(threePoint, /data-zone="three-top"/);
 });
 test('selected games aggregate team and player stats by stable player identity', () => {
   const first = fixture(); first.add('3PM'); first.add('AST', { playerId: 'player-1' });

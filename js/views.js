@@ -185,9 +185,28 @@ export function pickerHTML(g, events, type, options = {}) {
   const group = (list, label) => list.length ? `<p class="picker-label">${label}</p><div class="player-grid">${list.map(p => action(options.action || 'pick-player', `<strong>#${esc(p.number)}</strong><span>${esc(p.name)}</span>`, 'player-button', `data-id="${p.id}"`)).join('')}</div>` : '';
   return `<p class="picker-instruction">${esc(options.instruction || '記録する選手をタップ')}</p>${group(tracked ? players.filter(p => on.includes(p.id)) : players, tracked ? 'ON COURT' : 'PLAYERS')}${tracked ? `<details ${options.only || options.showBench ? 'open' : ''} class="bench-list"><summary>ベンチの選手を表示</summary>${group(players.filter(p => !on.includes(p.id)), 'BENCH')}</details>` : ''}`;
 }
-export function shotZonePicker(playerName, statLabel) {
-  const zones = SHOT_ZONES.map(zone => `<button type="button" class="shot-zone" data-action="shot-zone" data-zone="${zone.id}">${esc(zone.label)}</button>`).join('');
-  return `<p class="picker-instruction">${esc(playerName)} · ${esc(statLabel)}。コート上の位置をタップ</p><div class="shot-zone-legend"><span>○ 成功</span><span>× 失敗</span></div><div class="shot-court-picker" aria-label="ハーフコートのシュート位置"><svg viewBox="0 0 360 460" aria-hidden="true"><rect x="12" y="12" width="336" height="436" rx="3"/><path d="M38 448Q180 130 322 448M125 392V284h110v108M125 284a55 55 0 1 0 110 0M155 405h50M145 420h70M168 420a12 12 0 1 0 24 0"/><path d="M12 448h326"/></svg><div class="shot-zone-grid">${zones}</div></div><button type="button" class="button secondary full spaced" data-action="cancel-shot-zone">入力をやめる</button>`;
+const SHOT_MAP_ZONES = [
+  { id: 'three-left-corner', path: 'M20 440H50V330H20Z', x: 35, y: 382, lines: ['左コーナー', '3P'] },
+  { id: 'three-left-wing', path: 'M20 20H120L112 205Q78 252 50 330H20Z', x: 72, y: 150, lines: ['左ウイング', '3P'] },
+  { id: 'three-top', path: 'M120 20H240L248 205Q180 145 112 205Z', x: 180, y: 95, lines: ['正面3P'] },
+  { id: 'three-right-wing', path: 'M240 20H340V330H310Q282 252 248 205Z', x: 288, y: 150, lines: ['右ウイング', '3P'] },
+  { id: 'three-right-corner', path: 'M310 330H340V440H310Z', x: 325, y: 382, lines: ['右コーナー', '3P'] },
+  { id: 'short-left', path: 'M50 330Q78 292 100 290L120 300V440H50Z', x: 86, y: 364, lines: ['左ショート'] },
+  { id: 'mid-left', path: 'M112 205Q138 182 160 180V300H120L100 290Q98 242 112 205Z', x: 133, y: 246, lines: ['左ミドル'] },
+  { id: 'mid-center', path: 'M160 180Q180 165 200 180V345H160Z', x: 180, y: 248, lines: ['正面ミドル'] },
+  { id: 'mid-right', path: 'M248 205Q222 182 200 180V300H240L260 290Q262 242 248 205Z', x: 227, y: 246, lines: ['右ミドル'] },
+  { id: 'short-right', path: 'M310 330Q282 292 260 290L240 300V440H310Z', x: 274, y: 364, lines: ['右ショート'] },
+  { id: 'paint-left', path: 'M120 300H160V440H120Z', x: 140, y: 372, lines: ['左ペイント'] },
+  { id: 'rim', path: 'M160 345H200V440H160Z', x: 180, y: 392, lines: ['ゴール下'] },
+  { id: 'paint-right', path: 'M200 300H240V440H200Z', x: 220, y: 372, lines: ['右ペイント'] },
+];
+export function shotZonePicker(playerName, stat) {
+  const isThreePoint = stat?.type?.startsWith('3');
+  const active = zone => zone.id.startsWith('three-') === isThreePoint;
+  const zones = SHOT_MAP_ZONES.map(zone => `<path class="shot-map-zone ${zone.id.startsWith('three-') ? 'three-point' : 'two-point'} ${active(zone) ? 'active' : 'disabled'}" d="${zone.path}" ${active(zone) ? `data-action="shot-zone" data-zone="${zone.id}" role="button" tabindex="0" aria-label="${esc(zone.lines.join(' '))}"` : 'aria-hidden="true"'}/>`).join('');
+  const labels = SHOT_MAP_ZONES.map(zone => `<text class="shot-map-label ${active(zone) ? 'active' : 'disabled'}" x="${zone.x}" y="${zone.y}">${zone.lines.map((line, index) => `<tspan x="${zone.x}" dy="${index ? '1.25em' : '0'}">${esc(line)}</tspan>`).join('')}</text>`).join('');
+  const target = isThreePoint ? '3Pエリアをタップ' : '2Pエリアをタップ';
+  return `<p class="picker-instruction">${esc(playerName)} · ${esc(stat?.name)}。${target}</p><div class="shot-zone-legend"><span class="target-zone">${target}</span><span>薄いエリアは選べません</span></div><svg class="shot-court-map" viewBox="0 0 360 460" role="img" aria-label="ハーフコートのシュート位置"><rect class="court-surface" x="20" y="20" width="320" height="420" rx="3"/>${zones}<g class="court-markings"><path d="M20 20H340V440H20ZM50 440V330M310 440V330M50 330Q180 135 310 330M120 392V300H240V392M120 300a60 60 0 1 0 120 0M155 405H205M145 420H215M168 420a12 12 0 1 0 24 0"/></g>${labels}</svg><button type="button" class="button secondary full spaced" data-action="cancel-shot-zone">入力をやめる</button>`;
 }
 export function eventsHTML(g, events) {
   const active = activeEvents(events).reverse();
