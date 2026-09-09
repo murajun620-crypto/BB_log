@@ -33,6 +33,17 @@ test('edits and soft deletions change score, player totals and periods without d
   assert.equal(a.team.PTS, 2); assert.equal(a.team.FGA, 2); assert.equal(a.team.FGM, 1);
   assert.equal(a.opponent, 0); assert.equal(events.length, 3);
 });
+test('advanced shot zones validate and survive file and link sharing', async () => {
+  const { game, events, add } = fixture();
+  add('2PM', { shotZone: 'rim' }); add('3PX', { shotZone: 'three-top' });
+  validateGame(game, events);
+  const shared = parseSharedReport(JSON.stringify(createSharedReport(game, events)));
+  assert.deepEqual(shared.shots, [{ playerId: 'p1', zone: 'rim', result: 'made' }, { playerId: 'p1', zone: 'three-top', result: 'miss' }]);
+  const payload = await createCompressedSharePayload(game, events);
+  assert.deepEqual((await parseSharePayload(payload)).shots, shared.shots);
+  const invalid = structuredClone(events); invalid[0].shotZone = 'not-a-zone';
+  assert.throws(() => validateGame(game, invalid), /シュート位置/);
+});
 test('selected games aggregate team and player stats by stable player identity', () => {
   const first = fixture(); first.add('3PM'); first.add('AST', { playerId: 'player-1' });
   const second = structuredClone(first.game);

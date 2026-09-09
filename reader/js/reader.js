@@ -1,5 +1,6 @@
 import { parseSharePayload } from '../../js/shared-report.js';
 import { openCloudShare } from '../../js/cloud-share.js';
+import { SHOT_ZONES } from '../../js/domain.js';
 
 const app = document.querySelector('#app');
 const playerDialog = document.querySelector('#player-dialog');
@@ -19,9 +20,20 @@ const metric = (value, games) => displayMode === 'average' && games > 1 ? averag
 const modeText = () => displayMode === 'average' ? '平均' : '合計';
 function renderApp(html) {
   app.innerHTML = html;
+  if (report && app.querySelector('.reader-shell')) {
+    const detailGames = Array.isArray(report.games) && report.games.length === report.gameCount ? report.games : [];
+    const currentGame = selectedGameIndex === null ? null : detailGames[selectedGameIndex];
+    const source = currentGame || report;
+    [...app.querySelectorAll('.section-heading')].find(element => element.querySelector('h2')?.textContent === 'チーム・シューティング')?.insertAdjacentHTML('beforebegin', shotChart(source.shots || []));
+  }
 }
 function shooting(stats, games = 1) {
   return `<div class="shooting-grid">${[['FG', 'FGM', 'FGA'], ['2P', 'P2M', 'P2A'], ['3P', 'P3M', 'P3A'], ['FT', 'FTM', 'FTA']].map(([label, made, attempts]) => `<div><span>${label}</span><strong>${stats[made]}<small>/${stats[attempts]}</small></strong><b>${percent(stats[made], stats[attempts])}</b>${games > 1 ? `<em class="shooting-average">平均 ${average(stats[made], games)}/${average(stats[attempts], games)}</em>` : ''}</div>`).join('')}</div>`;
+}
+function shotChart(shots = [], playerId = null) {
+  const filtered = shots.filter(shot => shot?.zone && (!playerId || shot.playerId === playerId));
+  if (!filtered.length) return '';
+  return `<section class="shot-chart"><div class="section-heading"><h2>ショットチャート</h2><span>○ 成功 / × 失敗</span></div><div class="shot-chart-grid">${SHOT_ZONES.map(zone => { const zoneShots = filtered.filter(shot => shot.zone === zone.id); return `<div class="shot-chart-zone" data-zone="${zone.id}"><span>${esc(zone.label)}</span>${zoneShots.length ? `<div class="shot-markers">${zoneShots.map(shot => `<span class="shot-marker ${shot.result === 'made' ? 'made' : 'miss'}">${shot.result === 'made' ? '○' : '×'}</span>`).join('')}</div><small>${zoneShots.filter(shot => shot.result === 'made').length}/${zoneShots.length}</small>` : '<small>—</small>'}</div>`; }).join('')}</div></section>`;
 }
 
 function statCells(stats, games = 1) {
@@ -133,7 +145,7 @@ function openPlayer(playerId) {
   const playerValue = value => playerDisplay === 'average' && !selectedGame ? average(value, report.gameCount) : value;
   const options = detailGames.length > 1 ? `<div class="detail-mode-row"><span>表示する試合</span><select data-action="select-player-game" data-player-id="${esc(playerId)}" aria-label="選手スタッツの対象試合"><option value="total" ${playerDisplay === 'total' ? 'selected' : ''}>全試合集計</option><option value="average" ${playerDisplay === 'average' ? 'selected' : ''}>1試合平均</option>${detailGames.map((game, index) => `<option value="${index}" ${String(gameIndex) === String(index) ? 'selected' : ''}>${index + 1}試合目：${esc(formatDate(game.date))} vs. ${esc(game.opponentName)}</option>`).join('')}</select></div>` : '';
   const context = selectedGame ? `${selectedGame.teamName} vs ${selectedGame.opponentName} · ${formatDate(selectedGame.date)}` : `${report.teamName} vs ${report.opponentName} · ${report.gameCount > 1 ? '全試合集計' : formatDate(report.date)}`;
-  playerDialog.innerHTML = `<div class="dialog-handle"></div><button class="dialog-close" type="button" data-close-dialog aria-label="閉じる">×</button>${options}<p class="dialog-context">${esc(context)}</p><div class="player-detail"><span class="jersey">${esc(player.number)}</span><div><h2 id="player-dialog-title">${esc(player.name)}</h2><p><b>${playerValue(player.stats.PTS)}</b> PTS</p></div></div>${shooting(player.stats, selectedCount)}<div class="detail-stats">${['OREB', 'DREB', 'REB', 'AST', 'STL', 'BLK', 'TO', 'PF'].map(key => `<span><small>${statLabel(key)}</small><b>${playerValue(player.stats[key])}</b></span>`).join('')}</div>`;
+  playerDialog.innerHTML = `<div class="dialog-handle"></div><button class="dialog-close" type="button" data-close-dialog aria-label="閉じる">×</button>${options}<p class="dialog-context">${esc(context)}</p><div class="player-detail"><span class="jersey">${esc(player.number)}</span><div><h2 id="player-dialog-title">${esc(player.name)}</h2><p><b>${playerValue(player.stats.PTS)}</b> PTS</p></div></div>${shooting(player.stats, selectedCount)}<div class="detail-stats">${['OREB', 'DREB', 'REB', 'AST', 'STL', 'BLK', 'TO', 'PF'].map(key => `<span><small>${statLabel(key)}</small><b>${playerValue(player.stats[key])}</b></span>`).join('')}</div>${shotChart(source.shots || [], playerId)}`;
   if (!playerDialog.open && typeof playerDialog.showModal === 'function') playerDialog.showModal();
   else if (!playerDialog.open) playerDialog.setAttribute('open', '');
 }

@@ -172,6 +172,29 @@ dialog::backdrop { background: rgba(14, 28, 23, .48); }
 .aggregate-game-score .game-score { flex: 0 0 auto; font-size: 20px; }
 .aggregate-game-score .game-score-arrow { flex: 0 0 auto; }
 .reader-shell > .rebound-total { margin-bottom: 4px; }
+.shot-chart { margin-top: 24px; }
+.shot-chart .section-heading { margin-top: 0; }
+.shot-chart-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
+.shot-chart-zone { min-height: 60px; padding: 6px 2px; border: 1px solid var(--line); border-radius: 9px; color: var(--muted); background: var(--surface); text-align: center; font-size: 9px; }
+.shot-chart-zone > span { display: block; min-height: 22px; }
+.shot-chart-zone small { display: block; margin-top: 3px; color: var(--muted); font-size: 9px; }
+.shot-markers { display: flex; flex-wrap: wrap; justify-content: center; gap: 2px; }
+.shot-marker { display: inline-flex; align-items: center; justify-content: center; width: 17px; height: 17px; border-radius: 50%; font-size: 14px; font-weight: 800; line-height: 1; }
+.shot-marker.made { color: var(--accent); background: var(--accent-soft); }
+.shot-marker.miss { color: #a94a43; background: #f8e4e1; }
+.shot-chart-zone[data-zone="rim"] { grid-column: 3; grid-row: 3; }
+.shot-chart-zone[data-zone="paint-left"] { grid-column: 2; grid-row: 3; }
+.shot-chart-zone[data-zone="paint-right"] { grid-column: 4; grid-row: 3; }
+.shot-chart-zone[data-zone="short-left"] { grid-column: 1; grid-row: 2; }
+.shot-chart-zone[data-zone="short-right"] { grid-column: 5; grid-row: 2; }
+.shot-chart-zone[data-zone="mid-left"] { grid-column: 2; grid-row: 2; }
+.shot-chart-zone[data-zone="mid-center"] { grid-column: 3; grid-row: 2; }
+.shot-chart-zone[data-zone="mid-right"] { grid-column: 4; grid-row: 2; }
+.shot-chart-zone[data-zone="three-left-corner"] { grid-column: 1; grid-row: 1; }
+.shot-chart-zone[data-zone="three-left-wing"] { grid-column: 2; grid-row: 1; }
+.shot-chart-zone[data-zone="three-top"] { grid-column: 3; grid-row: 1; }
+.shot-chart-zone[data-zone="three-right-wing"] { grid-column: 4; grid-row: 1; }
+.shot-chart-zone[data-zone="three-right-corner"] { grid-column: 5; grid-row: 1; }
 .player-detail { margin: 6px 0 25px; }
 .player-detail .jersey { min-width: 52px; height: auto; padding: 8px 12px; color: var(--accent); background: var(--accent-soft); }
 .player-detail h2 { flex: 1; overflow-wrap: anywhere; }

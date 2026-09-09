@@ -10,7 +10,7 @@ import { cloudSettingsHTML, setupCloudShareUI } from './cloud-share-ui.js';
 const app = document.querySelector('#app');
 const sheet = document.querySelector('#sheet');
 const toastNode = document.querySelector('#toast');
-const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, historySelection: new Set(), aggregateMode: 'total', aggregateGameId: null, aggregatePlayerGameId: 'total', page: 'home', gameId: null, busy: false, lastError: '' };
+const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, advancedMode: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, historySelection: new Set(), aggregateMode: 'total', aggregateGameId: null, aggregatePlayerGameId: 'total', page: 'home', gameId: null, busy: false, lastError: '' };
 let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, resolvedShareHash = '', sharePayloadPromise = null, pwaRegistration = null;
 const getSetting = key => state.data.settings.find(s => s.key === key)?.value;
 const game = () => state.data.games.find(g => g.id === state.gameId);
@@ -27,7 +27,7 @@ function applyTheme() {
 }
 async function refresh() {
   state.data = await db.readAll();
-  state.preferences = { continuous: false, keepAwake: false, theme: 'system', ...getSetting('preferences') };
+  state.preferences = { continuous: false, keepAwake: false, advancedMode: false, theme: 'system', ...getSetting('preferences') };
   applyTheme();
 }
 async function syncWakeLock() {
@@ -105,6 +105,14 @@ function render() {
     html = page === 'live' ? view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 1.0.31 · BUILT FOR THE SIDELINES`);
+  if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game())));
+  if (page === 'aggregate') {
+    const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
+    const chartEvents = state.aggregateGameId ? gameEvents(state.data.games.find(candidate => candidate.id === state.aggregateGameId)) : state.data.events.filter(event => selectedForChart.some(candidate => candidate.id === event.gameId));
+    [...app.querySelectorAll('.section-heading')].find(element => element.querySelector('h2')?.textContent === 'チーム・シューティング')?.insertAdjacentHTML('beforebegin', view.shotChartHTML(chartEvents));
+  }
+  if (page === 'shared') [...app.querySelectorAll('.section-heading')].find(element => element.querySelector('h2')?.textContent === 'チーム・シューティング')?.insertAdjacentHTML('beforebegin', view.sharedShotChartHTML(sharedReport.shots || []));
   if (page === 'settings') app.querySelector('.settings-panel')?.insertAdjacentHTML('afterend', cloudSettingsHTML());
   if (page === 'settings' && !app.querySelector('#keepAwake')) {
     const continuous = app.querySelector('#continuous');
@@ -113,6 +121,10 @@ function render() {
       row.innerHTML = `<span><strong>試合中は画面をスリープさせない</strong><small>試合画面を開いている間だけ自動ロックを防ぎます。電池を消費します。</small></span><input type="checkbox" role="switch" id="keepAwake" ${state.preferences.keepAwake ? 'checked' : ''}>`;
       continuous.closest('.setting-row')?.after(row);
     }
+    const advanced = document.createElement('label'); advanced.className = 'setting-row';
+    advanced.innerHTML = '<span><strong>Advancedモード</strong><small>2P・3Pのシュート位置を記録します。</small></span><input type="checkbox" role="switch" id="advancedMode">';
+    advanced.querySelector('input').checked = state.preferences.advancedMode;
+    app.querySelector('#continuous')?.closest('.setting-row')?.after(advanced);
   }
   void syncWakeLock();
   if (state.lastError && page === 'live') {
@@ -252,6 +264,11 @@ function gameShareMessage(g, suffix = 'Courtside ReaderでBOX SCOREを見る') {
   const date = String(g.date || '').replaceAll('-', '/');
   return `${date} ${g.teamName} vs ${g.opponentName}\n${g.teamName} ${summary.team.PTS} - ${summary.opponent} ${g.opponentName}\n${suffix}`;
 }
+function startShotZone(type, playerId) {
+  const player = game()?.roster.find(candidate => candidate.id === playerId);
+  pending = { kind: 'advanced-shot', type, playerId };
+  showSheet(`${STATS[type].label} · 位置`, view.shotZonePicker(player?.name || '選手', STATS[type].name), 'player-sheet');
+}
 function aggregateShareContext() {
   const games = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
   if (games.length < 2 || new Set(games.map(candidate => candidate.teamId)).size !== 1) throw new Error('同じ自チームの試合を2試合以上選択してください。');
@@ -322,9 +339,16 @@ const handlers = {
       return busy(async () => { await record('SUB', null, { outPlayerId: out, inPlayerId: button.dataset.id }); closeSheet(); });
     } else {
       const selection = { ...pending };
+      if (state.preferences.advancedMode && ['2PM', '2PX', '3PM', '3PX'].includes(selection.type)) { startShotZone(selection.type, button.dataset.id); return; }
       return busy(async () => { const event = await record(selection.type, button.dataset.id); closeSheet(); if (!selection.followup) offerFollowup(event); });
     }
   },
+  'shot-zone': button => {
+    if (pending?.kind !== 'advanced-shot') return;
+    const selection = { ...pending };
+    return busy(async () => { const event = await record(selection.type, selection.playerId, { shotZone: button.dataset.zone }); closeSheet(); offerFollowup(event); });
+  },
+  'cancel-shot-zone': closeSheet,
   'prepare-member': button => {
     const g = game(); const team = state.data.teams.find(t => t.id === g?.teamId);
     const player = team?.players.find(p => p.id === button.dataset.id) || null;
@@ -389,8 +413,8 @@ const handlers = {
   },
   finish: () => confirm('試合を終了しますか？', 'BOX SCOREに結果をまとめます。終了後も履歴の編集や記録の再開ができます。', '試合を終了', async () => { const g = await saveGameChange({ ...game(), status: 'finished' }); closeSheet(); location.hash = `#box/${g.id}`; }),
   reopen: () => confirm('記録を再開しますか？', 'この試合を記録中に戻します。', '再開する', async () => { const g = await saveGameChange({ ...game(), status: 'live' }); closeSheet(); location.hash = `#live/${g.id}`; }),
-  'player-detail': button => showSheet('選手スタッツ', view.playerDetail(game(), gameEvents(), button.dataset.id)),
-  'shared-player-detail': button => showSheet('選手スタッツ', view.sharedPlayerDetail(sharedReport, button.dataset.id)),
+  'player-detail': button => showSheet('選手スタッツ', `${view.playerDetail(game(), gameEvents(), button.dataset.id)}${view.shotChartHTML(gameEvents(), button.dataset.id)}`),
+  'shared-player-detail': button => showSheet('選手スタッツ', `${view.sharedPlayerDetail(sharedReport, button.dataset.id)}${view.sharedShotChartHTML(sharedReport.shots || [], button.dataset.id)}`),
   'share-options': () => {
     const g = game();
     const events = gameEvents(g);
@@ -452,8 +476,8 @@ document.addEventListener('change', event => {
     }
     persistDraft('gameDraft', gameDraft);
   }
-  if (el.id === 'continuous' || el.id === 'keepAwake' || el.id === 'theme') busy(async () => {
-    const key = el.id === 'continuous' ? 'continuous' : el.id === 'keepAwake' ? 'keepAwake' : 'theme';
+  if (el.id === 'continuous' || el.id === 'keepAwake' || el.id === 'advancedMode' || el.id === 'theme') busy(async () => {
+    const key = el.id === 'continuous' ? 'continuous' : el.id === 'keepAwake' ? 'keepAwake' : el.id === 'advancedMode' ? 'advancedMode' : 'theme';
     const preferences = { ...state.preferences, [key]: key === 'theme' ? el.value : el.checked };
     await db.saveSetting('preferences', preferences); state.preferences = preferences;
     state.data.settings = state.data.settings.filter(s => s.key !== 'preferences').concat({ key: 'preferences', value: preferences });
@@ -524,7 +548,7 @@ document.addEventListener('submit', event => {
     const values = new FormData(form); const old = gameEvents().find(e => e.id === form.dataset.id);
     const e = { ...old, periodId: values.get('periodId'), updatedAt: new Date().toISOString() };
     if (old.eventType === 'OPP') e.points = Number(values.get('points'));
-    else if (old.eventType !== 'SUB') { e.eventType = values.get('eventType'); e.playerId = values.get('playerId'); e.points = STATS[e.eventType].points; }
+    else if (old.eventType !== 'SUB') { e.eventType = values.get('eventType'); e.playerId = values.get('playerId'); e.points = STATS[e.eventType].points; if (!['2PM', '2PX', '3PM', '3PX'].includes(e.eventType)) delete e.shotZone; }
     await saveGameChange(game(), e); closeSheet(); toast('記録を修正しました。');
   });
   if (form.id === 'ot-form') busy(async () => {

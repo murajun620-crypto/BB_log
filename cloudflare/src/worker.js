@@ -65,11 +65,13 @@ function canonicalReport(data) {
       gameCount: 1, teamName: game.teamName, opponentName: game.opponentName, opponentScore: game.opponentScore,
       periods: game.periods.map(p => ({ label: p.label, home: p.home, away: p.away })),
       team: stats(game.team),
+      shots: game.shots,
       players: game.players.map(p => ({ id: p.id, number: p.number, name: p.name, stats: stats(p.stats) })),
     })) : undefined,
     teamName: report.teamName, opponentName: report.opponentName, opponentScore: report.opponentScore,
     periods: report.periods.map(p => ({ label: p.label, home: p.home, away: p.away })),
     team: stats(report.team),
+    shots: report.shots,
     players: report.players.map(p => ({ id: p.id, number: p.number, name: p.name, stats: stats(p.stats) })),
   } };
 }

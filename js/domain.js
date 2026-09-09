@@ -8,6 +8,18 @@ export const STAT_DEFS = [
   ['PF', 'F', 'ファウル', 0, 'foul'],
 ].map(([type, label, name, points, tone]) => ({ type, label, name, points, tone }));
 export const STATS = Object.fromEntries(STAT_DEFS.map(s => [s.type, s]));
+export const SHOT_ZONES = [
+  ['rim', 'ゴール下'],
+  ['paint-left', '左ペイント'], ['paint-right', '右ペイント'],
+  ['short-left', '左ショート'], ['short-right', '右ショート'],
+  ['mid-left', '左ミドル'], ['mid-center', '正面ミドル'], ['mid-right', '右ミドル'],
+  ['three-left-corner', '左コーナー3P'], ['three-left-wing', '左ウイング3P'], ['three-top', '正面3P'],
+  ['three-right-wing', '右ウイング3P'], ['three-right-corner', '右コーナー3P'],
+].map(([id, label]) => ({ id, label }));
+export const SHOT_ZONE_IDS = new Set(SHOT_ZONES.map(zone => zone.id));
+export const SHOT_EVENT_TYPES = new Set(['2PM', '2PX', '3PM', '3PX']);
+export const isShotEvent = event => SHOT_EVENT_TYPES.has(event?.eventType);
+export const shotZoneLabel = zoneId => SHOT_ZONES.find(zone => zone.id === zoneId)?.label || '';
 export const uid = () => crypto.randomUUID();
 export const activeEvents = events => events.filter(e => !e.deletedAt).sort((a, b) => a.seq - b.seq);
 export const percent = (made, attempts) => attempts ? `${(made / attempts * 100).toFixed(1)}%` : '—';
@@ -76,7 +88,8 @@ export function eventLabel(game, event) {
   const player = id => { const p = game.roster.find(p => p.id === id); return p ? `#${p.number} ${p.name}` : '不明'; };
   if (event.eventType === 'OPP') return `相手 +${event.points}`;
   if (event.eventType === 'SUB') return `${player(event.outPlayerId)} → ${player(event.inPlayerId)}`;
-  return `${player(event.playerId)} · ${STATS[event.eventType]?.label || event.eventType}`;
+  const zone = event.shotZone ? ` · ${shotZoneLabel(event.shotZone)}` : '';
+  return `${player(event.playerId)} · ${STATS[event.eventType]?.label || event.eventType}${zone}`;
 }
 function ensure(ok, message) { if (!ok) throw new Error(message); }
 const isText = (s, max = 80) => typeof s === 'string' && s.trim().length > 0 && s.length <= max;
@@ -110,7 +123,10 @@ export function validateGame(g, events) {
     ensure(e && isId(e.id) && e.gameId === g.id && g.periods.some(p => p.id === e.periodId) && validTime(e.timestamp) && Number.isInteger(e.seq) && e.seq > 0 && e.seq < g.nextSeq && (!e.deletedAt || validTime(e.deletedAt)), 'イベント情報が不正です。');
     if (e.eventType === 'OPP') ensure([1, 2, 3].includes(e.points) && e.playerId == null, '相手得点が不正です。');
     else if (e.eventType === 'SUB') ensure(ids.has(e.outPlayerId) && ids.has(e.inPlayerId) && e.outPlayerId !== e.inPlayerId && e.points === 0, '交代選手が不正です。');
-    else ensure(Object.hasOwn(STATS, e.eventType) && ids.has(e.playerId) && e.points === STATS[e.eventType].points, 'スタッツイベントが不正です。');
+    else {
+      ensure(Object.hasOwn(STATS, e.eventType) && ids.has(e.playerId) && e.points === STATS[e.eventType].points, 'スタッツイベントが不正です。');
+      if (e.shotZone !== undefined) ensure(isShotEvent(e) && SHOT_ZONE_IDS.has(e.shotZone), 'シュート位置が不正です。');
+    }
   }
   lineup(g, events, true);
 }

@@ -1,4 +1,4 @@
-import { aggregate, aggregateGames, blankStats, formatGame } from './domain.js';
+import { aggregate, aggregateGames, blankStats, formatGame, SHOT_ZONE_IDS } from './domain.js';
 
 const STAT_KEYS = Object.keys(blankStats());
 const BASE_STAT_KEYS = ['P2M', 'P2A', 'P3M', 'P3A', 'FTM', 'FTA', 'OREB', 'DREB', 'AST', 'STL', 'BLK', 'TO', 'PF'];
@@ -6,6 +6,10 @@ const MAX_FILE_SIZE = 1024 * 1024;
 const MAX_PAYLOAD_SIZE = 120000;
 
 const statsCopy = stats => Object.fromEntries(STAT_KEYS.map(key => [key, stats[key]]));
+function shotsCopy(game, events) {
+  const playerIds = new Map(game.roster.map((player, index) => [player.id, `p${index + 1}`]));
+  return events.filter(event => !event.deletedAt && event.shotZone && playerIds.has(event.playerId) && ['2PM', '2PX', '3PM', '3PX'].includes(event.eventType)).map(event => ({ playerId: playerIds.get(event.playerId), zone: event.shotZone, result: event.eventType.endsWith('M') ? 'made' : 'miss' }));
+}
 
 export function createSharedReport(game, events) {
   const summary = aggregate(game, events);
@@ -23,6 +27,7 @@ export function createSharedReport(game, events) {
       opponentScore: summary.opponent,
       periods: summary.periods.map(period => ({ label: period.label, home: period.home, away: period.away })),
       team: statsCopy(summary.team),
+      shots: shotsCopy(game, events),
       players: game.roster.map((player, index) => ({
         id: `p${index + 1}`,
         number: player.number,
@@ -47,6 +52,7 @@ export function createAggregateSharedReport(games, events, tournamentName = '') 
       opponentScore: gameSummary.opponent,
       periods: gameSummary.periods.map(period => ({ label: period.label, home: period.home, away: period.away })),
       team: statsCopy(gameSummary.team),
+      shots: shotsCopy(game, events.filter(event => event.gameId === game.id)),
       players: summary.players.map((player, index) => ({ id: `p${index + 1}`, number: player.number, name: player.name, stats: statsCopy(gameSummary.players[player.id] || blankStats()) })),
     };
   });
@@ -66,6 +72,7 @@ export function createAggregateSharedReport(games, events, tournamentName = '') 
       opponentScore: summary.opponent,
       periods: [{ label: '合計', home: summary.team.PTS, away: summary.opponent }],
       team: statsCopy(summary.team),
+      shots: games.flatMap(game => shotsCopy(game, events.filter(event => event.gameId === game.id))),
       players: summary.players.map((player, index) => ({ id: `p${index + 1}`, number: player.number, name: player.name, stats: statsCopy(player.stats) })),
     },
   };
@@ -97,6 +104,12 @@ function validatePlayers(players) {
     validateStats(player.stats);
   }
 }
+function validateShots(shots, players) {
+  if (shots === undefined) return;
+  ensure(Array.isArray(shots) && shots.length <= 2000);
+  const ids = new Set(players.map(player => player.id));
+  for (const shot of shots) ensure(shot && ids.has(shot.playerId) && SHOT_ZONE_IDS.has(shot.zone) && ['made', 'miss'].includes(shot.result));
+}
 
 export function parseSharedReport(text) {
   if (typeof text !== 'string' || text.length > MAX_FILE_SIZE) throw new Error('共有レポートは1MB以下にしてください。');
@@ -119,6 +132,7 @@ export function parseSharedReport(text) {
     ensure(player && /^p\d{1,2}$/.test(player.id) && /^\d{1,3}$/.test(player.number) && validText(player.name, 40));
     validateStats(player.stats);
   }
+  validateShots(report.shots, report.players);
   if (report.games !== undefined) {
     ensure(Array.isArray(report.games) && report.games.length === (report.gameCount || 1) && report.games.length <= 999);
     for (const detail of report.games) {
@@ -130,6 +144,7 @@ export function parseSharedReport(text) {
       ensure(detail.team && typeof detail.team === 'object');
       validateStats(detail.team);
       validatePlayers(detail.players);
+      validateShots(detail.shots, detail.players);
       ensure(detail.players.length === report.players.length && detail.players.every((player, index) => player.id === report.players[index].id));
       for (const key of STAT_KEYS) ensure(detail.players.reduce((sum, player) => sum + player.stats[key], 0) === detail.team[key]);
       ensure(detail.periods.reduce((sum, period) => sum + period.home, 0) === detail.team.PTS);
@@ -179,6 +194,7 @@ function compactReport(game, events) {
     p: report.periods.map(period => [period.label, period.home, period.away]),
     a: statsArray(report.team),
     r: report.players.map(player => [player.number, player.name, statsArray(player.stats)]),
+    z: report.shots?.map(shot => [Number(shot.playerId.slice(1)) - 1, shot.zone, shot.result === 'made' ? 1 : 0]),
   };
 }
 
@@ -293,6 +309,7 @@ export async function parseSharePayload(payload) {
     periods: compact.p.map(period => ({ label: period[0], home: period[1], away: period[2] })),
     team: statsObject(compact.a),
     players: compact.r.map((player, index) => ({ id: `p${index + 1}`, number: player[0], name: player[1], stats: statsObject(player[2]) })),
+    shots: Array.isArray(compact.z) ? compact.z.map(shot => ({ playerId: `p${shot[0] + 1}`, zone: shot[1], result: shot[2] ? 'made' : 'miss' })) : undefined,
   };
   return parseSharedReport(JSON.stringify({ app: 'courtside-report', schemaVersion: 1, report }));
 }
