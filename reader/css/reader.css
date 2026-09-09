@@ -62,6 +62,7 @@ button:focus-visible { outline: 3px solid #2a8c70; outline-offset: 3px; }
 .shooting-grid strong { display: block; margin: 6px 0 3px; font-size: clamp(15px, 5vw, 21px); letter-spacing: -.04em; font-variant-numeric: tabular-nums; }
 .shooting-grid strong small { color: var(--muted); font-size: .62em; font-weight: 700; }
 .shooting-grid b { color: var(--accent); font-size: 10px; }
+.shooting-grid em { display: block; margin-top: 3px; color: var(--muted); font-size: 9px; font-style: normal; }
 .rebound-total { display: flex; justify-content: flex-end; gap: 8px; margin-top: 9px; }
 .rebound-total span { min-width: 57px; border-radius: 9px; padding: 7px 8px; color: var(--muted); background: var(--surface-subtle); text-align: center; font-size: 11px; font-weight: 700; }
 .rebound-total b { margin-left: 4px; color: var(--text); font-variant-numeric: tabular-nums; }
@@ -77,10 +78,12 @@ button.player-card:active { transform: scale(.992); background: var(--accent-sof
 .player-stats > span, .detail-stats > span { text-align: center; }
 .player-stats small, .detail-stats small { display: block; color: var(--muted); font-size: 9px; font-weight: 800; letter-spacing: .02em; }
 .player-stats b, .detail-stats b { display: block; margin-top: 2px; font-size: 14px; font-variant-numeric: tabular-nums; }
+.player-stats em, .detail-stats em { display: block; margin-top: 2px; color: var(--muted); font-size: 9px; font-style: normal; }
 .player-stats > span:first-child b { color: var(--accent); font-size: 17px; }
 .total-card { cursor: default; background: var(--surface-subtle); }
 .total-card .player-name small { display: none; }
 .total-card .player-name > b { color: var(--text); font-size: 10px; }
+.score-average { grid-column: 1 / -1; margin: 8px 0 0; color: inherit; font-size: 11px; text-align: center; opacity: .8; }
 .reader-footer { margin: 28px 4px 0; color: var(--muted); font-size: 11px; line-height: 1.6; text-align: center; }
 
 .loading { display: grid; place-content: center; justify-items: center; gap: 9px; text-align: center; }

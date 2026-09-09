@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { STATS, aggregate, aggregateGames, percent, lineup, validateGame, validateTeam, makePeriods, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
-import { createSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
+import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
 
 const fixture = () => {
   const players = Array.from({ length: 6 }, (_, i) => ({ id: `player-${i}`, number: `${i + 4}`, name: `選手${i + 1}` }));
@@ -47,6 +47,8 @@ test('selected games aggregate team and player stats by stable player identity',
   assert.equal(report.team.FGM, 2); assert.equal(report.team.FGA, 2);
   assert.equal(report.players.find(p => p.id === 'player-0').stats.PTS, 3);
   assert.equal(report.players.find(p => p.id === 'player-1').stats.PTS, 2);
+  const shared = parseSharedReport(JSON.stringify(createAggregateSharedReport([first.game, second], [...first.events, ...events])));
+  assert.equal(shared.gameCount, 2); assert.equal(shared.format, '2試合合計'); assert.deepEqual(shared.periods, [{ label: '合計', home: 5, away: 4 }]);
 });
 test('substitutions support undo; deleting a prerequisite substitution is rejected', () => {
   const { game, events, add } = fixture();

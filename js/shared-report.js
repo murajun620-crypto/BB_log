@@ -1,4 +1,4 @@
-import { aggregate, blankStats, formatGame } from './domain.js';
+import { aggregate, aggregateGames, blankStats, formatGame } from './domain.js';
 
 const STAT_KEYS = Object.keys(blankStats());
 const BASE_STAT_KEYS = ['P2M', 'P2A', 'P3M', 'P3A', 'FTM', 'FTA', 'OREB', 'DREB', 'AST', 'STL', 'BLK', 'TO', 'PF'];
@@ -17,6 +17,7 @@ export function createSharedReport(game, events) {
       date: game.date,
       format: formatGame(game),
       status: game.status,
+      gameCount: 1,
       teamName: game.teamName,
       opponentName: game.opponentName,
       opponentScore: summary.opponent,
@@ -28,6 +29,27 @@ export function createSharedReport(game, events) {
         name: player.name,
         stats: statsCopy(summary.players[player.id]),
       })),
+    },
+  };
+}
+export function createAggregateSharedReport(games, events) {
+  const summary = aggregateGames(games, events);
+  const date = [...games].map(game => game.date).sort().at(-1) || new Date().toISOString().slice(0, 10);
+  return {
+    app: 'courtside-report',
+    schemaVersion: 1,
+    exportedAt: new Date().toISOString(),
+    report: {
+      date,
+      format: `${games.length}試合合計`,
+      status: games.some(game => game.status === 'live') ? 'live' : 'finished',
+      gameCount: games.length,
+      teamName: summary.teamName,
+      opponentName: '相手合計',
+      opponentScore: summary.opponent,
+      periods: [{ label: '合計', home: summary.team.PTS, away: summary.opponent }],
+      team: statsCopy(summary.team),
+      players: summary.players.map((player, index) => ({ id: `p${index + 1}`, number: player.number, name: player.name, stats: statsCopy(player.stats) })),
     },
   };
 }
@@ -56,6 +78,7 @@ export function parseSharedReport(text) {
   const parsedDate = new Date(`${report.date}T00:00:00Z`);
   ensure(/^\d{4}-\d{2}-\d{2}$/.test(report.date) && !Number.isNaN(parsedDate.valueOf()) && parsedDate.toISOString().slice(0, 10) === report.date);
   ensure(validText(report.format, 40) && ['live', 'finished'].includes(report.status));
+  ensure(report.gameCount === undefined || (Number.isSafeInteger(report.gameCount) && report.gameCount >= 1 && report.gameCount <= 999));
   ensure(validText(report.teamName, 40) && validText(report.opponentName, 40));
   ensure(Number.isSafeInteger(report.opponentScore) && report.opponentScore >= 0 && report.opponentScore <= 999999);
   ensure(Array.isArray(report.periods) && report.periods.length >= 1 && report.periods.length <= 50);
@@ -70,7 +93,9 @@ export function parseSharedReport(text) {
   for (const key of STAT_KEYS) ensure(report.players.reduce((sum, player) => sum + player.stats[key], 0) === report.team[key]);
   ensure(report.periods.reduce((sum, period) => sum + period.home, 0) === report.team.PTS);
   ensure(report.periods.reduce((sum, period) => sum + period.away, 0) === report.opponentScore);
-  return structuredClone(report);
+  const normalized = structuredClone(report);
+  normalized.gameCount = report.gameCount || 1;
+  return normalized;
 }
 
 function statsArray(stats) {

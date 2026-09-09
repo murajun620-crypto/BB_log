@@ -58,6 +58,7 @@ function canonicalReport(data) {
   // Allowlist fields: never store injected settings, internal IDs, or event logs.
   return { app: 'courtside-report', schemaVersion: 1, report: {
     date: report.date, format: report.format, status: report.status,
+    gameCount: report.gameCount || 1,
     teamName: report.teamName, opponentName: report.opponentName, opponentScore: report.opponentScore,
     periods: report.periods.map(p => ({ label: p.label, home: p.home, away: p.away })),
     team: stats(report.team),

@@ -1,6 +1,6 @@
 # Project Status
 
-バスケットボールの試合記録・共有を行うオフライン対応PWA。正規リポジトリは `Documents/Github/BB_log`、公開先は `https://murajun620-crypto.github.io/BB_log/`。アプリは1.0.20。
+バスケットボールの試合記録・共有を行うオフライン対応PWA。正規リポジトリは `Documents/Github/BB_log`、公開先は `https://murajun620-crypto.github.io/BB_log/`。アプリは1.0.21。
 
 # Recent Changes
 
@@ -8,6 +8,7 @@
 - Cloudflare Workers + D1の短縮共有を実装・公開。Workerは `https://courtside-share.murajun620.workers.dev`、D1は `courtside-share`。
 - 短縮共有は `reader/#s/<22文字ID>`。集計スナップショットのみ保存し、期限（7/30/90/365日、初期30日）、任意パスワード、管理画面からの停止、レート制限を実装。
 - 履歴画面で同じ自チームの複数試合を選択し、チーム合計・相手合計・シューティング・選手別合計を表示できる。選手詳細も開ける。
+- 合計レポートのLINE共有に対応。受信側Readerにも合計・1試合平均・合計ベースのシュート率を表示する。
 - Worker secrets `PUBLISHER_TOKEN` / `PASSWORD_PEPPER` はCloudflareへ登録済み。管理キーの控えはローカルの無視ファイル `cloudflare/.publisher-token` にあり、GitHubへは送らない。
 - ローカルAPI・ブラウザ・回帰テストは通過。公開後の実環境はこの環境からQUIC/TLSエラーが出るため、ユーザー環境で疎通確認が必要。
 
@@ -19,7 +20,7 @@
 
 # Next Tasks
 
-1. 自宅PC/職場PCのアプリ設定へ同じ管理キーを入力し、テスト用試合で短縮リンク作成・パスワード閲覧・LINE共有を確認。
+1. 自宅PC/職場PCのアプリ設定へ同じ管理キーを入力し、テスト用試合で短縮リンク作成・パスワード閲覧・合計レポートのLINE共有を確認。
 2. iPhoneのLINEで、短縮リンクがReaderを開き、パスワードあり/なし、期限・停止後の表示を確認。
 3. Cloudflare無料プランの利用量を定期確認。無料枠超過時は自動課金せず共有エラーになる方針を維持。
 

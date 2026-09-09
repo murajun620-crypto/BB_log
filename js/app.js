@@ -2,7 +2,7 @@ import * as db from './db.js';
 import { uid, localDate, STATS, activeEvents, makePeriods, validateTeam, validateGame, lineup, eventLabel, aggregate, aggregateGames } from './domain.js';
 import { backupObject, parseBackup, gameCSV, download, shareFile, shareUrl } from './transfer.js';
 import { boxScoreImage, playerStatsImage, safeFilename, shareImage } from './share-image.js';
-import { createSharedReport, createCompressedSharePayload, parseSharePayload, parseSharedReport, sharedReportFile } from './shared-report.js';
+import { createSharedReport, createAggregateSharedReport, createCompressedSharePayload, parseSharePayload, parseSharedReport, sharedReportFile } from './shared-report.js';
 import * as view from './views.js';
 import { cloudShareEnabled } from './cloud-share.js';
 import { cloudSettingsHTML, setupCloudShareUI } from './cloud-share-ui.js';
@@ -251,6 +251,17 @@ function gameShareMessage(g, suffix = 'Courtside ReaderでBOX SCOREを見る') {
   const date = String(g.date || '').replaceAll('-', '/');
   return `${date} ${g.teamName} vs ${g.opponentName}\n${g.teamName} ${summary.team.PTS} - ${summary.opponent} ${g.opponentName}\n${suffix}`;
 }
+function aggregateShareContext() {
+  const games = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
+  if (games.length < 2 || new Set(games.map(candidate => candidate.teamId)).size !== 1) throw new Error('同じ自チームの試合を2試合以上選択してください。');
+  const summary = aggregateGames(games, state.data.events);
+  return {
+    snapshot: createAggregateSharedReport(games, state.data.events),
+    title: `${summary.teamName} ${games.length}試合合計`,
+    message: `${summary.teamName} ${games.length}試合合計\n${summary.teamName} ${summary.team.PTS} - ${summary.opponent} 相手合計\n1試合平均 ${ (summary.team.PTS / games.length).toFixed(1) } - ${ (summary.opponent / games.length).toFixed(1) }\nCourtside Readerで合計スタッツを見る`,
+    description: `${summary.teamName}の${games.length}試合分の合計スタッツ・1試合平均`,
+  };
+}
 function reportLink(payload) {
   // Reader has its own app shell, so a received link never exposes recording controls.
   const link = new URL('./reader/', location.href);
@@ -286,7 +297,7 @@ async function shareGameLink() {
   if (sheet.open) closeSheet();
 }
 const handlers = {
-  ...setupCloudShareUI({ showSheet, closeSheet, toast, refreshView: render, getGame: game, getEvents: gameEvents, message: gameShareMessage }),
+  ...setupCloudShareUI({ showSheet, closeSheet, toast, refreshView: render, getGame: game, getEvents: gameEvents, getAggregate: aggregateShareContext, message: gameShareMessage }),
   'close-sheet': closeSheet,
   confirm: () => busy(async () => { const fn = confirmAction; if (fn) await fn(); }),
   'add-player': () => { readTeamForm(); if (teamDraft.players.length >= 60) return toast('選手は60人まで登録できます。'); teamDraft.players.push({ id: uid(), number: '', name: '' }); persistDraft('teamDraft', teamDraft); render(); document.querySelector('.roster-edit-row:last-child input').focus(); },

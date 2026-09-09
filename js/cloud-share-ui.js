@@ -7,7 +7,7 @@ export function cloudSettingsHTML() {
   return `<section class="panel settings-panel" id="cloud-settings"><h2>短い共有リンク</h2><p class="help">${cloudShareEnabled() ? 'Cloudflare接続済み。共有した1試合の集計だけをクラウドに保存します。' : 'Cloudflareの初期設定待ちです。従来のリンク・ファイル・画像共有は使えます。'}</p><button class="button secondary full" data-action="cloud-key" ${cloudShareEnabled() ? '' : 'disabled'}>${publisherKey() ? '共有用管理キーを変更' : '共有用管理キーを設定'}</button><button class="button secondary full spaced" data-action="cloud-manage" ${cloudShareEnabled() && publisherKey() ? '' : 'disabled'}>共有したリンクを管理</button><p class="help">管理キーはこのブラウザだけに保存し、試合のJSONバックアップには含めません。別PCでも同じキーを設定すると共有を停止できます。</p></section>`;
 }
 
-export function setupCloudShareUI({ showSheet, closeSheet, toast, refreshView, getGame, getEvents, message }) {
+export function setupCloudShareUI({ showSheet, closeSheet, toast, refreshView, getGame, getEvents, getAggregate, message }) {
   let created = null, working = false;
   const date = ms => new Date(ms).toLocaleDateString('ja-JP');
   async function work(fn) {
@@ -19,14 +19,16 @@ export function setupCloudShareUI({ showSheet, closeSheet, toast, refreshView, g
     catch (error) { toast(error.message, true); }
     finally { working = false; buttons.forEach(b => { b.disabled = false; }); }
   }
-  function openCreate() {
+  function openCreate(context = null) {
     if (!publisherKey()) { openKey(); return; }
     const g = getGame();
-    if (!g) throw new Error('試合が見つかりません。');
-    const snapshot = createSharedReport(g, getEvents(g));
-    const shareMessage = message(g);
+    if (!g && !context) throw new Error('試合が見つかりません。');
+    const snapshot = context?.snapshot || createSharedReport(g, getEvents(g));
+    const title = context?.title || `${g.date} ${g.teamName} vs ${g.opponentName}`;
+    const shareMessage = context?.message || message(g);
+    const description = context?.description || `${g.teamName} vs ${g.opponentName}の集計・選手名`;
     created = null;
-    showSheet('短い共有リンクを作成', `<form id="cloud-create-form"><p class="help">${esc(g.teamName)} vs ${esc(g.opponentName)}の集計・選手名をCloudflareに保存します。後から試合を編集しても、この共有結果は変わりません。</p><label>有効期限<select name="days">${[7, 30, 90, 365].map(n => `<option value="${n}" ${n === 30 ? 'selected' : ''}>${n}日間</option>`).join('')}</select></label><label class="spaced">閲覧パスワード（任意）<input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" placeholder="設定する場合は8文字以上"></label><p class="help">パスワードなし：リンクを知る人が閲覧できます。設定する場合は、パスワードをリンクとは別に伝えてください。</p><button type="submit" class="button primary full spaced">リンクを作成</button><p class="help">作成・閲覧には通信が必要です。「設定」で共有を停止できます。</p></form>`);
+    showSheet('短い共有リンクを作成', `<form id="cloud-create-form"><p class="help">${esc(description)}をCloudflareに保存します。後から元の試合を編集しても、この共有結果は変わりません。</p><label>有効期限<select name="days">${[7, 30, 90, 365].map(n => `<option value="${n}" ${n === 30 ? 'selected' : ''}>${n}日間</option>`).join('')}</select></label><label class="spaced">閲覧パスワード（任意）<input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" placeholder="設定する場合は8文字以上"></label><p class="help">パスワードなし：リンクを知る人が閲覧できます。設定する場合は、パスワードをリンクとは別に伝えてください。</p><button type="submit" class="button primary full spaced">リンクを作成</button><p class="help">作成・閲覧には通信が必要です。「設定」で共有を停止できます。</p></form>`);
     document.querySelector('#cloud-create-form').addEventListener('submit', event => {
       event.preventDefault();
       const form = event.currentTarget;
@@ -34,7 +36,7 @@ export function setupCloudShareUI({ showSheet, closeSheet, toast, refreshView, g
       void work(async () => {
         const result = await createCloudShare(snapshot, { days: Number(values.get('days')), password: String(values.get('password')) });
         form.reset();
-        created = { ...result, link: shortShareLink(result.id), message: shareMessage };
+        created = { ...result, title, link: shortShareLink(result.id), message: shareMessage };
         showReady();
       });
     });
@@ -74,6 +76,7 @@ export function setupCloudShareUI({ showSheet, closeSheet, toast, refreshView, g
   }
   return {
     'cloud-create': openCreate,
+    'cloud-create-aggregate': () => work(() => openCreate(getAggregate?.())),
     'cloud-key': openKey,
     'cloud-manage': () => work(manage),
     'cloud-forget': () => { savePublisherKey(''); closeSheet(); refreshView(); toast('このブラウザの管理キーを解除しました。'); },
