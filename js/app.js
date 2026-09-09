@@ -105,7 +105,7 @@ function render() {
     html = page === 'live' ? view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 1.0.31 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 1.0.32 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game())));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -582,6 +582,11 @@ async function checkPWAUpdate() {
   const registration = pwaRegistration || await navigator.serviceWorker.getRegistration();
   if (!registration) { toast('更新を確認できませんでした。', true); return; }
   await registration.update();
+  const installing = registration.installing;
+  if (installing) await new Promise(resolve => {
+    if (['installed', 'redundant'].includes(installing.state)) { resolve(); return; }
+    installing.addEventListener('statechange', () => { if (['installed', 'redundant'].includes(installing.state)) resolve(); }, { once: false });
+  });
   state.pwa.update = !!registration.waiting;
   renderStatus();
   if (!state.pwa.update) toast('最新版です。');
