@@ -10,7 +10,7 @@ import { cloudSettingsHTML, setupCloudShareUI } from './cloud-share-ui.js';
 const app = document.querySelector('#app');
 const sheet = document.querySelector('#sheet');
 const toastNode = document.querySelector('#toast');
-const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, historySelection: new Set(), page: 'home', gameId: null, busy: false, lastError: '' };
+const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, theme: 'system' }, historySelection: new Set(), aggregateMode: 'total', page: 'home', gameId: null, busy: false, lastError: '' };
 let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, resolvedShareHash = '', sharePayloadPromise = null;
 const getSetting = key => state.data.settings.find(s => s.key === key)?.value;
 const game = () => state.data.games.find(g => g.id === state.gameId);
@@ -366,7 +366,13 @@ const handlers = {
     location.hash = '#aggregate';
   },
   'back-history': () => { location.hash = '#history'; },
-  'aggregate-player-detail': button => showSheet('合計スタッツ', view.aggregatePlayerDetail(aggregateGames(state.data.games.filter(candidate => state.historySelection.has(candidate.id)), state.data.events), button.dataset.id)),
+  'toggle-aggregate-mode': () => { state.aggregateMode = state.aggregateMode === 'average' ? 'total' : 'average'; render(); },
+  'aggregate-player-detail': button => showSheet('合計スタッツ', view.aggregatePlayerDetail(aggregateGames(state.data.games.filter(candidate => state.historySelection.has(candidate.id)), state.data.events), button.dataset.id, state.aggregateMode)),
+  'toggle-aggregate-player-mode': button => {
+    state.aggregateMode = state.aggregateMode === 'average' ? 'total' : 'average';
+    const report = aggregateGames(state.data.games.filter(candidate => state.historySelection.has(candidate.id)), state.data.events);
+    showSheet('合計スタッツ', view.aggregatePlayerDetail(report, button.dataset.id, state.aggregateMode));
+  },
   finish: () => confirm('試合を終了しますか？', 'BOX SCOREに結果をまとめます。終了後も履歴の編集や記録の再開ができます。', '試合を終了', async () => { const g = await saveGameChange({ ...game(), status: 'finished' }); closeSheet(); location.hash = `#box/${g.id}`; }),
   reopen: () => confirm('記録を再開しますか？', 'この試合を記録中に戻します。', '再開する', async () => { const g = await saveGameChange({ ...game(), status: 'live' }); closeSheet(); location.hash = `#live/${g.id}`; }),
   'player-detail': button => showSheet('選手スタッツ', view.playerDetail(game(), gameEvents(), button.dataset.id)),
@@ -379,7 +385,7 @@ const handlers = {
     if (cloudShareEnabled()) {
       const button = sheet.querySelector('[data-action="share-link"]');
       button.dataset.action = 'cloud-create';
-      button.nextElementSibling.textContent = '短いリンクを作成してLINEへ送ります。共有データをCloudflareに保存し、有効期限とパスワード（任意）を設定できます。';
+      button.nextElementSibling.textContent = 'リンクを作成してLINEへ送ります。共有データをCloudflareに保存し、有効期限とパスワード（任意）を設定できます。';
       sheet.querySelector('.sheet-content').insertAdjacentHTML('beforeend', '<button class="button secondary full spaced" data-action="share-link">従来の長いリンクで共有</button><p class="help">サーバーに保存しない方式です。パスワード・有効期限・共有停止は使えません。</p>');
     }
   },

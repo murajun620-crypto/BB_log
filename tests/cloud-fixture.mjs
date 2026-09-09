@@ -6,6 +6,7 @@ import { makePeriods } from '../js/domain.js';
 export function testDB() {
   const sqlite = new DatabaseSync(':memory:');
   sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0001_shares.sql', import.meta.url), 'utf8'));
+  sqlite.exec(readFileSync(new URL('../cloudflare/migrations/0002_unlimited_expiry.sql', import.meta.url), 'utf8'));
   const db = {
     sqlite,
     prepare(sql) {

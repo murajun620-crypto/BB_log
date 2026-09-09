@@ -201,7 +201,9 @@ try {
   await page.locator('[data-history-select]').nth(0).check(); await page.locator('[data-history-select]').nth(1).check();
   await page.getByRole('button', { name: '合計を見る', exact: true }).click(); await page.getByRole('heading', { name: '合計スタッツ', exact: true }).waitFor();
   assert.equal(await page.locator('.aggregate-game-list li').count(), 2); assert.equal(await page.locator('.total-row .pts-cell').textContent(), '13');
-  await page.locator('.box-table button').first().click(); await page.getByRole('heading', { name: '合計スタッツ', exact: true }).last().waitFor(); await dismiss();
+  await page.getByRole('button', { name: /合計と平均を切り替え/ }).click(); assert.equal(await page.locator('.total-row .pts-cell').textContent(), '6.5');
+  await page.locator('.box-table button').first().click(); await page.getByRole('heading', { name: '合計スタッツ', exact: true }).last().waitFor();
+  await page.locator('#sheet [data-action=toggle-aggregate-player-mode]').click(); await dismiss();
   await page.getByRole('button', { name: '履歴へ戻る', exact: true }).click(); await page.getByRole('heading', { name: '試合履歴', exact: true }).waitFor();
   step('history selection and multi-game aggregate report with player detail pass');
   await page.locator('.history-game-card').filter({ hasText: 'EAST SIDE' }).locator('[data-action=delete-game]').click();

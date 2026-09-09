@@ -5,6 +5,7 @@ const app = document.querySelector('#app');
 const playerDialog = document.querySelector('#player-dialog');
 let report = null;
 let requestNumber = 0;
+let displayMode = 'total';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const percent = (made, attempts) => attempts ? `${(made / attempts * 100).toFixed(1)}%` : '—';
@@ -12,12 +13,14 @@ const statLabel = key => ({ OREB: 'OR', DREB: 'DR', PF: 'F' }[key] || key);
 const formatDate = date => String(date || '').replaceAll('-', '.');
 
 const average = (value, games) => (value / games).toFixed(1);
+const metric = (value, games) => displayMode === 'average' ? average(value, games) : value;
+const modeText = () => displayMode === 'average' ? '平均' : '合計';
 function shooting(stats, games = 1) {
   return `<div class="shooting-grid">${[['FG', 'FGM', 'FGA'], ['2P', 'P2M', 'P2A'], ['3P', 'P3M', 'P3A'], ['FT', 'FTM', 'FTA']].map(([label, made, attempts]) => `<div><span>${label}</span><strong>${stats[made]}<small>/${stats[attempts]}</small></strong><b>${percent(stats[made], stats[attempts])}</b>${games > 1 ? `<em class="shooting-average">平均 ${average(stats[made], games)}/${average(stats[attempts], games)}</em>` : ''}</div>`).join('')}</div>`;
 }
 
 function statCells(stats, games = 1) {
-  return ['PTS', 'REB', 'AST', 'STL', 'BLK', 'TO', 'PF'].map(key => `<span><small>${statLabel(key)}</small><b>${stats[key]}</b>${games > 1 ? `<em>平均 ${average(stats[key], games)}</em>` : ''}</span>`).join('');
+  return ['PTS', 'REB', 'AST', 'STL', 'BLK', 'TO', 'PF'].map(key => `<span><small>${statLabel(key)}</small><b>${metric(stats[key], games)}</b></span>`).join('');
 }
 
 function playerCard(player, games = 1) {
@@ -26,7 +29,8 @@ function playerCard(player, games = 1) {
 
 function reportView(data) {
   const status = data.status === 'live' ? '記録時点' : 'FINAL';
-  return `<main class="reader-shell"><header class="reader-header"><div class="identity"><span class="brand-mark">C</span><div><strong>COURTSIDE</strong><span>READER</span></div></div><span class="read-only">閲覧専用</span></header><section class="intro-line"><span>SHARED BOX SCORE</span><span>${esc(formatDate(data.date))} · ${esc(data.format)}</span></section><section class="score-card"><div class="score-status">${status}</div><div class="team home"><span>HOME</span><h1>${esc(data.teamName)}</h1></div><div class="score"><strong>${data.team.PTS}</strong><span>–</span><strong>${data.opponentScore}</strong></div><div class="team away"><span>OPPONENT</span><h2>${esc(data.opponentName)}</h2></div>${data.gameCount > 1 ? `<p class="score-average">1試合平均 ${average(data.team.PTS, data.gameCount)} – ${average(data.opponentScore, data.gameCount)}</p>` : ''}</section><section class="period-card" aria-label="ピリオドごとの得点"><div class="period-row period-title"><span>PERIOD</span><b>${esc(data.teamName)}</b><b>${esc(data.opponentName)}</b></div>${data.periods.map(period => `<div class="period-row"><span>${esc(period.label)}</span><b>${period.home}</b><b>${period.away}</b></div>`).join('')}</section><section class="section"><div class="section-title"><div><span>TEAM</span><h2>シューティング</h2></div>${data.gameCount > 1 ? '<p>合計 / 平均</p>' : ''}</div>${shooting(data.team, data.gameCount)}<div class="rebound-total"><span>OR <b>${data.team.OREB}</b></span><span>DR <b>${data.team.DREB}</b></span><span>REB <b>${data.team.REB}</b></span></div></section><section class="section"><div class="section-title"><div><span>BOX SCORE</span><h2>選手スタッツ</h2></div><p>${data.gameCount > 1 ? '合計 / 平均' : '選手をタップで詳細'}</p></div><div class="player-list">${data.players.map(player => playerCard(player, data.gameCount)).join('')}<div class="player-card total-card"><span class="player-name"><b>TEAM</b><strong>チーム合計</strong></span><span class="player-stats">${statCells(data.team, data.gameCount)}</span></div></div></section><footer class="reader-footer">この画面は共有された${data.gameCount > 1 ? `${data.gameCount}試合の集計` : '試合結果'}だけを表示しています。チームや試合の記録は保存しません。</footer></main>`;
+  const mode = modeText();
+  return `<main class="reader-shell"><header class="reader-header"><div class="identity"><span class="brand-mark">C</span><div><strong>COURTSIDE</strong><span>READER</span></div></div><span class="read-only">閲覧専用</span></header><section class="intro-line"><span>SHARED BOX SCORE</span><span>${esc(formatDate(data.date))} · ${esc(data.format)}</span></section><section class="score-card"><div class="score-status">${status}</div><div class="team home"><span>HOME</span><h1>${esc(data.teamName)}</h1></div><div class="score"><strong>${metric(data.team.PTS, data.gameCount)}</strong><span>–</span><strong>${metric(data.opponentScore, data.gameCount)}</strong></div><div class="team away"><span>OPPONENT</span><h2>${esc(data.opponentName)}</h2></div>${data.gameCount > 1 ? `<p class="score-average">${mode === 'average' ? '合計' : '1試合平均'} ${mode === 'average' ? `${data.team.PTS} – ${data.opponentScore}` : `${average(data.team.PTS, data.gameCount)} – ${average(data.opponentScore, data.gameCount)}`}</p>` : ''}</section><section class="period-card" aria-label="ピリオドごとの得点"><div class="period-row period-title"><span>PERIOD</span><b>${esc(data.teamName)}</b><b>${esc(data.opponentName)}</b></div>${data.periods.map(period => `<div class="period-row"><span>${esc(period.label)}</span><b>${period.home}</b><b>${period.away}</b></div>`).join('')}</section><section class="section"><div class="section-title"><div><span>TEAM</span><h2>シューティング</h2></div>${data.gameCount > 1 ? '<p>成功数/試投数：合計・平均</p>' : ''}</div>${shooting(data.team, data.gameCount)}<div class="rebound-total"><span>OR <b>${metric(data.team.OREB, data.gameCount)}</b></span><span>DR <b>${metric(data.team.DREB, data.gameCount)}</b></span><span>REB <b>${metric(data.team.REB, data.gameCount)}</b></span></div></section><section class="section"><div class="section-title"><div><span>BOX SCORE</span><h2>選手スタッツ</h2></div>${data.gameCount > 1 ? `<button class="mode-toggle" data-action="toggle-stat-mode" aria-label="合計と平均を切り替え">合計 / 平均：${mode}</button>` : '<p>選手をタップで詳細</p>'}</div><div class="player-list">${data.players.map(player => playerCard(player, data.gameCount)).join('')}<div class="player-card total-card"><span class="player-name"><b>TEAM</b><strong>チーム合計</strong></span><span class="player-stats">${statCells(data.team, data.gameCount)}</span></div></div></section><footer class="reader-footer">この画面は共有された${data.gameCount > 1 ? `${data.gameCount}試合の集計` : '試合結果'}だけを表示しています。チームや試合の記録は保存しません。</footer></main>`;
 }
 
 function landingView() {
@@ -89,12 +93,15 @@ async function render(password = '') {
 function openPlayer(playerId) {
   const player = report?.players.find(item => item.id === playerId);
   if (!player) return;
-  playerDialog.innerHTML = `<div class="dialog-handle"></div><button class="dialog-close" type="button" data-close-dialog aria-label="閉じる">×</button><p class="dialog-context">${esc(report.teamName)} vs ${esc(report.opponentName)} · ${report.gameCount > 1 ? `${report.gameCount}試合合計` : esc(formatDate(report.date))}</p><div class="player-detail"><span class="jersey">${esc(player.number)}</span><div><h2 id="player-dialog-title">${esc(player.name)}</h2><p><b>${player.stats.PTS}</b> PTS${report.gameCount > 1 ? `（平均 ${average(player.stats.PTS, report.gameCount)}）` : ''}</p></div></div>${shooting(player.stats, report.gameCount)}<div class="detail-stats">${['OREB', 'DREB', 'REB', 'AST', 'STL', 'BLK', 'TO', 'PF'].map(key => `<span><small>${statLabel(key)}</small><b>${player.stats[key]}</b>${report.gameCount > 1 ? `<em>平均 ${average(player.stats[key], report.gameCount)}</em>` : ''}</span>`).join('')}</div>`;
+  playerDialog.innerHTML = `<div class="dialog-handle"></div><button class="dialog-close" type="button" data-close-dialog aria-label="閉じる">×</button>${report.gameCount > 1 ? `<div class="detail-mode-row"><span>表示</span><button class="mode-toggle" data-action="toggle-player-mode" data-player-id="${esc(playerId)}" aria-label="合計と平均を切り替え">合計 / 平均：${modeText()}</button></div>` : ''}<p class="dialog-context">${esc(report.teamName)} vs ${esc(report.opponentName)} · ${report.gameCount > 1 ? `${report.gameCount}試合合計` : esc(formatDate(report.date))}</p><div class="player-detail"><span class="jersey">${esc(player.number)}</span><div><h2 id="player-dialog-title">${esc(player.name)}</h2><p><b>${metric(player.stats.PTS, report.gameCount)}</b> PTS</p></div></div>${shooting(player.stats, report.gameCount)}<div class="detail-stats">${['OREB', 'DREB', 'REB', 'AST', 'STL', 'BLK', 'TO', 'PF'].map(key => `<span><small>${statLabel(key)}</small><b>${metric(player.stats[key], report.gameCount)}</b></span>`).join('')}</div>`;
   if (typeof playerDialog.showModal === 'function') playerDialog.showModal();
   else playerDialog.setAttribute('open', '');
 }
 
 document.addEventListener('click', event => {
+  const toggle = event.target.closest('[data-action]');
+  if (toggle?.dataset.action === 'toggle-stat-mode') { displayMode = displayMode === 'average' ? 'total' : 'average'; if (report) app.innerHTML = reportView(report); return; }
+  if (toggle?.dataset.action === 'toggle-player-mode') { displayMode = displayMode === 'average' ? 'total' : 'average'; openPlayer(toggle.dataset.playerId); return; }
   const player = event.target.closest('[data-player-id]');
   if (player) openPlayer(player.dataset.playerId);
   if (event.target.closest('[data-close-dialog]')) playerDialog.close();

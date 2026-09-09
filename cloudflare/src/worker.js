@@ -92,22 +92,22 @@ async function route(request, env) {
   if (path === '/v1/shares' && method === 'POST') {
     await limit(db, 'publish', 100, DAY, now);
     const data = await readJSON(request);
-    if (!data || ![7, 30, 90, 365].includes(data.days)) fail(400, 'invalid_expiry', '有効期限を選んでください。');
+    if (!data || (data.days !== null && ![7, 30, 90, 365].includes(data.days))) fail(400, 'invalid_expiry', '有効期限を選んでください。');
     const password = data.password ?? '';
     if (typeof password !== 'string' || (password && (password.length < 8 || password.length > 128))) fail(400, 'invalid_password', 'パスワードは8〜128文字で設定してください。');
     const report = canonicalReport(data.report);
-    const count = await db.prepare('SELECT COUNT(*) AS total FROM shares WHERE revoked_at IS NULL AND expires_at > ?').bind(now).first();
+    const count = await db.prepare('SELECT COUNT(*) AS total FROM shares WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)').bind(now).first();
     if (count.total >= 1000) fail(409, 'storage_limit', '共有の上限に達しました。不要な共有を停止してください。');
     const id = random(), salt = password ? random() : null;
     const hash = password ? await passwordHash(password, salt, env.PASSWORD_PEPPER) : null;
-    const expiresAt = now + data.days * DAY;
+    const expiresAt = data.days === null ? null : now + data.days * DAY;
     const title = `${report.report.date} ${report.report.teamName} vs ${report.report.opponentName}`;
     await db.prepare('INSERT INTO shares (id, report, title, created_at, expires_at, password_salt, password_hash) VALUES (?, ?, ?, ?, ?, ?, ?)')
       .bind(id, JSON.stringify(report), title, now, expiresAt, salt, hash).run();
     return { id, title, createdAt: now, expiresAt, passwordRequired: !!password };
   }
   if (path === '/v1/shares' && method === 'GET') {
-    const { results } = await db.prepare('SELECT id, title, created_at, expires_at, password_hash IS NOT NULL AS protected FROM shares WHERE revoked_at IS NULL AND expires_at > ? ORDER BY created_at DESC LIMIT 1000').bind(now).all();
+    const { results } = await db.prepare('SELECT id, title, created_at, expires_at, password_hash IS NOT NULL AS protected FROM shares WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?) ORDER BY created_at DESC LIMIT 1000').bind(now).all();
     return { shares: results.map(row => ({ id: row.id, title: row.title, createdAt: row.created_at, expiresAt: row.expires_at, passwordRequired: !!row.protected })) };
   }
   const match = path.match(/^\/v1\/shares\/([A-Za-z0-9_-]{22})(\/open)?$/);
@@ -121,7 +121,7 @@ async function route(request, env) {
   if (method !== 'POST' || !match[2]) fail(405, 'method_not_allowed', 'この操作には対応していません。');
   const data = await readJSON(request, 2048);
   const row = await db.prepare('SELECT report, expires_at, revoked_at, password_salt, password_hash FROM shares WHERE id = ?').bind(id).first();
-  if (!row || row.revoked_at || row.expires_at <= now) fail(404, 'unavailable', '共有が停止されたか、有効期限が切れています。リンクも確認してください。');
+  if (!row || row.revoked_at || (row.expires_at !== null && row.expires_at <= now)) fail(404, 'unavailable', '共有が停止されたか、有効期限が切れています。リンクも確認してください。');
   if (row.password_hash) {
     if (!data?.password) fail(401, 'password_required', 'パスワードを入力してください。');
     if (typeof data.password !== 'string' || data.password.length > 128) fail(400, 'invalid_password', 'パスワードを確認してください。');
@@ -154,7 +154,7 @@ export default {
   async scheduled(_event, env) {
     const now = Date.now();
     await env.DB.batch([
-      env.DB.prepare('DELETE FROM shares WHERE expires_at <= ? OR revoked_at IS NOT NULL').bind(now),
+      env.DB.prepare('DELETE FROM shares WHERE (expires_at IS NOT NULL AND expires_at <= ?) OR revoked_at IS NOT NULL').bind(now),
       env.DB.prepare('DELETE FROM rate_limits WHERE expires_at <= ?').bind(now),
     ]);
   },

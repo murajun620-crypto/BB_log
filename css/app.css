@@ -87,6 +87,8 @@ h3 { font-size: 16px; font-weight: 650; }
 .quick-facts .icon { width: 13px; height: 13px; }
 .section-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 24px 0 12px; min-height: 32px; }
 .section-heading h2 { display: flex; align-items: center; gap: 8px; }
+.mode-toggle { min-height: 32px; padding: 5px 9px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--accent); font-size: 10px; font-weight: 700; white-space: nowrap; }
+.detail-mode-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; color: var(--muted); font-size: 11px; }
 .live-dot { width: 6px; height: 6px; background: #6f9659; border-radius: 50%; display: inline-block; flex: 0 0 auto; }
 .card-list { display: grid; gap: 12px; }
 .history-game-card { display: grid; grid-template-columns: 54px minmax(0, 1fr) 48px; gap: 8px; }

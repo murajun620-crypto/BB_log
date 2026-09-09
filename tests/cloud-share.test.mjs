@@ -7,8 +7,8 @@ import { shortShareLink } from '../js/cloud-share.js';
 const req = (env, path, method = 'GET', body, token = '', headers = {}) => worker.fetch(new Request(`https://worker.example${path}`, {
   method, headers: { Origin: 'https://app.example', ...(token ? { Authorization: `Bearer ${token}` } : {}), ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}), ...headers }, body: body === undefined ? undefined : JSON.stringify(body),
 }), env);
-const create = async (env, password = '') => {
-  const response = await req(env, '/v1/shares', 'POST', { report: fixture().report, days: 30, password }, testToken);
+const create = async (env, password = '', days = 30) => {
+  const response = await req(env, '/v1/shares', 'POST', { report: fixture().report, days, password }, testToken);
   assert.equal(response.status, 200, await response.clone().text());
   return response.json();
 };
@@ -62,6 +62,19 @@ test('unprotected snapshots contain only allowlisted fields and expired links ca
     assert.equal((await req(env, `/v1/shares/${a.id}/open`, 'POST', {})).status, 404);
     await worker.scheduled({}, env);
     assert.equal(env.DB.sqlite.prepare('SELECT COUNT(*) AS count FROM shares').get().count, 0);
+  } finally { env.DB.sqlite.close(); }
+});
+test('unlimited shares remain readable and visible in management', async () => {
+  const env = testEnv();
+  try {
+    const share = await create(env, '', null);
+    assert.equal(share.expiresAt, null);
+    const open = await req(env, `/v1/shares/${share.id}/open`, 'POST', {});
+    assert.equal(open.status, 200); assert.equal((await open.json()).expiresAt, null);
+    const list = await (await req(env, '/v1/shares', 'GET', undefined, testToken)).json();
+    assert.equal(list.shares[0].expiresAt, null);
+    await worker.scheduled({}, env);
+    assert.equal(env.DB.sqlite.prepare('SELECT COUNT(*) AS count FROM shares').get().count, 1);
   } finally { env.DB.sqlite.close(); }
 });
 

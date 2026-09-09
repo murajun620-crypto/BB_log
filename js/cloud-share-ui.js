@@ -4,12 +4,12 @@ import { shareUrl } from './transfer.js';
 import { esc } from './views.js';
 
 export function cloudSettingsHTML() {
-  return `<section class="panel settings-panel" id="cloud-settings"><h2>短い共有リンク</h2><p class="help">${cloudShareEnabled() ? 'Cloudflare接続済み。共有した1試合の集計だけをクラウドに保存します。' : 'Cloudflareの初期設定待ちです。従来のリンク・ファイル・画像共有は使えます。'}</p><button class="button secondary full" data-action="cloud-key" ${cloudShareEnabled() ? '' : 'disabled'}>${publisherKey() ? '共有用管理キーを変更' : '共有用管理キーを設定'}</button><button class="button secondary full spaced" data-action="cloud-manage" ${cloudShareEnabled() && publisherKey() ? '' : 'disabled'}>共有したリンクを管理</button><p class="help">管理キーはこのブラウザだけに保存し、試合のJSONバックアップには含めません。別PCでも同じキーを設定すると共有を停止できます。</p></section>`;
+  return `<section class="panel settings-panel" id="cloud-settings"><h2>共有リンク</h2><p class="help">${cloudShareEnabled() ? 'Cloudflare接続済み。共有した1試合の集計だけをクラウドに保存します。' : 'Cloudflareの初期設定待ちです。従来のリンク・ファイル・画像共有は使えます。'}</p><button class="button secondary full" data-action="cloud-key" ${cloudShareEnabled() ? '' : 'disabled'}>${publisherKey() ? '共有用管理キーを変更' : '共有用管理キーを設定'}</button><button class="button secondary full spaced" data-action="cloud-manage" ${cloudShareEnabled() && publisherKey() ? '' : 'disabled'}>共有したリンクを管理</button><p class="help">管理キーはこのブラウザだけに保存し、試合のJSONバックアップには含めません。別PCでも同じキーを設定すると共有を停止できます。</p></section>`;
 }
 
 export function setupCloudShareUI({ showSheet, closeSheet, toast, refreshView, getGame, getEvents, getAggregate, message }) {
   let created = null, working = false;
-  const date = ms => new Date(ms).toLocaleDateString('ja-JP');
+  const date = ms => ms === null ? '無期限' : new Date(ms).toLocaleDateString('ja-JP');
   async function work(fn) {
     if (working) return;
     working = true;
@@ -28,13 +28,14 @@ export function setupCloudShareUI({ showSheet, closeSheet, toast, refreshView, g
     const shareMessage = context?.message || message(g);
     const description = context?.description || `${g.teamName} vs ${g.opponentName}の集計・選手名`;
     created = null;
-    showSheet('短い共有リンクを作成', `<form id="cloud-create-form"><p class="help">${esc(description)}をCloudflareに保存します。後から元の試合を編集しても、この共有結果は変わりません。</p><label>有効期限<select name="days">${[7, 30, 90, 365].map(n => `<option value="${n}" ${n === 30 ? 'selected' : ''}>${n}日間</option>`).join('')}</select></label><label class="spaced">閲覧パスワード（任意）<input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" placeholder="設定する場合は8文字以上"></label><p class="help">パスワードなし：リンクを知る人が閲覧できます。設定する場合は、パスワードをリンクとは別に伝えてください。</p><button type="submit" class="button primary full spaced">リンクを作成</button><p class="help">作成・閲覧には通信が必要です。「設定」で共有を停止できます。</p></form>`);
+    showSheet('共有リンクを作成', `<form id="cloud-create-form"><p class="help">${esc(description)}をCloudflareに保存します。後から元の試合を編集しても、この共有結果は変わりません。</p><label>有効期限<select name="days"><option value="7">7日間</option><option value="30" selected>30日間</option><option value="90">90日間</option><option value="365">365日間</option><option value="unlimited">無期限</option></select></label><label class="spaced">閲覧パスワード（任意）<input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" placeholder="設定する場合は8文字以上"></label><p class="help">パスワードなし：リンクを知る人が閲覧できます。設定する場合は、パスワードをリンクとは別に伝えてください。</p><button type="submit" class="button primary full spaced">リンクを作成</button><p class="help">作成・閲覧には通信が必要です。「設定」で共有を停止できます。</p></form>`);
     document.querySelector('#cloud-create-form').addEventListener('submit', event => {
       event.preventDefault();
       const form = event.currentTarget;
       const values = new FormData(form);
       void work(async () => {
-        const result = await createCloudShare(snapshot, { days: Number(values.get('days')), password: String(values.get('password')) });
+        const selectedDays = String(values.get('days'));
+        const result = await createCloudShare(snapshot, { days: selectedDays === 'unlimited' ? null : Number(selectedDays), password: String(values.get('password')) });
         form.reset();
         created = { ...result, title, link: shortShareLink(result.id), message: shareMessage };
         showReady();

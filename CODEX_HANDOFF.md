@@ -1,14 +1,15 @@
 # Project Status
 
-バスケットボールの試合記録・共有を行うオフライン対応PWA。正規リポジトリは `Documents/Github/BB_log`、公開先は `https://murajun620-crypto.github.io/BB_log/`。アプリは1.0.21。
+バスケットボールの試合記録・共有を行うオフライン対応PWA。正規リポジトリは `Documents/Github/BB_log`、公開先は `https://murajun620-crypto.github.io/BB_log/`。アプリは1.0.22。
 
 # Recent Changes
 
 - LIFF/LINEカード共有を廃止し、OSの共有シートによる従来リンク・ファイル・画像共有を維持。
 - Cloudflare Workers + D1の短縮共有を実装・公開。Workerは `https://courtside-share.murajun620.workers.dev`、D1は `courtside-share`。
-- 短縮共有は `reader/#s/<22文字ID>`。集計スナップショットのみ保存し、期限（7/30/90/365日、初期30日）、任意パスワード、管理画面からの停止、レート制限を実装。
+- 共有リンクは `reader/#s/<22文字ID>`。集計スナップショットのみ保存し、期限（7/30/90/365日または無期限、初期30日）、任意パスワード、管理画面からの停止、レート制限を実装。
 - 履歴画面で同じ自チームの複数試合を選択し、チーム合計・相手合計・シューティング・選手別合計を表示できる。選手詳細も開ける。
 - 合計レポートのLINE共有に対応。受信側Readerにも合計・1試合平均・合計ベースのシュート率を表示する。
+- 選手一覧・選手詳細の合計/平均をボタンで切り替え可能。共有リンクの期限に無期限を追加し、D1の既存テーブルを移行済み。
 - Worker secrets `PUBLISHER_TOKEN` / `PASSWORD_PEPPER` はCloudflareへ登録済み。管理キーの控えはローカルの無視ファイル `cloudflare/.publisher-token` にあり、GitHubへは送らない。
 - ローカルAPI・ブラウザ・回帰テストは通過。公開後の実環境はこの環境からQUIC/TLSエラーが出るため、ユーザー環境で疎通確認が必要。
 
@@ -16,7 +17,7 @@
 
 - ブラウザ回帰テストは、このPCにPlaywright依存がないため未実行。単体テストと構文チェックは通過。
 - `Documents/ChatGPT/BB_log_` は退避フォルダーで開発対象外。
-- 管理キーは各端末の「設定 → 短い共有リンク」に入力する必要がある。共用端末では解除する。
+- 管理キーは各端末の「設定 → 共有リンク」に入力する必要がある。共用端末では解除する。
 
 # Next Tasks
 
