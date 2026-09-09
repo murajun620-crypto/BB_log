@@ -11,7 +11,7 @@ const app = document.querySelector('#app');
 const sheet = document.querySelector('#sheet');
 const toastNode = document.querySelector('#toast');
 const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, historySelection: new Set(), aggregateMode: 'total', page: 'home', gameId: null, busy: false, lastError: '' };
-let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, resolvedShareHash = '', sharePayloadPromise = null;
+let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, resolvedShareHash = '', sharePayloadPromise = null, pwaRegistration = null;
 const getSetting = key => state.data.settings.find(s => s.key === key)?.value;
 const game = () => state.data.games.find(g => g.id === state.gameId);
 const gameEvents = (g = game()) => state.data.events.filter(e => e.gameId === g?.id);
@@ -303,6 +303,8 @@ async function shareGameLink() {
 const handlers = {
   ...setupCloudShareUI({ showSheet, closeSheet, toast, refreshView: render, getGame: game, getEvents: gameEvents, getAggregate: aggregateShareContext, message: gameShareMessage }),
   'close-sheet': closeSheet,
+  'apply-update': applyPWAUpdate,
+  'check-update': checkPWAUpdate,
   confirm: () => busy(async () => { const fn = confirmAction; if (fn) await fn(); }),
   'add-player': () => { readTeamForm(); if (teamDraft.players.length >= 60) return toast('選手は60人まで登録できます。'); teamDraft.players.push({ id: uid(), number: '', name: '' }); persistDraft('teamDraft', teamDraft); render(); document.querySelector('.roster-edit-row:last-child input').focus(); },
   'remove-player': button => { readTeamForm(); if (teamDraft.players.length <= 1) return toast('1人以上の選手を登録してください。'); teamDraft.players = teamDraft.players.filter(p => p.id !== button.dataset.id); persistDraft('teamDraft', teamDraft); render(); },
@@ -528,10 +530,28 @@ function renderStatus() {
   });
 }
 window.addEventListener('online', renderStatus); window.addEventListener('offline', renderStatus);
+async function applyPWAUpdate() {
+  const registration = pwaRegistration || await navigator.serviceWorker.getRegistration();
+  const waiting = registration?.waiting;
+  if (!waiting) { state.pwa.update = false; renderStatus(); toast('利用中のアプリは最新版です。'); return; }
+  const changed = new Promise(resolve => navigator.serviceWorker.addEventListener('controllerchange', resolve, { once: true }));
+  waiting.postMessage({ type: 'SKIP_WAITING' });
+  await changed;
+  location.reload();
+}
+async function checkPWAUpdate() {
+  const registration = pwaRegistration || await navigator.serviceWorker.getRegistration();
+  if (!registration) { toast('更新を確認できませんでした。', true); return; }
+  await registration.update();
+  state.pwa.update = !!registration.waiting;
+  renderStatus();
+  if (!state.pwa.update) toast('最新版です。');
+}
 async function initPWA() {
   if (!('serviceWorker' in navigator)) { state.pwa.error = 'このブラウザではオフライン起動に対応していません。HTTPSのSafariなどで開いてください。'; renderStatus(); return; }
   try {
     const registration = await navigator.serviceWorker.register('./sw.js', { scope: './', updateViaCache: 'none' });
+    pwaRegistration = registration;
     const updateStatus = () => { state.pwa.update = !!registration.waiting; renderStatus(); };
     const watchInstall = () => {
       const worker = registration.installing;

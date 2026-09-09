@@ -24,9 +24,9 @@ export function setupCloudShareUI({ showSheet, closeSheet, toast, refreshView, g
     const g = getGame();
     if (!g && !context) throw new Error('試合が見つかりません。');
     const snapshot = context?.snapshot || createSharedReport(g, getEvents(g));
-    const title = context?.title || `${g.date} ${g.teamName} vs ${g.opponentName}`;
-    const shareMessage = context?.message || message(g);
-    const description = context?.description || `${g.teamName} vs ${g.opponentName}の集計・選手名`;
+    const title = context?.title || context?.getTitle?.('') || (g ? `${g.date} ${g.teamName} vs ${g.opponentName}` : '共有レポート');
+    const shareMessage = context?.message || context?.getMessage?.('') || (g ? message(g) : 'Courtside Readerで合計スタッツを見る');
+    const description = context?.description || (g ? `${g.teamName} vs ${g.opponentName}の集計・選手名` : '選択した試合の集計・選手名');
     created = null;
     const tournamentField = context?.aggregate ? '<label>大会名（任意）<input name="tournamentName" maxlength="40" placeholder="例：夏季総体、○○カップ"></label>' : '';
     showSheet('共有リンクを作成', `<form id="cloud-create-form"><p class="help">${esc(description)}をCloudflareに保存します。後から元の試合を編集しても、この共有結果は変わりません。</p>${tournamentField}<label class="spaced">有効期限<select name="days"><option value="7">7日間</option><option value="30" selected>30日間</option><option value="90">90日間</option><option value="365">365日間</option><option value="unlimited">無期限</option></select></label><label class="spaced">閲覧パスワード（任意）<input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" placeholder="設定する場合は8文字以上"></label><p class="help">パスワードなし：リンクを知る人が閲覧できます。設定する場合は、パスワードをリンクとは別に伝えてください。</p><button type="submit" class="button primary full spaced">リンクを作成</button><p class="help">作成・閲覧には通信が必要です。「設定」で共有を停止できます。</p></form>`);

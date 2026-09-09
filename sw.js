@@ -1,5 +1,5 @@
 // Bump this version whenever any app-shell asset changes.
-const VERSION = 'v1.0.23';
+const VERSION = 'v1.0.24';
 const CACHE_PREFIX = 'courtside-shell-';
 // Include scope in the name so multiple GitHub Pages projects cannot clear each other's caches.
 const CACHE_BASE = `${CACHE_PREFIX}${encodeURIComponent(self.registration.scope)}-`;
@@ -20,6 +20,9 @@ self.addEventListener('activate', event => {
     await Promise.all(names.filter(name => name.startsWith(CACHE_BASE) && name !== CACHE_NAME).map(name => caches.delete(name)));
     await self.clients.claim();
   })());
+});
+self.addEventListener('message', event => {
+  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
 });
 self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
