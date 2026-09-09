@@ -198,6 +198,12 @@ try {
   const restored = await snapshot(); assert.deepEqual(restored.games, original.games); assert.deepEqual(restored.events, original.events);
   await route('#history'); assert.equal(await page.locator('.game-card').count(), 2);
   await page.reload(); await page.getByRole('heading', { name: '試合履歴', exact: true }).waitFor(); assert.equal(await page.locator('.game-card').count(), 2);
+  await page.locator('[data-history-select]').nth(0).check(); await page.locator('[data-history-select]').nth(1).check();
+  await page.getByRole('button', { name: '合計を見る', exact: true }).click(); await page.getByRole('heading', { name: '合計スタッツ', exact: true }).waitFor();
+  assert.equal(await page.locator('.aggregate-game-list li').count(), 2); assert.equal(await page.locator('.total-row .pts-cell').textContent(), '13');
+  await page.locator('.box-table button').first().click(); await page.getByRole('heading', { name: '合計スタッツ', exact: true }).last().waitFor(); await dismiss();
+  await page.getByRole('button', { name: '履歴へ戻る', exact: true }).click(); await page.getByRole('heading', { name: '試合履歴', exact: true }).waitFor();
+  step('history selection and multi-game aggregate report with player detail pass');
   await page.locator('.history-game-card').filter({ hasText: 'EAST SIDE' }).locator('[data-action=delete-game]').click();
   await page.getByRole('heading', { name: 'この試合を削除しますか？' }).waitFor();
   await page.getByRole('button', { name: '試合を削除', exact: true }).click(); await ready();

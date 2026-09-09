@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { STATS, aggregate, percent, lineup, validateGame, validateTeam, makePeriods, uid } from '../js/domain.js';
+import { STATS, aggregate, aggregateGames, percent, lineup, validateGame, validateTeam, makePeriods, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
 
@@ -32,6 +32,21 @@ test('edits and soft deletions change score, player totals and periods without d
   validateGame(game, events); const a = aggregate(game, events);
   assert.equal(a.team.PTS, 2); assert.equal(a.team.FGA, 2); assert.equal(a.team.FGM, 1);
   assert.equal(a.opponent, 0); assert.equal(events.length, 3);
+});
+test('selected games aggregate team and player stats by stable player identity', () => {
+  const first = fixture(); first.add('3PM'); first.add('AST', { playerId: 'player-1' });
+  const second = structuredClone(first.game);
+  second.id = 'game-2'; second.date = '2026-09-06'; second.opponentName = 'VISITORS 2';
+  second.periods = makePeriods('quarters', 4, 8); second.currentPeriodId = second.periods[0].id;
+  const events = [
+    { id: uid(), gameId: second.id, periodId: second.currentPeriodId, eventType: '2PM', playerId: 'player-1', points: 2, timestamp: new Date().toISOString(), seq: 1 },
+    { id: uid(), gameId: second.id, periodId: second.currentPeriodId, eventType: 'OPP', playerId: null, points: 4, timestamp: new Date().toISOString(), seq: 2 },
+  ];
+  const report = aggregateGames([first.game, second], [...first.events, ...events]);
+  assert.equal(report.team.PTS, 5); assert.equal(report.opponent, 4);
+  assert.equal(report.team.FGM, 2); assert.equal(report.team.FGA, 2);
+  assert.equal(report.players.find(p => p.id === 'player-0').stats.PTS, 3);
+  assert.equal(report.players.find(p => p.id === 'player-1').stats.PTS, 2);
 });
 test('substitutions support undo; deleting a prerequisite substitution is rejected', () => {
   const { game, events, add } = fixture();

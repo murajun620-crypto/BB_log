@@ -45,6 +45,25 @@ export function aggregate(game, events) {
   }
   return { players, team, opponent, periods };
 }
+function addStats(target, source) {
+  for (const key of Object.keys(target)) target[key] += source[key] || 0;
+}
+export function aggregateGames(games, events) {
+  const selected = games.filter(Boolean);
+  const team = blankStats();
+  const players = new Map();
+  let opponent = 0;
+  for (const game of selected) {
+    const summary = aggregate(game, events.filter(event => event.gameId === game.id));
+    addStats(team, summary.team);
+    opponent += summary.opponent;
+    for (const player of game.roster) {
+      if (!players.has(player.id)) players.set(player.id, { ...player, stats: blankStats() });
+      addStats(players.get(player.id).stats, summary.players[player.id]);
+    }
+  }
+  return { games: selected, teamName: selected[0]?.teamName || '', teamId: selected[0]?.teamId || '', team, opponent, players: [...players.values()] };
+}
 export function lineup(game, events, strict = false) {
   const on = new Set(game.starters);
   for (const e of activeEvents(events)) if (e.eventType === 'SUB') {

@@ -89,8 +89,14 @@ h3 { font-size: 16px; font-weight: 650; }
 .section-heading h2 { display: flex; align-items: center; gap: 8px; }
 .live-dot { width: 6px; height: 6px; background: #6f9659; border-radius: 50%; display: inline-block; flex: 0 0 auto; }
 .card-list { display: grid; gap: 12px; }
-.history-game-card { display: grid; grid-template-columns: minmax(0, 1fr) 48px; gap: 8px; }
+.history-game-card { display: grid; grid-template-columns: 54px minmax(0, 1fr) 48px; gap: 8px; }
 .history-game-card .game-card { min-width: 0; }
+.history-game-card.selected .game-card { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.history-select { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; min-height: 72px; border: 1px solid var(--line); border-radius: 15px; background: var(--surface); color: var(--muted); font-size: 10px; cursor: pointer; }
+.history-select:has(input:checked) { color: var(--accent); background: var(--accent-soft); border-color: var(--accent); }
+.history-select input { width: 20px; height: 20px; margin: 0; accent-color: var(--accent); }
+.history-select input:disabled { opacity: .35; }
+.aggregate-game-list { display: grid; gap: 4px; margin: 17px 0 0; padding: 12px 0 0 18px; border-top: 1px solid var(--line); color: var(--muted); font-size: 11px; }
 .delete-game-button { display: inline-flex; align-items: center; justify-content: center; background: var(--surface); color: var(--muted); border: 1px solid var(--line); border-radius: 15px; }
 .delete-game-button:active { color: var(--danger); background: var(--danger-soft); }
 .game-card { display: block; border: 1px solid var(--line); background: var(--surface); padding: 17px; border-radius: 15px; }

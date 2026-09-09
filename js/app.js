@@ -1,5 +1,5 @@
 import * as db from './db.js';
-import { uid, localDate, STATS, activeEvents, makePeriods, validateTeam, validateGame, lineup, eventLabel, aggregate } from './domain.js';
+import { uid, localDate, STATS, activeEvents, makePeriods, validateTeam, validateGame, lineup, eventLabel, aggregate, aggregateGames } from './domain.js';
 import { backupObject, parseBackup, gameCSV, download, shareFile, shareUrl } from './transfer.js';
 import { boxScoreImage, playerStatsImage, safeFilename, shareImage } from './share-image.js';
 import { createSharedReport, createCompressedSharePayload, parseSharePayload, parseSharedReport, sharedReportFile } from './shared-report.js';
@@ -10,7 +10,7 @@ import { cloudSettingsHTML, setupCloudShareUI } from './cloud-share-ui.js';
 const app = document.querySelector('#app');
 const sheet = document.querySelector('#sheet');
 const toastNode = document.querySelector('#toast');
-const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, page: 'home', gameId: null, busy: false, lastError: '' };
+const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, historySelection: new Set(), page: 'home', gameId: null, busy: false, lastError: '' };
 let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, resolvedShareHash = '', sharePayloadPromise = null;
 const getSetting = key => state.data.settings.find(s => s.key === key)?.value;
 const game = () => state.data.games.find(g => g.id === state.gameId);
@@ -87,6 +87,11 @@ function render() {
     }
     html = view.gameFormView(state, gameDraft);
   } else if (page === 'history') html = view.historyView(state);
+  else if (page === 'aggregate') {
+    const selectedGames = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
+    if (selectedGames.length < 2 || new Set(selectedGames.map(candidate => candidate.teamId)).size !== 1) { state.historySelection.clear(); location.hash = '#history'; return; }
+    html = view.aggregateView(state, selectedGames, state.data.events);
+  }
   else if (page === 'settings') html = view.settingsView(state);
   else if (page === 'shared') {
     if (!sharedReport) { location.hash = '#settings'; return; }
@@ -328,6 +333,7 @@ const handlers = {
       await db.deleteGame(g);
       state.data.games = state.data.games.filter(candidate => candidate.id !== g.id);
       state.data.events = state.data.events.filter(event => event.gameId !== g.id);
+      state.historySelection.delete(g.id);
       closeSheet(); render(); toast('試合履歴を削除しました。');
     }, true);
   },
@@ -342,6 +348,14 @@ const handlers = {
   },
   'add-member': addMemberMenu,
   'game-menu': () => showSheet('試合メニュー', `<div class="card-list"><a class="button secondary full" href="#box/${game().id}">BOX SCOREを表示</a><button class="button secondary full" data-action="add-member">メンバーを追加</button><button class="button secondary full" data-action="period-menu">ピリオド操作</button><button class="button secondary full" data-action="events">イベント履歴・編集</button><button class="button primary full" data-action="finish">試合を終了する</button><a class="button secondary full" href="#home">保存してホームへ</a></div><p class="help">追加した選手はベンチメンバーとして記録できます。すべての入力はその都度保存されています。</p>`),
+  'aggregate-selected': () => {
+    const selected = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
+    if (selected.length < 2) return toast('2試合以上を選択してください。', true);
+    if (new Set(selected.map(candidate => candidate.teamId)).size !== 1) return toast('同じ自チームの試合を選択してください。', true);
+    location.hash = '#aggregate';
+  },
+  'back-history': () => { location.hash = '#history'; },
+  'aggregate-player-detail': button => showSheet('合計スタッツ', view.aggregatePlayerDetail(aggregateGames(state.data.games.filter(candidate => state.historySelection.has(candidate.id)), state.data.events), button.dataset.id)),
   finish: () => confirm('試合を終了しますか？', 'BOX SCOREに結果をまとめます。終了後も履歴の編集や記録の再開ができます。', '試合を終了', async () => { const g = await saveGameChange({ ...game(), status: 'finished' }); closeSheet(); location.hash = `#box/${g.id}`; }),
   reopen: () => confirm('記録を再開しますか？', 'この試合を記録中に戻します。', '再開する', async () => { const g = await saveGameChange({ ...game(), status: 'live' }); closeSheet(); location.hash = `#live/${g.id}`; }),
   'player-detail': button => showSheet('選手スタッツ', view.playerDetail(game(), gameEvents(), button.dataset.id)),
@@ -378,6 +392,16 @@ document.addEventListener('input', event => {
 });
 document.addEventListener('change', event => {
   const el = event.target;
+  if (el.matches('[data-history-select]')) {
+    const selected = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
+    const target = state.data.games.find(candidate => candidate.id === el.dataset.id);
+    if (el.checked) {
+      if (selected[0] && selected[0].teamId !== target?.teamId) { el.checked = false; toast('同じ自チームの試合を選択してください。', true); return; }
+      state.historySelection.add(el.dataset.id);
+    } else state.historySelection.delete(el.dataset.id);
+    render();
+    return;
+  }
   if (el.closest('#game-form')) {
     readGameForm();
     if (el.name === 'teamId') { selectTeam(el.value); render(); }
