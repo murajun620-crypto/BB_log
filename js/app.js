@@ -10,7 +10,7 @@ import { cloudSettingsHTML, setupCloudShareUI } from './cloud-share-ui.js';
 const app = document.querySelector('#app');
 const sheet = document.querySelector('#sheet');
 const toastNode = document.querySelector('#toast');
-const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, historySelection: new Set(), aggregateMode: 'total', page: 'home', gameId: null, busy: false, lastError: '' };
+const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, historySelection: new Set(), aggregateMode: 'total', aggregateGameId: null, aggregatePlayerGameId: 'total', page: 'home', gameId: null, busy: false, lastError: '' };
 let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, resolvedShareHash = '', sharePayloadPromise = null, pwaRegistration = null;
 const getSetting = key => state.data.settings.find(s => s.key === key)?.value;
 const game = () => state.data.games.find(g => g.id === state.gameId);
@@ -90,7 +90,8 @@ function render() {
   else if (page === 'aggregate') {
     const selectedGames = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
     if (selectedGames.length < 2 || new Set(selectedGames.map(candidate => candidate.teamId)).size !== 1) { state.historySelection.clear(); location.hash = '#history'; return; }
-    html = view.aggregateView(state, selectedGames, state.data.events);
+    if (state.aggregateGameId && !selectedGames.some(candidate => candidate.id === state.aggregateGameId)) state.aggregateGameId = null;
+    html = view.aggregateViewUnified(state, selectedGames, state.data.events);
   }
   else if (page === 'settings') html = view.settingsView(state);
   else if (page === 'shared') {
@@ -369,15 +370,22 @@ const handlers = {
     const selected = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
     if (selected.length < 2) return toast('2試合以上を選択してください。', true);
     if (new Set(selected.map(candidate => candidate.teamId)).size !== 1) return toast('同じ自チームの試合を選択してください。', true);
-    location.hash = '#aggregate';
+    state.aggregateGameId = null; state.aggregatePlayerGameId = state.aggregateMode; location.hash = '#aggregate';
   },
-  'back-history': () => { location.hash = '#history'; },
-  'toggle-aggregate-mode': () => { state.aggregateMode = state.aggregateMode === 'average' ? 'total' : 'average'; render(); },
-  'aggregate-player-detail': button => showSheet('合計スタッツ', view.aggregatePlayerDetail(aggregateGames(state.data.games.filter(candidate => state.historySelection.has(candidate.id)), state.data.events), button.dataset.id, state.aggregateMode)),
+  'back-history': () => { state.aggregateGameId = null; state.aggregatePlayerGameId = state.aggregateMode; location.hash = '#history'; },
+  'select-aggregate-game': button => { state.aggregateGameId = button.dataset.id || null; state.aggregatePlayerGameId = state.aggregateGameId || state.aggregateMode; render(); },
+  'toggle-aggregate-mode': () => { state.aggregateMode = state.aggregateMode === 'average' ? 'total' : 'average'; state.aggregatePlayerGameId = state.aggregateMode; render(); },
+  'aggregate-player-detail': button => {
+    const games = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
+    const report = aggregateGames(games, state.data.events);
+    showSheet('合計スタッツ', view.aggregatePlayerDetailWithGames(report, button.dataset.id, state.aggregateMode, games, state.data.events, state.aggregatePlayerGameId));
+  },
   'toggle-aggregate-player-mode': button => {
     state.aggregateMode = state.aggregateMode === 'average' ? 'total' : 'average';
-    const report = aggregateGames(state.data.games.filter(candidate => state.historySelection.has(candidate.id)), state.data.events);
-    showSheet('合計スタッツ', view.aggregatePlayerDetail(report, button.dataset.id, state.aggregateMode));
+    state.aggregatePlayerGameId = state.aggregateMode;
+    const games = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
+    const report = aggregateGames(games, state.data.events);
+    showSheet('合計スタッツ', view.aggregatePlayerDetailWithGames(report, button.dataset.id, state.aggregateMode, games, state.data.events, state.aggregatePlayerGameId));
   },
   finish: () => confirm('試合を終了しますか？', 'BOX SCOREに結果をまとめます。終了後も履歴の編集や記録の再開ができます。', '試合を終了', async () => { const g = await saveGameChange({ ...game(), status: 'finished' }); closeSheet(); location.hash = `#box/${g.id}`; }),
   reopen: () => confirm('記録を再開しますか？', 'この試合を記録中に戻します。', '再開する', async () => { const g = await saveGameChange({ ...game(), status: 'live' }); closeSheet(); location.hash = `#live/${g.id}`; }),
@@ -415,6 +423,13 @@ document.addEventListener('input', event => {
 });
 document.addEventListener('change', event => {
   const el = event.target;
+  if (el.matches('[data-action="select-aggregate-player-game"]')) {
+    const games = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
+    const report = aggregateGames(games, state.data.events);
+    state.aggregatePlayerGameId = el.value;
+    showSheet('合計スタッツ', view.aggregatePlayerDetailWithGames(report, el.dataset.id, state.aggregateMode, games, state.data.events, state.aggregatePlayerGameId));
+    return;
+  }
   if (el.matches('[data-history-select]')) {
     const selected = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
     const target = state.data.games.find(candidate => candidate.id === el.dataset.id);
