@@ -32,7 +32,7 @@ export function createSharedReport(game, events) {
     },
   };
 }
-export function createAggregateSharedReport(games, events) {
+export function createAggregateSharedReport(games, events, tournamentName = '') {
   const summary = aggregateGames(games, events);
   const date = [...games].map(game => game.date).sort().at(-1) || new Date().toISOString().slice(0, 10);
   return {
@@ -44,6 +44,7 @@ export function createAggregateSharedReport(games, events) {
       format: `${games.length}試合合計`,
       status: games.some(game => game.status === 'live') ? 'live' : 'finished',
       gameCount: games.length,
+      tournamentName: String(tournamentName || '').trim(),
       teamName: summary.teamName,
       opponentName: '相手合計',
       opponentScore: summary.opponent,
@@ -79,6 +80,7 @@ export function parseSharedReport(text) {
   ensure(/^\d{4}-\d{2}-\d{2}$/.test(report.date) && !Number.isNaN(parsedDate.valueOf()) && parsedDate.toISOString().slice(0, 10) === report.date);
   ensure(validText(report.format, 40) && ['live', 'finished'].includes(report.status));
   ensure(report.gameCount === undefined || (Number.isSafeInteger(report.gameCount) && report.gameCount >= 1 && report.gameCount <= 999));
+  ensure(report.tournamentName === undefined || (typeof report.tournamentName === 'string' && report.tournamentName.length <= 40));
   ensure(validText(report.teamName, 40) && validText(report.opponentName, 40));
   ensure(Number.isSafeInteger(report.opponentScore) && report.opponentScore >= 0 && report.opponentScore <= 999999);
   ensure(Array.isArray(report.periods) && report.periods.length >= 1 && report.periods.length <= 50);

@@ -59,6 +59,7 @@ function canonicalReport(data) {
   return { app: 'courtside-report', schemaVersion: 1, report: {
     date: report.date, format: report.format, status: report.status,
     gameCount: report.gameCount || 1,
+    tournamentName: report.tournamentName || '',
     teamName: report.teamName, opponentName: report.opponentName, opponentScore: report.opponentScore,
     periods: report.periods.map(p => ({ label: p.label, home: p.home, away: p.away })),
     team: stats(report.team),
@@ -101,7 +102,7 @@ async function route(request, env) {
     const id = random(), salt = password ? random() : null;
     const hash = password ? await passwordHash(password, salt, env.PASSWORD_PEPPER) : null;
     const expiresAt = data.days === null ? null : now + data.days * DAY;
-    const title = `${report.report.date} ${report.report.teamName} vs ${report.report.opponentName}`;
+    const title = `${report.report.tournamentName ? `${report.report.tournamentName} · ` : ''}${report.report.date} ${report.report.teamName} vs ${report.report.opponentName}`;
     await db.prepare('INSERT INTO shares (id, report, title, created_at, expires_at, password_salt, password_hash) VALUES (?, ?, ?, ?, ?, ?, ?)')
       .bind(id, JSON.stringify(report), title, now, expiresAt, salt, hash).run();
     return { id, title, createdAt: now, expiresAt, passwordRequired: !!password };

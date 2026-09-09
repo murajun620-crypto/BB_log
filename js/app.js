@@ -255,10 +255,14 @@ function aggregateShareContext() {
   const games = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
   if (games.length < 2 || new Set(games.map(candidate => candidate.teamId)).size !== 1) throw new Error('同じ自チームの試合を2試合以上選択してください。');
   const summary = aggregateGames(games, state.data.events);
+  const getTitle = tournamentName => `${tournamentName ? `${tournamentName} · ` : ''}${summary.teamName} ${games.length}試合合計`;
+  const getMessage = tournamentName => `${tournamentName ? `${tournamentName}\n` : ''}${summary.teamName} ${games.length}試合合計\n${summary.teamName} ${summary.team.PTS} - ${summary.opponent} 相手合計\n1試合平均 ${ (summary.team.PTS / games.length).toFixed(1) } - ${ (summary.opponent / games.length).toFixed(1) }\nCourtside Readerで合計スタッツを見る`;
   return {
+    aggregate: true,
     snapshot: createAggregateSharedReport(games, state.data.events),
-    title: `${summary.teamName} ${games.length}試合合計`,
-    message: `${summary.teamName} ${games.length}試合合計\n${summary.teamName} ${summary.team.PTS} - ${summary.opponent} 相手合計\n1試合平均 ${ (summary.team.PTS / games.length).toFixed(1) } - ${ (summary.opponent / games.length).toFixed(1) }\nCourtside Readerで合計スタッツを見る`,
+    makeSnapshot: tournamentName => createAggregateSharedReport(games, state.data.events, tournamentName),
+    getTitle,
+    getMessage,
     description: `${summary.teamName}の${games.length}試合分の合計スタッツ・1試合平均`,
   };
 }

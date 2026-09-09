@@ -28,16 +28,19 @@ export function setupCloudShareUI({ showSheet, closeSheet, toast, refreshView, g
     const shareMessage = context?.message || message(g);
     const description = context?.description || `${g.teamName} vs ${g.opponentName}の集計・選手名`;
     created = null;
-    showSheet('共有リンクを作成', `<form id="cloud-create-form"><p class="help">${esc(description)}をCloudflareに保存します。後から元の試合を編集しても、この共有結果は変わりません。</p><label>有効期限<select name="days"><option value="7">7日間</option><option value="30" selected>30日間</option><option value="90">90日間</option><option value="365">365日間</option><option value="unlimited">無期限</option></select></label><label class="spaced">閲覧パスワード（任意）<input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" placeholder="設定する場合は8文字以上"></label><p class="help">パスワードなし：リンクを知る人が閲覧できます。設定する場合は、パスワードをリンクとは別に伝えてください。</p><button type="submit" class="button primary full spaced">リンクを作成</button><p class="help">作成・閲覧には通信が必要です。「設定」で共有を停止できます。</p></form>`);
+    const tournamentField = context?.aggregate ? '<label>大会名（任意）<input name="tournamentName" maxlength="40" placeholder="例：夏季総体、○○カップ"></label>' : '';
+    showSheet('共有リンクを作成', `<form id="cloud-create-form"><p class="help">${esc(description)}をCloudflareに保存します。後から元の試合を編集しても、この共有結果は変わりません。</p>${tournamentField}<label class="spaced">有効期限<select name="days"><option value="7">7日間</option><option value="30" selected>30日間</option><option value="90">90日間</option><option value="365">365日間</option><option value="unlimited">無期限</option></select></label><label class="spaced">閲覧パスワード（任意）<input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" placeholder="設定する場合は8文字以上"></label><p class="help">パスワードなし：リンクを知る人が閲覧できます。設定する場合は、パスワードをリンクとは別に伝えてください。</p><button type="submit" class="button primary full spaced">リンクを作成</button><p class="help">作成・閲覧には通信が必要です。「設定」で共有を停止できます。</p></form>`);
     document.querySelector('#cloud-create-form').addEventListener('submit', event => {
       event.preventDefault();
       const form = event.currentTarget;
       const values = new FormData(form);
       void work(async () => {
         const selectedDays = String(values.get('days'));
-        const result = await createCloudShare(snapshot, { days: selectedDays === 'unlimited' ? null : Number(selectedDays), password: String(values.get('password')) });
+        const tournamentName = context?.aggregate ? String(values.get('tournamentName') || '').trim() : '';
+        const report = context?.makeSnapshot ? context.makeSnapshot(tournamentName) : snapshot;
+        const result = await createCloudShare(report, { days: selectedDays === 'unlimited' ? null : Number(selectedDays), password: String(values.get('password')) });
         form.reset();
-        created = { ...result, title, link: shortShareLink(result.id), message: shareMessage };
+        created = { ...result, title: context?.getTitle ? context.getTitle(tournamentName) : title, link: shortShareLink(result.id), message: context?.getMessage ? context.getMessage(tournamentName) : shareMessage };
         showReady();
       });
     });
