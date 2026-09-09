@@ -186,7 +186,8 @@ export function pickerHTML(g, events, type, options = {}) {
   return `<p class="picker-instruction">${esc(options.instruction || '記録する選手をタップ')}</p>${group(tracked ? players.filter(p => on.includes(p.id)) : players, tracked ? 'ON COURT' : 'PLAYERS')}${tracked ? `<details ${options.only || options.showBench ? 'open' : ''} class="bench-list"><summary>ベンチの選手を表示</summary>${group(players.filter(p => !on.includes(p.id)), 'BENCH')}</details>` : ''}`;
 }
 export function shotZonePicker(playerName, statLabel) {
-  return `<p class="picker-instruction">${esc(playerName)} · ${esc(statLabel)}。打った位置をタップ</p><div class="shot-zone-legend"><span>○ 成功</span><span>× 失敗</span></div><div class="shot-zone-grid">${SHOT_ZONES.map(zone => `<button type="button" class="shot-zone" data-action="shot-zone" data-zone="${zone.id}">${esc(zone.label)}</button>`).join('')}</div><button type="button" class="button secondary full spaced" data-action="cancel-shot-zone">入力をやめる</button>`;
+  const zones = SHOT_ZONES.map(zone => `<button type="button" class="shot-zone" data-action="shot-zone" data-zone="${zone.id}">${esc(zone.label)}</button>`).join('');
+  return `<p class="picker-instruction">${esc(playerName)} · ${esc(statLabel)}。コート上の位置をタップ</p><div class="shot-zone-legend"><span>○ 成功</span><span>× 失敗</span></div><div class="shot-court-picker" aria-label="ハーフコートのシュート位置"><svg viewBox="0 0 360 460" aria-hidden="true"><rect x="12" y="12" width="336" height="436" rx="3"/><path d="M38 448Q180 130 322 448M125 392V284h110v108M125 284a55 55 0 1 0 110 0M155 405h50M145 420h70M168 420a12 12 0 1 0 24 0"/><path d="M12 448h326"/></svg><div class="shot-zone-grid">${zones}</div></div><button type="button" class="button secondary full spaced" data-action="cancel-shot-zone">入力をやめる</button>`;
 }
 export function eventsHTML(g, events) {
   const active = activeEvents(events).reverse();

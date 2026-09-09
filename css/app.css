@@ -290,6 +290,10 @@ dialog::backdrop { background: #07170f70; backdrop-filter: blur(3px); }
 .sheet-content { padding-bottom: 3px; }
 .picker-instruction { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
 .shot-zone-legend { display: flex; gap: 16px; margin: 0 0 10px; color: var(--muted); font-size: 11px; }
+.shot-court-picker { position: relative; width: 100%; max-width: 420px; aspect-ratio: 360 / 460; margin: 0 auto; overflow: hidden; border: 1px solid var(--line); border-radius: 14px; color: var(--accent); background: var(--surface-subtle); }
+.shot-court-picker > svg { position: absolute; inset: 0; width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 1.5; pointer-events: none; }
+.shot-court-picker .shot-zone-grid { position: absolute; inset: 12px; grid-template-rows: repeat(3, minmax(0, 1fr)); gap: 6px; }
+.shot-court-picker .shot-zone { min-height: 0; color: var(--text); background: rgba(255, 255, 255, .74); backdrop-filter: blur(1px); }
 .shot-zone-grid, .shot-chart-grid { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 5px; }
 .shot-zone { min-height: 52px; padding: 5px 2px; border: 1px solid var(--line); border-radius: 9px; color: var(--text); background: var(--bg); font-size: 10px; font-weight: 650; }
 .shot-zone[data-zone="rim"], .shot-chart-zone[data-zone="rim"] { grid-column: 3; grid-row: 3; }
