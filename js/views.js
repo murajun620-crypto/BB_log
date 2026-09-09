@@ -24,7 +24,7 @@ const paths = {
 export const icon = (name, cls = '') => `<svg class="icon ${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.ball}</svg>`;
 const action = (name, text, cls = 'button secondary', attrs = '') => `<button class="${cls}" data-action="${name}" ${attrs}>${text}</button>`;
 const tag = text => `<span class="tag">${esc(text)}</span>`;
-const statusChip = s => `<span class="connection ${s.pwa.ready ? 'ready' : ''}"><i></i>${s.pwa.ready ? (navigator.onLine ? 'オフライン利用OK' : 'オフライン') : s.pwa.error ? 'キャッシュ未完了' : 'オフライン準備中'}</span>`;
+const statusChip = s => { const pwa = s?.pwa || {}; return `<span class="connection ${pwa.ready ? 'ready' : ''}"><i></i>${pwa.ready ? (navigator.onLine ? 'オフライン利用OK' : 'オフライン') : pwa.error ? 'キャッシュ未完了' : 'オフライン準備中'}</span>`; };
 function nav(current) {
   return `<nav class="navigation" aria-label="メインナビゲーション">${[['home', 'ホーム'], ['teams', 'チーム'], ['history', '履歴'], ['settings', '設定']].map(([id, label]) => `<a href="#${id}" class="nav-item ${current === id ? 'selected' : ''}" ${current === id ? 'aria-current="page"' : ''}>${icon(id === 'teams' ? 'team' : id)}<span>${label}</span></a>`).join('')}</nav>`;
 }
