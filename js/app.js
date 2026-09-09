@@ -4,6 +4,8 @@ import { backupObject, parseBackup, gameCSV, download, shareFile, shareUrl } fro
 import { boxScoreImage, playerStatsImage, safeFilename, shareImage } from './share-image.js';
 import { createSharedReport, createCompressedSharePayload, parseSharePayload, parseSharedReport, sharedReportFile } from './shared-report.js';
 import * as view from './views.js';
+import { cloudShareEnabled } from './cloud-share.js';
+import { cloudSettingsHTML, setupCloudShareUI } from './cloud-share-ui.js';
 
 const app = document.querySelector('#app');
 const sheet = document.querySelector('#sheet');
@@ -97,6 +99,7 @@ function render() {
     html = page === 'live' ? view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
+  if (page === 'settings') app.querySelector('.settings-panel')?.insertAdjacentHTML('afterend', cloudSettingsHTML());
   if (page === 'settings' && !app.querySelector('#keepAwake')) {
     const continuous = app.querySelector('#continuous');
     if (continuous) {
@@ -278,6 +281,7 @@ async function shareGameLink() {
   if (sheet.open) closeSheet();
 }
 const handlers = {
+  ...setupCloudShareUI({ showSheet, closeSheet, toast, refreshView: render, getGame: game, getEvents: gameEvents, message: gameShareMessage }),
   'close-sheet': closeSheet,
   confirm: () => busy(async () => { const fn = confirmAction; if (fn) await fn(); }),
   'add-player': () => { readTeamForm(); if (teamDraft.players.length >= 60) return toast('選手は60人まで登録できます。'); teamDraft.players.push({ id: uid(), number: '', name: '' }); persistDraft('teamDraft', teamDraft); render(); document.querySelector('.roster-edit-row:last-child input').focus(); },
@@ -347,6 +351,12 @@ const handlers = {
     const events = gameEvents(g);
     sharePayloadPromise = g ? { gameId: g.id, promise: createCompressedSharePayload(g, events) } : null;
     showSheet('スタッツを共有', `<button class="button primary full" data-action="share-link">${view.icon('share')}LINEへ共有</button><p class="help">日付・対戦チーム・スコアを本文に添えて、リンクをLINEなどの共有メニューから送ります。受信者はリンクをタップしてBOX SCOREを開き、選手をタップして詳細も確認できます。</p><button class="button secondary full spaced" data-action="share-report">${view.icon('download')}ファイルで共有</button><p class="help">リンクを使わず、閲覧用ファイルを送る方法です。受信者は「設定」から開きます。</p><button class="button secondary full spaced" data-action="share-box-image">${view.icon('download')}画像で共有</button>`);
+    if (cloudShareEnabled()) {
+      const button = sheet.querySelector('[data-action="share-link"]');
+      button.dataset.action = 'cloud-create';
+      button.nextElementSibling.textContent = '短いリンクを作成してLINEへ送ります。共有データをCloudflareに保存し、有効期限とパスワード（任意）を設定できます。';
+      sheet.querySelector('.sheet-content').insertAdjacentHTML('beforeend', '<button class="button secondary full spaced" data-action="share-link">従来の長いリンクで共有</button><p class="help">サーバーに保存しない方式です。パスワード・有効期限・共有停止は使えません。</p>');
+    }
   },
   'share-link': () => shareGameLink(),
   'share-report': () => shareGameReport(),

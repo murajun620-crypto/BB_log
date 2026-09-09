@@ -1,0 +1,19 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "courtside-share",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-09-09",
+  "workers_dev": true,
+  "preview_urls": false,
+  "vars": {
+    "ALLOWED_ORIGINS": "https://murajun620-crypto.github.io"
+  },
+  "d1_databases": [{
+    "binding": "DB",
+    "database_name": "courtside-share",
+    "database_id": "7767b7c2-dbfc-4341-b74a-5913ab549026",
+    "migrations_dir": "migrations"
+  }],
+  "triggers": { "crons": ["17 19 * * *"] },
+  "observability": { "enabled": false }
+}

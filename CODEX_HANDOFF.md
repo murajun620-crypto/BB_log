@@ -1,33 +1,39 @@
 # Project Status
 
-バスケットボールの試合記録・共有を行うオフライン対応PWA。正規リポジトリは `Documents/Github/BB_log`。GitHub Pages公開先は `https://murajun620-crypto.github.io/BB_log/`。
+バスケットボールの試合記録・共有を行うオフライン対応PWA。正規リポジトリは `Documents/Github/BB_log`、公開先は `https://murajun620-crypto.github.io/BB_log/`。アプリは1.0.19。
 
 # Recent Changes
 
-- LIFFとLINEカード共有を廃止し、通常の「LINEへ共有」（本文＋閲覧リンク）を正式な共有導線にした。
-- LIFF ID設定、LIFF SDK、カード送信処理、関連テストと説明を削除。旧バックアップに残る `lineShare` 設定は復元時に無視する。
-- リリース番号は `1.0.18` に統一。LIFF廃止版はコミット `c5adf03` としてプッシュ・GitHub Pages反映確認済み。
+- LIFF/LINEカード共有を廃止し、OSの共有シートによる従来リンク・ファイル・画像共有を維持。
+- Cloudflare Workers + D1の短縮共有を実装・公開。Workerは `https://courtside-share.murajun620.workers.dev`、D1は `courtside-share`。
+- 短縮共有は `reader/#s/<22文字ID>`。集計スナップショットのみ保存し、期限（7/30/90/365日、初期30日）、任意パスワード、管理画面からの停止、レート制限を実装。
+- Worker secrets `PUBLISHER_TOKEN` / `PASSWORD_PEPPER` はCloudflareへ登録済み。管理キーの控えはローカルの無視ファイル `cloudflare/.publisher-token` にあり、GitHubへは送らない。
+- ローカルAPI・ブラウザ・回帰テストは通過。公開後の実環境はこの環境からQUIC/TLSエラーが出るため、ユーザー環境で疎通確認が必要。
 
 # Current Issues
 
-- 通常のLINE共有リンクが長い。提示例は456文字。現在は1試合の集計をDeflate圧縮し、URLフラグメントへ全量格納しているため、試合の情報量に応じて長くなる。
+- GitHub Pagesへ接続先設定をまだコミット・プッシュしていない。次の作業で行う。
 - `Documents/ChatGPT/BB_log_` は退避フォルダーで開発対象外。
+- 管理キーは各端末の「設定 → 短い共有リンク」に入力する必要がある。共用端末では解除する。
 
 # Next Tasks
 
-1. 短い共有リンクの設計をユーザーと決定する。検討案は、共有時点の1試合の集計だけをCloudflare Workers + D1へ保存し、Readerの `#s/<22文字のランダムID>` で取得する方式（現在のドメインで75文字）。クラウド保存は未承認・未実装。
-2. 採用する場合は、作成者の認証・共有停止・保存期間を決める。閲覧者はログイン不要でリンクを知る人が閲覧可能。作成と初回閲覧は通信必須。従来リンクとファイル・画像共有は維持する。
+1. 変更をコミットし、`origin/main`へプッシュ。GitHub Pagesの公開 `cloud-config.js`、`sw.js`、`app.js` を確認。
+2. 自宅PC/職場PCのアプリ設定へ同じ管理キーを入力し、実試合ではなくテスト用試合で短縮リンク作成・パスワード閲覧・LINE共有を確認。
+3. iPhoneのLINEで、短縮リンクがReaderを開き、パスワードあり/なし、期限・停止後の表示を確認。
+4. Cloudflare無料プランの利用量を定期確認。無料枠超過時は自動課金せず共有エラーになる方針を維持。
 
 # Important Decisions
 
-- LINE共有はOSの共有シートを使う。共有内容は日付・チーム名・スコア・閲覧専用BOX SCOREリンク。
-- LINE Developers、LIFF ID、LINEログイン、Flexカード送信には依存しない。
-- 現行の共有データはサーバーへ保存せず、閲覧リンクのURLフラグメントから復元する。クラウド保存への変更は設計案の段階であり、まだ採用していない。
-- ファイル変更後は原則コミット・プッシュし、GitHub Pagesの公開更新を確認する。長期ルールは `AGENTS.md` に置く。
+- 通常記録は端末内保存。短縮共有を選んだ時だけ対象試合の集計をCloudflareへ送る。閲覧者のログインは不要。
+- パスワードはWorker側で検証し、検証前にレポートを返さない。URLを知る人への転送・スクリーンショットは防げない。
+- 旧 `#share/v1…` / `v2…` / `v3…` リンク、ファイル、画像共有は壊さない。Cloudflare障害時に旧リンクへ自動フォールバックしない。
+- Cloudflareの有料プラン変更・課金情報操作は行わない。新しい権限や秘密情報の外部登録はユーザー承認を得る。
+- 変更後は原則コミット・プッシュし、GitHub Pagesの更新を確認する。長期ルールは `AGENTS.md` に置く。
 
 # Environment / Testing Notes
 
-- Windows。正規リポジトリで作業する。
-- ユニットテスト：`node tests/domain.test.mjs`。
-- ブラウザテスト：既存Chromeを `BROWSER_EXECUTABLE` に指定して `tests/browser.mjs` を実行。
-- GitHub Pages反映は `sw.js?commit=<hash>` のバージョンと公開 `app.js` を確認する。
+- Windows。Wranglerは `cloudflare/` のローカル依存。初回設定・秘密・運用手順は `cloudflare/README.md`。
+- ユニット：`node --test tests/*.test.mjs`。Cloudflareハンドラー：同コマンドに含まれる `cloud-share.test.mjs`。
+- ブラウザ：Chromeを `BROWSER_EXECUTABLE` に指定して `node tests/browser.mjs`、`node tests/cloud-browser.mjs`、`node tests/resilience.mjs`。
+- 短縮リンク作成/閲覧は通信必須。旧自己完結リンクはオフライン可。GitHub Pages反映は公開 `sw.js` のバージョンと `cloud-config.js` のWorker URLを確認。

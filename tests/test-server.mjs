@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { readFile } from 'node:fs/promises';
 
 // Test-only origin. An unavailable origin cannot serve even one missing PWA asset.
-export async function startTestServer(prefix = '/') {
+export async function startTestServer(prefix = '/', { cloudAPI = '' } = {}) {
   const root = fileURLToPath(new URL('../', import.meta.url));
   let available = true;
   let shellVersion = null;
@@ -16,10 +16,13 @@ export async function startTestServer(prefix = '/') {
     try {
       const url = new URL(req.url, 'http://localhost');
       if (!url.pathname.startsWith(prefix)) { res.writeHead(404); res.end(); return; }
-      const relative = url.pathname.slice(prefix.length) || 'index.html';
+      const requested = url.pathname.slice(prefix.length);
+      const relative = !requested || requested.endsWith('/') ? `${requested}index.html` : requested;
       const target = path.resolve(root, relative);
       if (!target.startsWith(root)) { res.writeHead(403); res.end(); return; }
       let body = await readFile(target);
+      // Tests never send match data to the production Cloudflare endpoint.
+      if (relative === 'js/cloud-config.js') body = Buffer.from(`export const CLOUD_SHARE_API = ${JSON.stringify(cloudAPI)};`);
       if (relative === 'sw.js' && shellVersion) body = Buffer.from(body.toString().replace(/const VERSION = '[^']+';/, `const VERSION = '${shellVersion}';`));
       res.writeHead(200, { 'Content-Type': `${types[path.extname(target)] || 'application/octet-stream'}; charset=utf-8`, 'Cache-Control': 'no-store' }); res.end(body);
     } catch { res.writeHead(404); res.end(); }

@@ -2,3 +2,7 @@ node_modules/
 test-results/
 .DS_Store
 Thumbs.db
+.wrangler/
+.dev.vars*
+*.secrets.json
+cloudflare/.publisher-token

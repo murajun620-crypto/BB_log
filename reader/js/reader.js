@@ -1,4 +1,5 @@
 import { parseSharePayload } from '../../js/shared-report.js';
+import { openCloudShare } from '../../js/cloud-share.js';
 
 const app = document.querySelector('#app');
 const playerDialog = document.querySelector('#player-dialog');
@@ -44,24 +45,43 @@ function payloadFromHash() {
   return match ? match[1] : '';
 }
 
-async function render() {
+function passwordView(message = '') {
+  return `<main class="landing"><section class="landing-card"><span class="landing-icon">鍵</span><h1>閲覧パスワード</h1><p class="landing-note">送信者から教えてもらったパスワードを入力してください。パスワードはこの端末に保存しません。</p><form id="unlock-form"><label for="share-password">パスワード</label><input id="share-password" name="password" type="password" autocomplete="off" maxlength="128" required><p role="alert">${esc(message)}</p><button type="submit">BOX SCOREを開く</button></form></section></main>`;
+}
+
+async function render(password = '') {
+  if (typeof password !== 'string') password = '';
   const sequence = ++requestNumber;
   if (playerDialog.open) playerDialog.close();
   const payload = payloadFromHash();
+  const short = location.hash.match(/^#s\/([A-Za-z0-9_-]{22})$/);
   report = null;
-  if (!payload) {
-    app.innerHTML = landingView();
+  if (!payload && !short) {
+    app.innerHTML = location.hash ? errorView('共有リンクの形式が不正です。') : landingView();
     return;
   }
   app.innerHTML = loadingView();
   try {
-    const parsed = await parseSharePayload(payload);
+    const parsed = short ? await openCloudShare(short[1], password) : await parseSharePayload(payload);
     if (sequence !== requestNumber) return;
     report = parsed;
     app.innerHTML = reportView(parsed);
   } catch (error) {
     if (sequence !== requestNumber) return;
+    if (['password_required', 'wrong_password'].includes(error.code)) {
+      app.innerHTML = passwordView(error.code === 'wrong_password' ? error.message : '');
+      document.querySelector('#unlock-form').addEventListener('submit', event => {
+        event.preventDefault();
+        const input = event.currentTarget.querySelector('input');
+        const value = input.value; input.value = '';
+        void render(value);
+      });
+      document.querySelector('#share-password').focus();
+      return;
+    }
     app.innerHTML = errorView(error?.message || '共有レポートを読み取れませんでした。');
+    app.querySelector('.error-card').insertAdjacentHTML('beforeend', '<button id="retry-share" type="button">再試行</button>');
+    document.querySelector('#retry-share').addEventListener('click', () => void render());
   }
 }
 
@@ -82,6 +102,8 @@ playerDialog.addEventListener('click', event => {
   if (event.target === playerDialog) playerDialog.close();
 });
 window.addEventListener('hashchange', render);
+// Recheck stopped/expired links on return; reports and passwords never enter Cache Storage.
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible' && location.hash.startsWith('#s/')) void render(); });
 
 if ('serviceWorker' in navigator) navigator.serviceWorker.register('./sw.js').catch(() => {});
 render();

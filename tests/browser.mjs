@@ -31,7 +31,7 @@ try {
   await page.waitForFunction(async () => !!(await navigator.serviceWorker.getRegistration())?.active && !!navigator.serviceWorker.controller);
   await page.screenshot({ path: `${output}/home.png`, fullPage: true });
   const cache = await page.evaluate(async () => { const names = await caches.keys(); return (await (await caches.open(names[0])).keys()).map(r => r.url); });
-  assert.equal(cache.length, 16); step('app shell and all 16 offline assets cached');
+  assert.equal(cache.length, 19); step('app shell and all 19 offline assets cached');
   await route('#team/new');
   await page.locator('[name=name]').fill('TOKYO HOOPS');
   const numbers = ['4', '5', '7', '8', '12', '23', '30']; const names = ['山田', '田中', '鈴木', '佐藤', '高橋', '伊藤', '中村'];
