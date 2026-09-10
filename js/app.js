@@ -127,7 +127,7 @@ function render() {
     html = page === 'live' ? g.mode === 'pro' ? view.proLiveView(state, g, gameEvents(g), currentClockSeconds(g)) : view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.1.1 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.1.2 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game())));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -265,14 +265,14 @@ function addMemberMenu() {
   if (!g || !team) return;
   const current = new Set(g.roster.map(p => p.id));
   const available = team.players.filter(p => !current.has(p.id));
-  const players = available.length ? `<p class="picker-label">登録済み選手</p><div class="player-grid">${available.map(p => `<button class="player-button" data-action="prepare-member" data-id="${p.id}"><strong>#${view.esc(p.number)}</strong><span>${view.esc(p.name)}</span></button>`).join('')}</div>` : '<p class="help">試合に未追加の登録済み選手はいません。</p>';
+  const players = available.length ? `<p class="picker-label">登録済み選手</p><div class="player-grid">${available.map(p => `<button class="player-button" data-action="prepare-member" data-id="${p.id}"><strong>${view.esc(p.number)}</strong><span>${view.esc(p.name)}</span></button>`).join('')}</div>` : '<p class="help">試合に未追加の登録済み選手はいません。</p>';
   showSheet('メンバーを追加', `${players}<button class="button primary full spaced" data-action="prepare-member">＋ 新しい選手を登録して追加</button><p class="help">登録済み選手は背番号を確認・変更してから追加できます。</p>`, 'player-sheet');
 }
 function subStart() {
   const g = game();
   if (g.roster.length < 5) { showSheet('選手交代', '<p class="help">交代管理には5人以上の出場メンバーが必要です。試合メニューの「メンバーを追加」から選手を追加してください。</p>'); return; }
   if (g.starters.length !== 5) {
-    const choices = g.roster.map(p => `<label class="member-choice"><input type="checkbox" name="lineup" value="${p.id}" ${g.roster.length === 5 ? 'checked' : ''}><strong>#${view.esc(p.number)}</strong><span>${view.esc(p.name)}</span></label>`).join('');
+    const choices = g.roster.map(p => `<label class="member-choice"><input type="checkbox" name="lineup" value="${p.id}" ${g.roster.length === 5 ? 'checked' : ''}><strong>${view.esc(p.number)}</strong><span>${view.esc(p.name)}</span></label>`).join('');
     showSheet('コート上の5人を設定', `<form id="live-lineup-form"><p class="help">現在コートにいる5人を選んでください。これまでのスタッツには影響しません。</p><div class="panel roster-select">${choices}</div><button class="button primary full spaced" type="submit">5人を設定して交代へ</button></form>`);
     return;
   }
@@ -289,7 +289,7 @@ async function shareStatsImage(playerId = null) {
   if (!g) throw new Error('試合が見つかりません。');
   const player = playerId ? g.roster.find(candidate => candidate.id === playerId) : null;
   const canvas = player ? playerStatsImage(g, gameEvents(g), player.id) : boxScoreImage(g, gameEvents(g));
-  const subject = player ? `#${player.number}-${player.name}` : 'box-score';
+  const subject = player ? `${player.number}-${player.name}` : 'box-score';
   const filename = `${safeFilename(`courtside-${g.date}-${subject}`)}.png`;
   const result = await shareImage(canvas, filename, player ? `${player.name}のスタッツ` : `${g.teamName} vs ${g.opponentName}`);
   if (result === 'downloaded') toast('共有画像を保存しました。');
@@ -411,6 +411,12 @@ const handlers = {
     if (g?.mode !== 'pro' || g.opponentTracking !== 'player' || !selection?.type) return toast('先に相手のプレーを選んでください。', true);
     if (PRO_FIELD_SHOT_TYPES.has(selection.type)) { state.proOpponentSelection = { ...selection, playerId: button.dataset.id }; render(); return; }
     return busy(async () => { await record(selection.type, button.dataset.id, { side: 'opponent' }); state.proOpponentSelection = { ...selection, playerId: button.dataset.id }; render(); });
+  },
+  'pro-clock-edit': () => {
+    const g = game(); if (g?.mode !== 'pro' || !g.clockEnabled) return;
+    const seconds = Math.max(0, Math.floor(currentClockSeconds(g) ?? 0));
+    const minutes = Math.floor(seconds / 60); const remainder = seconds % 60;
+    showSheet('ゲームクロックを編集', `<p class="help">分と秒を入力してください。設定後も現在の開始・停止状態を引き継ぎます。</p><form id="pro-clock-form"><div class="clock-edit-grid"><label>分<input name="minutes" type="number" min="0" max="600" step="1" inputmode="numeric" required value="${minutes}"></label><label>秒<input name="seconds" type="number" min="0" max="59" step="1" inputmode="numeric" required value="${remainder}"></label></div><button type="submit" class="button primary full spaced">設定する</button></form>`);
   },
   'pro-clock-toggle': () => busy(async () => {
     const g = game(); if (g?.mode !== 'pro' || !g.clockEnabled) return;
@@ -640,7 +646,7 @@ document.addEventListener('submit', event => {
     const saved = await db.addPlayerToTeamAndGame(team, g, player);
     state.data.teams = state.data.teams.map(candidate => candidate.id === saved.team.id ? saved.team : candidate);
     state.data.games = state.data.games.map(candidate => candidate.id === saved.game.id ? saved.game : candidate);
-    closeSheet(); render(); toast(`#${player.number} ${player.name}をチームと試合に追加しました。`);
+    closeSheet(); render(); toast(`${player.number} ${player.name}をチームと試合に追加しました。`);
   });
   if (form.id === 'live-lineup-form') busy(async () => {
     const selected = new FormData(form).getAll('lineup');
@@ -664,6 +670,14 @@ document.addEventListener('submit', event => {
   if (form.id === 'ot-form') busy(async () => {
     const g = game(); const p = { id: uid(), label: `OT${g.periods.filter(p => p.overtime).length + 1}`, minutes: Number(new FormData(form).get('minutes')), overtime: true };
     await saveGameChange({ ...g, periods: [...g.periods, p], currentPeriodId: p.id }); closeSheet(); toast(`${p.label}を追加しました。`);
+  });
+  if (form.id === 'pro-clock-form') busy(async () => {
+    const g = game(); if (g?.mode !== 'pro' || !g.clockEnabled) throw new Error('Proのゲームクロックを開いてください。');
+    const values = new FormData(form); const minutes = Number(values.get('minutes')); const seconds = Number(values.get('seconds'));
+    if (!Number.isInteger(minutes) || minutes < 0 || minutes > 600 || !Number.isInteger(seconds) || seconds < 0 || seconds > 59) throw new Error('分は0〜600、秒は0〜59の整数で入力してください。');
+    const total = minutes * 60 + seconds; const running = g.clockRunning && total > 0;
+    await saveGameChange({ ...g, clockSeconds: total, clockRunning: running, clockStartedAt: running ? new Date().toISOString() : null });
+    closeSheet(); toast('ゲームクロックを変更しました。');
   });
 });
 sheet.addEventListener('cancel', event => { if (state.busy) event.preventDefault(); else { pending = null; confirmAction = null; } });

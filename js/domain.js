@@ -120,7 +120,7 @@ export function lineup(game, events, strict = false) {
   return [...on];
 }
 export function eventLabel(game, event) {
-  const player = (id, side = 'home') => { const p = (side === 'opponent' ? game.opponentRoster || [] : game.roster).find(p => p.id === id); return p ? `#${p.number} ${p.name}` : '不明'; };
+  const player = (id, side = 'home') => { const p = (side === 'opponent' ? game.opponentRoster || [] : game.roster).find(p => p.id === id); return p ? `${p.number} ${p.name}` : '不明'; };
   if (event.eventType === 'OPP') return `相手 +${event.points}`;
   if (event.eventType === 'SUB') return `${player(event.outPlayerId)} → ${player(event.inPlayerId)}`;
   const zone = event.shotZone ? ` · ${shotZoneLabel(event.shotZone)}` : '';

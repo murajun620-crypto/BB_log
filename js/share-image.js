@@ -149,7 +149,7 @@ export function boxScoreImage(game, events) {
   const drawRow = (player, rowStats, total = false) => {
     ctx.fillStyle = total ? COLORS.accentSoft : COLORS.surface;
     ctx.fillRect(PAD, y, WIDTH - PAD * 2, rowHeight);
-    const playerLabel = total ? 'TEAM TOTAL' : `#${player.number}  ${player.name}`;
+    const playerLabel = total ? 'TEAM TOTAL' : `${player.number}  ${player.name}`;
     fittedText(ctx, playerLabel, PAD + 16, y + rowHeight / 2, playerWidth - 28, rowHeight < 52 ? 17 : 20, total ? 750 : 600, total ? COLORS.accent : COLORS.text);
     const values = [rowStats.PTS, rowStats.REB, rowStats.AST, rowStats.STL, rowStats.BLK, rowStats.TO, rowStats.PF];
     values.forEach((value, index) => text(ctx, value, PAD + playerWidth + statWidth * (index + .5), y + rowHeight / 2, rowHeight < 52 ? 18 : 21, index === 0 || total ? 750 : 550, index === 0 ? COLORS.accent : COLORS.text, 'center'));
@@ -177,7 +177,7 @@ export function playerStatsImage(game, events, playerId) {
 
   card(ctx, PAD, 190, WIDTH - PAD * 2, 218);
   roundedRect(ctx, PAD + 30, 224, 104, 104, 20, COLORS.accentSoft);
-  text(ctx, `#${player.number}`, PAD + 82, 276, 38, 800, COLORS.accent, 'center');
+  text(ctx, `${player.number}`, PAD + 82, 276, 38, 800, COLORS.accent, 'center');
   fittedText(ctx, player.name, PAD + 165, 257, 390, 39, 750);
   text(ctx, game.teamName, PAD + 165, 304, 20, 550, COLORS.muted);
   text(ctx, stats.PTS, WIDTH - PAD - 47, 269, 78, 800, COLORS.text, 'center');

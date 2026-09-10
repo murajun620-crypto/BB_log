@@ -21,7 +21,7 @@ const snapshot = () => page.evaluate(async () => (await import('./js/db.js')).re
 const score = async () => (await page.locator('.score-numbers b').allTextContents()).map(Number);
 const choose = async (stat, number = 4) => {
   await page.locator(`[data-action=stat][data-type="${stat}"]`).click();
-  await page.locator('#sheet [data-action=pick-player]').filter({ has: page.locator('strong', { hasText: new RegExp(`^#${number}$`) }) }).click();
+  await page.locator('#sheet [data-action=pick-player]').filter({ has: page.locator('strong', { hasText: new RegExp(`^${number}$`) }) }).click();
   await ready();
 };
 const dismiss = async () => { if (await page.locator('#sheet').isVisible()) await page.getByRole('button', { name: '閉じる', exact: true }).click(); };
@@ -53,7 +53,7 @@ try {
   step('team/game drafts survive reload; team and seven players created without starters');
   await page.getByRole('button', { name: '試合メニュー', exact: true }).click();
   await page.getByRole('button', { name: 'メンバーを追加', exact: true }).click();
-  await page.locator('#sheet [data-action=prepare-member]').filter({ hasText: '#30中村' }).click();
+  await page.locator('#sheet [data-action=prepare-member]').filter({ hasText: '30中村' }).click();
   await page.locator('#live-member-form [name=number]').fill('31');
   await page.getByRole('button', { name: 'チームと試合に追加', exact: true }).click(); await ready();
   let added = await snapshot();
@@ -80,8 +80,8 @@ try {
   await page.getByRole('heading', { name: 'コート上の5人を設定' }).waitFor();
   for (let i = 0; i < 5; i++) await page.locator('#live-lineup-form [name=lineup]').nth(i).check();
   await page.getByRole('button', { name: '5人を設定して交代へ', exact: true }).click(); await ready();
-  await page.locator('#sheet [data-action=pick-player]').filter({ hasText: '#4山田' }).click();
-  await page.locator('#sheet [data-action=pick-player]').filter({ hasText: '#23伊藤' }).click(); await ready();
+  await page.locator('#sheet [data-action=pick-player]').filter({ hasText: '4山田' }).click();
+  await page.locator('#sheet [data-action=pick-player]').filter({ hasText: '23伊藤' }).click(); await ready();
   let data = await snapshot(); assert.equal(data.events.sort((a, b) => a.seq - b.seq).at(-1).eventType, 'SUB');
   await page.getByRole('button', { name: /UNDO/ }).click(); await ready();
   step('all 13 stats, automatic score, opponent scoring and substitution UNDO work');
@@ -103,7 +103,7 @@ try {
   await page.evaluate(() => { const put = IDBObjectStore.prototype.put; IDBObjectStore.prototype.put = function (...args) { if (window.failSave && this.name === 'events') throw new DOMException('テスト保存失敗', 'QuotaExceededError'); return put.apply(this, args); }; window.failSave = true; });
   await choose('2PM'); assert.deepEqual(await score(), [9, 5]); assert.equal((await snapshot()).events.length, beforeFailure); assert.ok(await page.locator('.inline-error').isVisible());
   await page.evaluate(() => { window.failSave = false; });
-  await page.locator('#sheet [data-action=pick-player]').filter({ hasText: '#4山田' }).click(); await ready(); assert.deepEqual(await score(), [11, 5]);
+  await page.locator('#sheet [data-action=pick-player]').filter({ hasText: '4山田' }).click(); await ready(); assert.deepEqual(await score(), [11, 5]);
   step('transaction failure leaves picker open and no phantom stats; retry succeeds');
   // Two clients read the same revision. Only the first writer may commit.
   const second = await context.newPage(); await second.goto(base + liveHash); await second.locator('.stat-grid').waitFor();

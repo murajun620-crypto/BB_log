@@ -120,6 +120,7 @@ test('Pro shot input uses result buttons, auto-selects points and skips the cour
   const field = proLiveView(state, game, events);
   assert.match(field, /data-type="FGM"/); assert.match(field, /data-type="FGX"/);
   assert.doesNotMatch(field, /data-type="2PM"|data-type="3PM"/); assert.match(field, /data-action="pro-shot-point"/);
+  assert.match(field, /pro-history-button/); assert.match(field, /pro-player on-court/); assert.doesNotMatch(field, /<strong>#/);
   const freeThrow = proLiveView({ ...state, proSelection: { type: 'FTM', playerId: 'player-0' } }, game, events);
   assert.doesNotMatch(freeThrow, /data-action="pro-shot-point"/);
 });

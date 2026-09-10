@@ -1,6 +1,6 @@
 # Project Status
 
-バスケットボールの試合記録・共有を行うオフライン対応PWA。正規リポジトリは `Documents/Github/BB_log`、公開先は `https://murajun620-crypto.github.io/BB_log/`。現在のアプリ版は2.1.1。標準記録とAdvanced（Bリーグ式12ゾーン）に加え、iPad横向き中心のPro記録モードを実装済み。
+バスケットボールの試合記録・共有を行うオフライン対応PWA。正規リポジトリは `Documents/Github/BB_log`、公開先は `https://murajun620-crypto.github.io/BB_log/`。現在のアプリ版は2.1.2。標準記録とAdvanced（Bリーグ式12ゾーン）に加え、iPad横向き中心のPro記録モードを実装済み。
 
 # Recent Changes
 
@@ -8,9 +8,10 @@
 - Proのシュート入力は、FG成功／失敗 → 選手 → フルコート上の位置の流れ。位置から2P・3Pを自動判定し、FTは位置なしで選手タップ時に記録する。連続入力ON時は標準と同じくシュート後にAST／OR・DRを提案する。
 - Proのコート線を3Pライン・キー・フリースローサークル付きのフルコート表示へ修正し、ショットマーカーは色付きのシンプルな○／×に統一した。
 - Proの相手記録は「総得点のみ」または「相手選手の個人スタッツ」を試合開始時に選択可能。個人記録時はBOX SCOREに相手選手表を表示する。
+- Pro LIVEにイベント履歴、コート上／ベンチの色分けとコート上選手の上位表示、タップ編集できるゲームクロックを追加。背番号表示の先頭記号は全画面から削除した。
 - 位置付きシュートは本体のBOX SCORE、選手詳細、自己完結リンク／ファイル共有、Readerで、フルコート上の○×と12エリア別の成功数・試投数・成功率を表示する。
 - FD（ファールドローン）をスタッツへ追加。FD追加前の共有レポート・圧縮リンクも読み込み可能。
-- アプリ本体、Reader、Service Worker、設定画面、package metadataのバージョンを2.1.1に統一。
+- アプリ本体、Reader、Service Worker、設定画面、package metadataのバージョンを2.1.2に統一。
 
 # Current Issues
 
@@ -34,7 +35,7 @@
 # Environment / Testing Notes
 
 - Windows。Cloudflare Worker関連は `cloudflare/`。共有Workerは `https://courtside-share.murajun620.workers.dev`。
-- 単体／Workerテスト：`node --test tests/domain.test.mjs tests/cloud-share.test.mjs`（現在24件成功）。構文チェックは変更したJS全ファイルで成功。
+- 単体／Workerテスト：`node --test tests/domain.test.mjs tests/cloud-share.test.mjs`（現在25件成功）。構文チェックは変更したJS全ファイルで成功。
 - 自動ブラウザテスト：`node tests/browser.mjs`。実行にはPlaywrightが必要だが、この環境では未導入。
-- 手動確認用ローカルサーバーは `node scripts/serve.mjs`。今回、Pro設定、Pro記録、クロック、相手個人記録、BOX SCORE、位置付きチャート、コンソールエラーなしを確認した。今回の修正は2.1.1として公開する。
-- `Documents/ChatGPT/BB_log_` は退避フォルダーで開発対象外。管理キーなどの秘密情報はGitへ追加しない。
+- 手動確認用ローカルサーバーは `node scripts/serve.mjs`。今回、Pro設定、Pro記録、クロック、相手個人記録、BOX SCORE、位置付きチャート、コンソールエラーなしを確認した。今回の修正は2.1.2として公開する。
+- `Documents/ChatGPT/BB_log_` は退避フォルダーで開発対象外。管理キーなどの秘密情報はGitへ追加しない。今回の修正は2.1.2として公開する。

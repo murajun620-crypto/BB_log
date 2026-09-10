@@ -255,8 +255,12 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-clock span { font: 750 18px/1 ui-monospace, SFMono-Regular, Consolas, monospace; font-variant-numeric: tabular-nums; }
 .pro-clock small { font-size: 8px; font-weight: 750; letter-spacing: .7px; }
 .pro-clock.running { background: var(--accent); color: var(--surface); }
+.pro-clock-toggle { min-width: 50px; min-height: 34px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--muted); }
+.pro-clock-toggle small { font-size: 8px; font-weight: 750; letter-spacing: .7px; }
+.pro-clock-toggle.running { background: var(--accent); color: var(--surface); }
 .pro-clock-reset { min-width: 34px; min-height: 34px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font-size: 20px; }
 .pro-clock-off { font-size: 9px; letter-spacing: 1px; }
+.clock-edit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .pro-layout { display: flex; flex: 1; flex-direction: column; gap: 8px; min-height: 0; }
 .pro-center { display: flex; flex-direction: column; gap: 6px; min-width: 0; order: 1; }
 .pro-court-status { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 22px; color: var(--muted); font-size: 10px; }
@@ -281,10 +285,18 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-side-heading span { color: var(--muted); font-size: 10px; font-weight: 750; letter-spacing: 1px; }
 .pro-side-heading strong { color: var(--accent); font-size: 25px; font-variant-numeric: tabular-nums; }
 .pro-roster-label { margin: 0; color: var(--muted); font-size: 9px; }
+.pro-roster-key { display: flex; gap: 10px; color: var(--muted); font-size: 9px; }
+.pro-roster-key span { display: inline-flex; align-items: center; gap: 4px; }
+.pro-roster-key span::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--line); }
+.pro-roster-key .on-court-key::before { background: var(--accent); }
+.pro-roster-key .bench-key::before { border: 1px solid var(--muted); background: transparent; }
 .pro-roster { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; max-height: 28vh; overflow-y: auto; }
 .pro-player { display: flex; align-items: center; gap: 5px; min-width: 0; min-height: 40px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); text-align: left; }
 .pro-player strong { color: var(--accent); font-size: 15px; font-variant-numeric: tabular-nums; }
 .pro-player span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
+.pro-player.on-court { border-color: var(--accent); background: var(--accent-soft); }
+.pro-player.bench { background: var(--surface-2); color: var(--muted); opacity: .82; }
+.pro-player.bench strong { color: var(--muted); }
 .pro-player.selected { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
 .pro-sub-button { min-height: 39px; margin-top: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--muted); font-size: 11px; font-weight: 700; }
 .pro-opponent-score { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
@@ -293,6 +305,8 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-footer { display: flex; gap: 7px; min-height: 48px; }
 .pro-footer > * { min-height: 48px; }
 .pro-footer .undo-button { flex: 1; }
+.pro-footer .pro-history-button { flex: 0 0 100px; display: flex; align-items: center; justify-content: center; gap: 5px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--text); font-size: 9px; font-weight: 750; }
+.pro-footer .pro-history-button .icon { width: 17px; }
 .pro-footer .box-button { flex: 0 0 140px; }
 .report-card { background: var(--surface); border: 1px solid var(--line); border-radius: 15px; padding: 18px; }
 .report-score { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 10px; padding: 22px 0; }
