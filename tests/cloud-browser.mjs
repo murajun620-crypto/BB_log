@@ -74,8 +74,8 @@ try {
   await reader.getByRole('alert').filter({ hasText: 'パスワードが違います。' }).waitFor();
   await reader.locator('#share-password').fill('test-password-123');
   await reader.getByRole('button', { name: 'BOX SCOREを開く', exact: true }).click();
-  await reader.locator('.score-card').waitFor();
-  assert.equal(await reader.locator('.score strong').first().textContent(), '3');
+  await reader.locator('.report-card').waitFor();
+  assert.equal(await reader.locator('.report-score > strong').first().textContent(), '3–0');
   await reader.locator('[data-player-id]').first().click();
   await reader.getByRole('heading', { name: 'テスト選手', exact: true }).waitFor();
   await reader.screenshot({ path: `${output}/reader.png`, fullPage: true });
@@ -103,7 +103,7 @@ try {
   // Old self-contained links still render on Reader without cloud or a publisher key.
   const legacy = createSharePayload(f.game, f.events);
   await reader.goto(`${server.url}reader/#share/${legacy}`);
-  await reader.locator('.score-card').waitFor();
+  await reader.locator('.report-card').waitFor();
   failNetwork = true;
   await page.getByRole('button', { name: '共有', exact: true }).click();
   await page.getByRole('button', { name: 'LINEへ共有', exact: true }).click();

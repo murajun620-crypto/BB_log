@@ -49,6 +49,14 @@ test('advanced shot zones validate and survive file and link sharing', async () 
   assert.equal(SHOT_ZONES.length, 12);
   assert.equal(normalizeShotZone('mid-left'), 'two-left-wing');
 });
+test('sharing a legacy game ignores an unknown shot position without losing its stats', () => {
+  const { game, events, add } = fixture();
+  add('2PM', { shotZone: 'old-zone-name' });
+  const shared = createSharedReport(game, events);
+  assert.equal(shared.report.team.PTS, 2);
+  assert.deepEqual(shared.report.shots, []);
+  assert.doesNotThrow(() => parseSharedReport(JSON.stringify(shared)));
+});
 test('shot court map enables only matching two- or three-point zones', () => {
   const twoPoint = shotZonePicker('選手1', STATS['2PM']);
   const threePoint = shotZonePicker('選手1', STATS['3PM']);

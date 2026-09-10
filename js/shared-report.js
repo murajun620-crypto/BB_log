@@ -8,7 +8,10 @@ const MAX_PAYLOAD_SIZE = 120000;
 const statsCopy = stats => Object.fromEntries(STAT_KEYS.map(key => [key, stats[key]]));
 function shotsCopy(game, events) {
   const playerIds = new Map(game.roster.map((player, index) => [player.id, `p${index + 1}`]));
-  return events.filter(event => !event.deletedAt && event.shotZone && playerIds.has(event.playerId) && ['2PM', '2PX', '3PM', '3PX'].includes(event.eventType)).map(event => ({ playerId: playerIds.get(event.playerId), zone: normalizeShotZone(event.shotZone), result: event.eventType.endsWith('M') ? 'made' : 'miss' }));
+  return events.filter(event => !event.deletedAt && event.shotZone && playerIds.has(event.playerId) && ['2PM', '2PX', '3PM', '3PX'].includes(event.eventType)).map(event => {
+    const zone = normalizeShotZone(event.shotZone);
+    return SHOT_ZONE_IDS.has(zone) ? { playerId: playerIds.get(event.playerId), zone, result: event.eventType.endsWith('M') ? 'made' : 'miss' } : null;
+  }).filter(Boolean);
 }
 
 export function createSharedReport(game, events) {
