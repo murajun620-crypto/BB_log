@@ -1,10 +1,10 @@
-import { cloudShareEnabled, publisherKey, savePublisherKey, verifyPublisherKey, createCloudShare, listCloudShares, stopCloudShare, shortShareLink } from './cloud-share.js';
+import { cloudShareEnabled, publisherKey, savePublisherKey, verifyPublisherKey, createCloudShare, listCloudShares, getCloudShare, deleteCloudShare, shortShareLink } from './cloud-share.js';
 import { createSharedReport } from './shared-report.js';
 import { shareUrl } from './transfer.js';
 import { esc } from './views.js';
 
 export function cloudSettingsHTML() {
-  return `<section class="panel settings-panel" id="cloud-settings"><h2>共有リンク</h2><p class="help">${cloudShareEnabled() ? 'Cloudflare接続済み。共有した1試合の集計だけをクラウドに保存します。' : 'Cloudflareの初期設定待ちです。従来のリンク・ファイル・画像共有は使えます。'}</p><button class="button secondary full" data-action="cloud-key" ${cloudShareEnabled() ? '' : 'disabled'}>${publisherKey() ? '共有用管理キーを変更' : '共有用管理キーを設定'}</button><button class="button secondary full spaced" data-action="cloud-manage" ${cloudShareEnabled() && publisherKey() ? '' : 'disabled'}>共有したリンクを管理</button><p class="help">管理キーはこのブラウザだけに保存し、試合のJSONバックアップには含めません。別PCでも同じキーを設定すると共有を停止できます。</p></section>`;
+  return `<section class="panel settings-panel" id="cloud-settings"><h2>共有リンク</h2><p class="help">${cloudShareEnabled() ? 'Cloudflare接続済み。共有した1試合の集計だけをクラウドに保存します。' : 'Cloudflareの初期設定待ちです。従来のリンク・ファイル・画像共有は使えます。'}</p><button class="button secondary full" data-action="cloud-key" ${cloudShareEnabled() ? '' : 'disabled'}>${publisherKey() ? '共有用管理キーを変更' : '共有用管理キーを設定'}</button><button class="button secondary full spaced" data-action="cloud-manage" ${cloudShareEnabled() && publisherKey() ? '' : 'disabled'}>共有したリンクを管理</button><p class="help">管理キーはこのブラウザだけに保存し、試合のJSONバックアップには含めません。別PCでも同じキーを設定すると、保存内容の確認や共有リンク・データの削除ができます。</p></section>`;
 }
 
 export function setupCloudShareUI({ showSheet, closeSheet, toast, refreshView, getGame, getEvents, getAggregate, message }) {
@@ -60,22 +60,41 @@ export function setupCloudShareUI({ showSheet, closeSheet, toast, refreshView, g
       });
     });
   }
+  async function viewShare(entry) {
+    await work(async () => {
+      const detail = await getCloudShare(entry.id);
+      const report = detail.report || {};
+      const players = Array.isArray(report.players) ? report.players : [];
+      const createdAt = detail.createdAt ? new Date(detail.createdAt).toLocaleString('ja-JP') : '不明';
+      const json = JSON.stringify(report, null, 2);
+      showSheet('共有データを確認', `<p class="help">Cloudflareに保存されている共有用スナップショットです。元の試合データのイベントや管理キーは含まれません。</p><div class="cloud-share-preview"><dl><dt>タイトル</dt><dd>${esc(detail.title || entry.title)}</dd><dt>大会名</dt><dd>${esc(report.tournamentName || 'なし')}</dd><dt>作成日時</dt><dd>${esc(createdAt)}</dd><dt>試合数</dt><dd>${esc(report.gameCount ?? 1)}試合</dd><dt>チーム</dt><dd>${esc(report.teamName || '')}</dd><dt>対戦相手</dt><dd>${esc(report.opponentName || '')}</dd><dt>選手</dt><dd>${players.map(p => `#${esc(p.number)} ${esc(p.name)}`).join('、') || 'なし'}</dd><dt>有効期限</dt><dd>${date(detail.expiresAt)}</dd><dt>パスワード</dt><dd>${detail.passwordRequired ? 'あり' : 'なし'}</dd></dl><details><summary>保存されているJSONを表示</summary><pre class="cloud-share-json">${esc(json)}</pre></details></div><button class="button danger-solid full" id="cloud-detail-delete">共有停止・データ削除</button><p class="help">削除するとこのリンクは開けなくなり、Cloudflare上の共有データ本体も即時削除されます。すでに相手が保存した画像やコピーは消せません。</p>`);
+      document.querySelector('#cloud-detail-delete').addEventListener('click', () => confirmDelete(entry));
+    });
+  }
+  function confirmDelete(entry) {
+    showSheet('共有データを削除しますか？', `<p class="confirm-body">「${esc(entry.title)}」の共有リンクを停止し、Cloudflare上のデータ本体を完全に削除します。この操作は元に戻せません。</p><button class="button danger-solid full" id="cloud-delete-confirm">共有停止・データ削除</button>`);
+    document.querySelector('#cloud-delete-confirm').addEventListener('click', () => void work(async () => { await deleteCloudShare(entry.id); toast('共有リンクと保存データを削除しました。'); await manage(); }));
+  }
   async function manage() {
     const { shares } = await listCloudShares();
-    showSheet('共有したリンクを管理', `<p class="help">同じ管理キーで作成した有効な共有です。停止後も、相手が保存した画像やコピーは消せません。</p><div class="card-list">${shares.length ? shares.map(s => `<section class="panel"><h3>${esc(s.title)}</h3><p class="help">${date(s.expiresAt)}まで / ${s.passwordRequired ? 'パスワードあり' : 'パスワードなし'}</p><button class="button secondary full" data-cloud-resend="${esc(s.id)}">リンクを再共有</button><button class="button secondary full spaced" data-cloud-stop="${esc(s.id)}">共有を停止</button></section>`).join('') : '<p>有効な共有はありません。</p>'}</div>`);
+    showSheet('共有したリンクを管理', `<p class="help">同じ管理キーで作成した有効な共有です。「データを確認」で保存内容を確認できます。削除するとCloudflare上の共有データ本体も消去されます。</p><div class="card-list">${shares.length ? shares.map(s => `<section class="panel"><h3>${esc(s.title)}</h3><p class="help">${date(s.expiresAt)}まで / ${s.passwordRequired ? 'パスワードあり' : 'パスワードなし'}</p><button class="button secondary full" data-cloud-view="${esc(s.id)}">データを確認</button><button class="button secondary full spaced" data-cloud-resend="${esc(s.id)}">リンクを再共有</button><button class="button danger-solid full spaced" data-cloud-delete="${esc(s.id)}">共有停止・データ削除</button></section>`).join('') : '<p>有効な共有はありません。</p>'}</div>`);
     const sheet = document.querySelector('#sheet');
+    sheet.querySelectorAll('[data-cloud-view]').forEach(b => b.addEventListener('click', () => {
+      const entry = shares.find(s => s.id === b.dataset.cloudView);
+      if (entry) void viewShare(entry);
+    }));
     sheet.querySelectorAll('[data-cloud-resend]').forEach(b => b.addEventListener('click', () => {
       const entry = shares.find(s => s.id === b.dataset.cloudResend);
+      if (!entry) return;
       void work(async () => {
         const result = await shareUrl(shortShareLink(entry.id), entry.title, `${entry.title}\nCourtside ReaderでBOX SCOREを見る`);
         if (result === 'copied') toast('共有リンクをコピーしました。');
         if (result === 'copy-failed') throw new Error('リンクをコピーできませんでした。');
       });
     }));
-    sheet.querySelectorAll('[data-cloud-stop]').forEach(b => b.addEventListener('click', () => {
-      const entry = shares.find(s => s.id === b.dataset.cloudStop);
-      showSheet('共有を停止しますか？', `<p class="help">${esc(entry.title)}のリンクを開けなくします。元の試合記録は残ります。必要なら新しいリンクを作れます。</p><button class="button danger-solid full" id="cloud-stop-confirm">このリンクの共有を停止</button>`);
-      document.querySelector('#cloud-stop-confirm').addEventListener('click', () => void work(async () => { await stopCloudShare(entry.id); toast('共有を停止しました。'); await manage(); }));
+    sheet.querySelectorAll('[data-cloud-delete]').forEach(b => b.addEventListener('click', () => {
+      const entry = shares.find(s => s.id === b.dataset.cloudDelete);
+      if (entry) confirmDelete(entry);
     }));
   }
   return {

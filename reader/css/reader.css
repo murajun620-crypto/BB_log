@@ -195,7 +195,7 @@ dialog::backdrop { background: rgba(14, 28, 23, .48); }
 .shot-chart-map .shot-chart-zone-label { pointer-events: none; }
 .shot-chart-map .shot-chart-zone-rate, .shot-chart-map .shot-chart-zone-count { fill: #173c32; font-family: inherit; paint-order: stroke; stroke: rgba(255, 255, 255, .68); stroke-linejoin: round; }
 .shot-chart-map .shot-chart-zone-rate { font-size: 16px; font-weight: 800; stroke-width: 3px; }
-.shot-chart-map .shot-chart-zone-count { font-size: 12px; font-weight: 650; stroke-width: 2px; }
+.shot-chart-map .shot-chart-zone-count { font-size: 16px; font-weight: 650; stroke-width: 2px; }
 .player-detail { margin: 6px 0 25px; }
 .player-detail .jersey { min-width: 52px; height: auto; padding: 8px 12px; color: var(--accent); background: var(--accent-soft); }
 .player-detail h2 { flex: 1; overflow-wrap: anywhere; }

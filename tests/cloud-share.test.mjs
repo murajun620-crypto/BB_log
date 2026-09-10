@@ -24,11 +24,12 @@ test('short IDs have fixed length; creating and listing require a publisher key'
     assert.equal(link.length, 75); assert.match(link, /\/reader\/#s\//);
     const list = await (await req(env, '/v1/shares', 'GET', undefined, testToken)).json();
     assert.equal(list.shares.length, 2); assert.equal(JSON.stringify(list).includes('テスト選手'), false);
+    assert.equal((await req(env, `/v1/shares/${a.id}`, 'GET')).status, 401);
     assert.equal((await req(env, `/v1/shares/${a.id}`, 'DELETE')).status, 401);
   } finally { env.DB.sqlite.close(); }
 });
 
-test('password protection never returns data before verification; stopping clears the stored report', async () => {
+test('password protection never returns data before verification; management can inspect and delete a snapshot', async () => {
   const env = testEnv();
   try {
     const a = await create(env, 'test-password-123');
@@ -41,9 +42,15 @@ test('password protection never returns data before verification; stopping clear
     assert.equal((await ok.json()).report.team.PTS, 3);
     const stored = env.DB.sqlite.prepare('SELECT * FROM shares WHERE id = ?').get(a.id);
     assert.notEqual(stored.password_hash, 'test-password-123'); assert.equal(stored.report.includes('test-password-123'), false);
+    const detail = await req(env, `/v1/shares/${a.id}`, 'GET', undefined, testToken);
+    assert.equal(detail.status, 200);
+    const detailBody = await detail.json();
+    assert.equal(detailBody.report.players[0].name, 'テスト選手');
+    assert.equal(JSON.stringify(detailBody).includes('internal-player-id'), false);
     assert.equal((await req(env, `/v1/shares/${a.id}`, 'DELETE', undefined, testToken)).status, 200);
     assert.equal((await req(env, `/v1/shares/${a.id}/open`, 'POST', { password: 'test-password-123' })).status, 404);
-    assert.equal(env.DB.sqlite.prepare('SELECT report FROM shares WHERE id = ?').get(a.id).report, null);
+    assert.equal((await req(env, `/v1/shares/${a.id}`, 'GET', undefined, testToken)).status, 404);
+    assert.equal(env.DB.sqlite.prepare('SELECT COUNT(*) AS count FROM shares WHERE id = ?').get(a.id).count, 0);
   } finally { env.DB.sqlite.close(); }
 });
 
@@ -97,7 +104,7 @@ test('malformed data, oversize bodies, unauthorized origins, and short passwords
     const preflight = await req(env, '/v1/shares', 'OPTIONS');
     assert.equal(preflight.status, 204); assert.equal(preflight.headers.get('Access-Control-Allow-Origin'), 'https://app.example');
     const a = await create(env);
-    assert.equal((await req(env, `/v1/shares/${a.id}`)).status, 405);
+    assert.equal((await req(env, `/v1/shares/${a.id}`)).status, 401);
     assert.equal((await req({ ...env, PUBLISHER_TOKEN: '' }, '/health')).status, 503);
   } finally { env.DB.sqlite.close(); }
 });

@@ -320,7 +320,12 @@ dialog::backdrop { background: #07170f70; backdrop-filter: blur(3px); }
 .shot-chart-map .shot-chart-zone-label { pointer-events: none; }
 .shot-chart-map .shot-chart-zone-rate, .shot-chart-map .shot-chart-zone-count { fill: #173c32; font-family: inherit; paint-order: stroke; stroke: rgba(255, 255, 255, .68); stroke-linejoin: round; }
 .shot-chart-map .shot-chart-zone-rate { font-size: 16px; font-weight: 800; stroke-width: 3px; }
-.shot-chart-map .shot-chart-zone-count { font-size: 12px; font-weight: 650; stroke-width: 2px; }
+.shot-chart-map .shot-chart-zone-count { font-size: 16px; font-weight: 650; stroke-width: 2px; }
+.cloud-share-preview { display: grid; gap: 10px; margin: 12px 0 16px; }
+.cloud-share-preview dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 5px 12px; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); font-size: 12px; }
+.cloud-share-preview dt { color: var(--muted); }
+.cloud-share-preview dd { margin: 0; overflow-wrap: anywhere; }
+.cloud-share-json { max-height: 260px; margin: 8px 0 0; padding: 10px; overflow: auto; border: 1px solid var(--line); border-radius: 10px; color: var(--muted); background: var(--surface-2); font: 10px/1.5 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
 .picker-label { font-size: 10px; letter-spacing: 1.5px; font-weight: 650; color: var(--muted); margin: 14px 0 9px; }
 .player-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .player-button { display: flex; align-items: center; gap: 10px; min-height: 70px; padding: 13px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg); text-align: left; }

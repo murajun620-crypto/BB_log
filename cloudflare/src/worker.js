@@ -94,7 +94,7 @@ async function route(request, env) {
   }
   const ip = await sha(`ip:${request.headers.get('CF-Connecting-IP') || 'local'}`);
   await limit(db, `request:${ip}`, 120, 60000, now);
-  const management = path === '/v1/shares' || (method === 'DELETE' && /^\/v1\/shares\//.test(path));
+  const management = path === '/v1/shares' || (method !== 'POST' && /^\/v1\/shares\/[A-Za-z0-9_-]{22}$/.test(path));
   if (management) {
     const authorization = request.headers.get('Authorization') || '';
     if (authorization.length > 160 || !await equal(authorization, `Bearer ${env.PUBLISHER_TOKEN}`)) fail(401, 'unauthorized', '共有用管理キーを確認してください。');
@@ -120,13 +120,19 @@ async function route(request, env) {
     const { results } = await db.prepare('SELECT id, title, created_at, expires_at, password_hash IS NOT NULL AS protected FROM shares WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?) ORDER BY created_at DESC LIMIT 1000').bind(now).all();
     return { shares: results.map(row => ({ id: row.id, title: row.title, createdAt: row.created_at, expiresAt: row.expires_at, passwordRequired: !!row.protected })) };
   }
+  const detailMatch = path.match(/^\/v1\/shares\/([A-Za-z0-9_-]{22})$/);
+  if (detailMatch && method === 'GET') {
+    const row = await db.prepare('SELECT id, report, title, created_at, expires_at, password_hash FROM shares WHERE id = ?').bind(detailMatch[1]).first();
+    if (!row || !row.report || (row.expires_at !== null && row.expires_at <= now)) fail(404, 'unavailable', '共有が停止されたか、有効期限が切れています。');
+    return { id: row.id, title: row.title, createdAt: row.created_at, expiresAt: row.expires_at, passwordRequired: !!row.password_hash, report: JSON.parse(row.report).report };
+  }
   const match = path.match(/^\/v1\/shares\/([A-Za-z0-9_-]{22})(\/open)?$/);
   if (!match || !ID.test(match[1])) fail(404, 'not_found', '共有が見つかりません。');
   const id = match[1];
   if (method === 'DELETE' && !match[2]) {
-    // Stop future reads immediately; do not claim to erase copies recipients already saved.
-    await db.prepare('UPDATE shares SET revoked_at = ?, report = NULL, password_hash = NULL, password_salt = NULL WHERE id = ?').bind(now, id).run();
-    return { stopped: true };
+    // Delete the server-side snapshot immediately; copies already received by others cannot be erased.
+    await db.prepare('DELETE FROM shares WHERE id = ?').bind(id).run();
+    return { deleted: true, stopped: true };
   }
   if (method !== 'POST' || !match[2]) fail(405, 'method_not_allowed', 'この操作には対応していません。');
   const data = await readJSON(request, 2048);

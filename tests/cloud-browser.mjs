@@ -95,8 +95,10 @@ try {
   await admin.locator('[name=key]').fill(testToken);
   await admin.getByRole('button', { name: '接続を確認して保存', exact: true }).click();
   await admin.getByRole('button', { name: '共有したリンクを管理', exact: true }).click();
-  await admin.getByRole('button', { name: '共有を停止', exact: true }).click();
-  await admin.getByRole('button', { name: 'このリンクの共有を停止', exact: true }).click();
+  await admin.getByRole('button', { name: 'データを確認', exact: true }).click();
+  await admin.getByText('保存されているJSONを表示', { exact: true }).waitFor();
+  await admin.getByRole('button', { name: '共有停止・データ削除', exact: true }).click();
+  await admin.getByRole('button', { name: '共有停止・データ削除', exact: true }).click();
   await admin.getByText('有効な共有はありません。', { exact: true }).waitFor();
   await reader.reload(); await reader.getByText(/共有が停止されたか、有効期限が切れています/).waitFor();
   await secondContext.close();
