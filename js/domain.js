@@ -32,6 +32,11 @@ export function attackDirectionForPeriod(game, periodId = game?.currentPeriodId)
   const periodIndex = (game?.periods || []).findIndex(period => period?.id === periodId);
   return game?.format === 'quarters' && periodIndex >= 2 ? (firstHalfDirection === 'left' ? 'right' : 'left') : firstHalfDirection;
 }
+export function isBackcourtPoint(direction, x, opponent = false) {
+  if (!['left', 'right'].includes(direction) || !Number.isFinite(x) || x < 0 || x > 1) return false;
+  const attackingDirection = opponent ? (direction === 'left' ? 'right' : 'left') : direction;
+  return attackingDirection === 'right' ? x <= .5 : x >= .5;
+}
 function pointIsThree(x, y) {
   const px = x * PRO_COURT.width, py = y * PRO_COURT.height;
   if (py <= PRO_COURT.threeCornerY || py >= PRO_COURT.height - PRO_COURT.threeCornerY) return true;

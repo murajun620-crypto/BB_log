@@ -297,6 +297,8 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-court-markings { fill: none; stroke: rgba(255,255,255,.96); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .pro-court-markings circle { fill: none; }
 .pro-court-zone-boundaries { fill: none; stroke: rgba(255,255,255,.28); stroke-width: 1.15; stroke-linecap: round; stroke-linejoin: round; }
+.pro-backcourt-overlay { fill: rgba(82, 91, 89, .62); cursor: not-allowed; pointer-events: all; }
+.pro-backcourt-label { fill: rgba(255,255,255,.88); font-size: 22px; font-weight: 800; letter-spacing: 2px; pointer-events: none; }
 .pro-shot-marker { pointer-events: none; }
 .pro-shot-marker text { fill: var(--accent); font-size: 28px; font-weight: 850; paint-order: stroke; stroke: rgba(255,255,255,.9); stroke-width: 4px; stroke-linejoin: round; }
 .pro-shot-marker.miss text { fill: #c7483f; }

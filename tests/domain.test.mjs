@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, normalizeShotZone, percent, lineup, validateGame, validateTeam, makePeriods, shotPointsFromPoint, shotZoneFromPoint, uid } from '../js/domain.js';
+import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, isBackcourtPoint, normalizeShotZone, percent, lineup, validateGame, validateTeam, makePeriods, shotPointsFromPoint, shotZoneFromPoint, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
 import { proLiveView, shotZonePicker, shotChartMapHTML } from '../js/views.js';
@@ -52,6 +52,16 @@ test('Pro games preserve clock, opponent player stats and exact shot positions',
   assert.equal(shotZoneFromPoint(null, 74 / 940, .5), 'rim'); assert.equal(shotZoneFromPoint(null, 180 / 940, .5), 'paint');
   assert.equal(attackDirectionForPeriod(game), 'right'); assert.equal(attackDirectionForPeriod(game, game.periods[2].id), 'left');
   game.attackDirection = 'left'; assert.equal(attackDirectionForPeriod(game, game.periods[2].id), 'right');
+});
+test('Pro shot selection treats the center line and the defending half as backcourt', () => {
+  assert.equal(isBackcourtPoint('right', .5), true);
+  assert.equal(isBackcourtPoint('right', .49), true);
+  assert.equal(isBackcourtPoint('right', .51), false);
+  assert.equal(isBackcourtPoint('left', .5), true);
+  assert.equal(isBackcourtPoint('left', .51), true);
+  assert.equal(isBackcourtPoint('left', .49), false);
+  assert.equal(isBackcourtPoint('right', .25, true), false);
+  assert.equal(isBackcourtPoint('right', .75, true), true);
 });
 test('advanced shot zones validate and survive file and link sharing', async () => {
   const { game, events, add } = fixture();
@@ -128,6 +138,7 @@ test('Pro shot input uses result buttons, auto-selects points and skips the cour
   assert.doesNotMatch(field, /data-type="2PM"|data-type="3PM"/); assert.match(field, /data-action="pro-shot-point"/);
   assert.match(field, /pro-history-button/); assert.match(field, /pro-player on-court/); assert.doesNotMatch(field, /<strong>#/);
   assert.match(field, /data-action="toggle-pro-attack"/); assert.match(field, /→ 右ゴール/);
+  assert.match(field, /pro-backcourt-overlay/); assert.match(field, /BACK COURT/);
   assert.match(proLiveView(state, { ...game, currentPeriodId: game.periods[2].id }, events), /← 左ゴール/);
   const freeThrow = proLiveView({ ...state, proSelection: { type: 'FTM', playerId: 'player-0' } }, game, events);
   assert.doesNotMatch(freeThrow, /data-action="pro-shot-point"/);

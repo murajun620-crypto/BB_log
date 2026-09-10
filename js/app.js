@@ -1,5 +1,5 @@
 import * as db from './db.js';
-import { uid, localDate, STATS, activeEvents, attackDirectionForPeriod, makePeriods, shotPointsFromPoint, shotZoneFromPoint, validateTeam, validateGame, lineup, eventLabel, aggregate, aggregateGames } from './domain.js';
+import { uid, localDate, STATS, activeEvents, attackDirectionForPeriod, isBackcourtPoint, makePeriods, shotPointsFromPoint, shotZoneFromPoint, validateTeam, validateGame, lineup, eventLabel, aggregate, aggregateGames } from './domain.js';
 import { backupObject, parseBackup, gameCSV, download, shareFile, shareUrl } from './transfer.js';
 import { boxScoreImage, playerStatsImage, safeFilename, shareImage } from './share-image.js';
 import { createSharedReport, createAggregateSharedReport, createCompressedSharePayload, parseSharePayload, parseSharedReport, sharedReportFile } from './shared-report.js';
@@ -127,7 +127,7 @@ function render() {
     html = page === 'live' ? g.mode === 'pro' ? view.proLiveView(state, g, gameEvents(g), currentClockSeconds(g)) : view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.1.6 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.1.8 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game())));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -394,12 +394,14 @@ const handlers = {
     const rect = button.getBoundingClientRect();
     const x = Math.max(0, Math.min(1, ((event?.clientX || rect.left + rect.width / 2) - rect.left) / rect.width));
     const y = Math.max(0, Math.min(1, ((event?.clientY || rect.top + rect.height / 2) - rect.top) / rect.height));
+    if (isBackcourtPoint(attackDirectionForPeriod(g), x, isOpponent)) return toast('バックコートは選択できません。', true);
     const points = shotPointsFromPoint(x, y);
     const eventType = `${points}${selection.type.endsWith('M') ? 'PM' : 'PX'}`;
     const zone = shotZoneFromPoint(null, x, y);
     const shotExtra = { ...(zone ? { shotZone: zone } : {}), shotX: x, shotY: y, ...(isOpponent ? { side: 'opponent' } : {}) };
     return busy(async () => { const saved = await record(eventType, selection.playerId, shotExtra); if (isOpponent) state.proOpponentSelection = null; else state.proSelection = null; render(); if (!isOpponent) offerFollowup(saved); });
   },
+  'pro-backcourt': () => toast('バックコートは選択できません。', true),
   'pro-sub': () => { if (game()?.mode !== 'pro') return; state.proSelection = null; state.proSub = { outPlayerId: null }; state.proOpponentSelection = null; render(); },
   'toggle-pro-attack': () => busy(async () => {
     const g = game(); if (g?.mode !== 'pro') return;
