@@ -164,16 +164,24 @@ test('Pro shot input uses result buttons, auto-selects points and skips the cour
   assert.doesNotMatch(freeThrow, /data-action="pro-shot-point"/);
 });
 test('strategy board exposes court tools and preserves placed items in its view', () => {
-  const board = { tool: 'arrow', nextPlayer: 2, items: [
-    { id: 'player-1', kind: 'marker', marker: 'player', label: '1', x: 240, y: 300 },
+  const board = { tool: 'away', items: [
+    { id: 'home-1', kind: 'athlete', team: 'home', label: '1', x: 240, y: 300 },
+    { id: 'away-1', kind: 'athlete', team: 'away', label: '1', x: 420, y: 300 },
+    { id: 'ball-1', kind: 'ball', x: 330, y: 300 },
     { id: 'arrow-1', kind: 'arrow', startX: 240, startY: 300, endX: 520, endY: 300 },
   ] };
   const html = strategyBoardHTML(board);
   assert.match(html, /作戦ボードの道具/);
-  assert.equal((html.match(/data-action="strategy-tool"/g) || []).length, 5);
-  assert.match(html, /data-tool="arrow" aria-pressed="true"/);
+  assert.equal((html.match(/data-action="strategy-tool"/g) || []).length, 6);
+  assert.match(html, /data-tool="away" aria-pressed="true"/);
+  assert.match(html, /味方 <b>1\/5<\/b>/);
+  assert.match(html, /相手 <b>1\/5<\/b>/);
+  assert.match(html, /ボール <b>1\/1<\/b>/);
   assert.match(html, /data-strategy-board-items/);
-  assert.match(html, /data-strategy-item="player-1"/);
+  assert.match(html, /strategy-board-uniform strategy-board-home/);
+  assert.match(html, /strategy-board-uniform strategy-board-away/);
+  assert.match(html, /strategy-board-ball/);
+  assert.match(html, /data-strategy-item="home-1"/);
   assert.match(html, /data-strategy-item="arrow-1"/);
 });
 test('selected games aggregate team and player stats by stable player identity', () => {

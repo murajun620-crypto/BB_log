@@ -128,7 +128,7 @@ function render() {
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
   if (page === 'live') app.querySelector('.live-footer, .pro-footer')?.insertAdjacentHTML('beforeend', view.strategyBoardButtonHTML());
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.0 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.1 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -354,10 +354,14 @@ async function shareGameLink() {
   if (result === 'copy-failed') toast('リンクをコピーできませんでした。共有メニューから送ってください。', true);
   if (sheet.open) closeSheet();
 }
-const strategyToolHints = { player: '選手を選び、コートをタップして配置', ball: 'ボールを選び、コートをタップして配置', line: '始点から終点までドラッグしてラインを描く', arrow: '始点から終点までドラッグして矢印を描く', erase: '消したい選手・ボール・線をタップ' };
+const strategyToolHints = { home: '味方を選び、コートをタップして配置（最大5人）', away: '相手を選び、コートをタップして配置（最大5人）', ball: 'ボールをタップして配置（1個。もう一度タップで移動）', line: '始点から終点までドラッグしてラインを描く', arrow: '始点から終点までドラッグして矢印を描く', erase: '消したいユニフォーム・ボール・線をタップ' };
+const strategyBoardTools = new Set(Object.keys(strategyToolHints));
 function strategyPoint(svg, event) {
   const rect = svg.getBoundingClientRect();
-  return { x: Math.max(20, Math.min(980, ((event.clientX - rect.left) / rect.width) * 1000)), y: Math.max(20, Math.min(580, ((event.clientY - rect.top) / rect.height) * 600)) };
+  const scale = Math.min(rect.width / 1000, rect.height / 600) || 1;
+  const offsetX = (rect.width - 1000 * scale) / 2;
+  const offsetY = (rect.height - 600 * scale) / 2;
+  return { x: Math.max(20, Math.min(980, (event.clientX - rect.left - offsetX) / scale)), y: Math.max(20, Math.min(580, (event.clientY - rect.top - offsetY) / scale)) };
 }
 function strategyDistance(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
 function strategySegmentDistance(point, start, end) {
@@ -366,9 +370,38 @@ function strategySegmentDistance(point, start, end) {
   const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / (dx * dx + dy * dy)));
   return strategyDistance(point, { x: start.x + t * dx, y: start.y + t * dy });
 }
+function normalizeStrategyBoard(board) {
+  const count = { home: 0, away: 0 }; let hasBall = false;
+  board.items = (Array.isArray(board.items) ? board.items : []).reduce((items, item) => {
+    if (!item || typeof item !== 'object') return items;
+    if (item.kind === 'marker' && item.marker === 'player') item = { ...item, kind: 'athlete', team: 'home' };
+    if (item.kind === 'marker' && item.marker === 'ball') item = { ...item, kind: 'ball' };
+    if (item.kind === 'athlete') {
+      const team = item.team === 'away' ? 'away' : 'home';
+      if (count[team] >= 5) return items;
+      count[team] += 1;
+      items.push({ ...item, team, label: item.label || String(count[team]) });
+      return items;
+    }
+    if (item.kind === 'ball') {
+      if (hasBall) return items;
+      hasBall = true; items.push(item); return items;
+    }
+    if (item.kind === 'line' || item.kind === 'arrow') items.push(item);
+    return items;
+  }, []);
+  board.tool = board.tool === 'player' ? 'home' : strategyBoardTools.has(board.tool) ? board.tool : 'home';
+  return board;
+}
+function strategyNextUniformNumber(team) {
+  const used = new Set(state.strategyBoard.items.filter(item => item.kind === 'athlete' && item.team === team).map(item => String(item.label)));
+  return String([1, 2, 3, 4, 5].find(number => !used.has(String(number))) || 5);
+}
 function refreshStrategyBoard(itemsOnly = false) {
   const items = sheet.querySelector('[data-strategy-board-items]');
   if (items) items.innerHTML = view.strategyBoardItemsHTML(state.strategyBoard);
+  const counts = sheet.querySelector('[data-strategy-board-counts]');
+  if (counts) counts.innerHTML = view.strategyBoardCountsHTML(state.strategyBoard);
   if (!itemsOnly) sheet.querySelector('[data-strategy-board-draft]')?.replaceChildren();
 }
 function setupStrategyBoard() {
@@ -386,20 +419,27 @@ function setupStrategyBoard() {
   svg.addEventListener('pointerdown', event => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     const point = strategyPoint(svg, event); const tool = state.strategyBoard.tool;
-    if (tool === 'player' || tool === 'ball') {
-      state.strategyBoard.items.push({ id: uid(), kind: 'marker', marker: tool, label: tool === 'player' ? String(state.strategyBoard.nextPlayer) : '●', x: point.x, y: point.y });
-      if (tool === 'player') state.strategyBoard.nextPlayer = state.strategyBoard.nextPlayer >= 5 ? 1 : state.strategyBoard.nextPlayer + 1;
+    if (tool === 'home' || tool === 'away') {
+      const count = state.strategyBoard.items.filter(item => item.kind === 'athlete' && item.team === tool).length;
+      if (count >= 5) return toast(`${tool === 'home' ? '味方' : '相手'}は5人まで配置できます。`);
+      state.strategyBoard.items.push({ id: uid(), kind: 'athlete', team: tool, label: strategyNextUniformNumber(tool), x: point.x, y: point.y });
+      refreshStrategyBoard(true); return;
+    }
+    if (tool === 'ball') {
+      const ball = state.strategyBoard.items.find(item => item.kind === 'ball');
+      if (ball) { ball.x = point.x; ball.y = point.y; } else state.strategyBoard.items.push({ id: uid(), kind: 'ball', x: point.x, y: point.y });
       refreshStrategyBoard(true); return;
     }
     if (tool === 'erase') {
       let nearest = -1; let distance = 42;
       state.strategyBoard.items.forEach((item, index) => {
-        const current = item.kind === 'marker' ? strategyDistance(point, { x: item.x, y: item.y }) : strategySegmentDistance(point, { x: item.startX, y: item.startY }, { x: item.endX, y: item.endY });
+        const current = item.kind === 'athlete' || item.kind === 'ball' || item.kind === 'marker' ? strategyDistance(point, { x: item.x, y: item.y }) : strategySegmentDistance(point, { x: item.startX, y: item.startY }, { x: item.endX, y: item.endY });
         if (current < distance) { nearest = index; distance = current; }
       });
       if (nearest >= 0) { state.strategyBoard.items.splice(nearest, 1); refreshStrategyBoard(true); }
       return;
     }
+    if (!['line', 'arrow'].includes(tool)) return;
     draft = { tool, pointerId: event.pointerId, startX: point.x, startY: point.y, endX: point.x, endY: point.y };
     svg.setPointerCapture?.(event.pointerId); renderDraft(); event.preventDefault();
   });
@@ -410,7 +450,8 @@ function setupStrategyBoard() {
 function openStrategyBoard() {
   const g = game();
   if (!g || g.status !== 'live') return toast('試合中に作戦ボードを開いてください。', true);
-  if (!state.strategyBoard || state.strategyBoard.gameId !== g.id) state.strategyBoard = { gameId: g.id, items: [], tool: 'player', nextPlayer: 1 };
+  if (!state.strategyBoard || state.strategyBoard.gameId !== g.id) state.strategyBoard = { gameId: g.id, items: [], tool: 'home' };
+  normalizeStrategyBoard(state.strategyBoard);
   showSheet('作戦ボード', view.strategyBoardHTML(state.strategyBoard), 'strategy-board-sheet');
   setupStrategyBoard();
 }
@@ -420,7 +461,7 @@ const handlers = {
   'strategy-board': openStrategyBoard,
   'strategy-tool': button => {
     if (!state.strategyBoard) return;
-    state.strategyBoard.tool = ['player', 'ball', 'line', 'arrow', 'erase'].includes(button.dataset.tool) ? button.dataset.tool : 'player';
+    state.strategyBoard.tool = strategyBoardTools.has(button.dataset.tool) ? button.dataset.tool : 'home';
     sheet.querySelectorAll('[data-action="strategy-tool"]').forEach(tool => { const active = tool.dataset.tool === state.strategyBoard.tool; tool.classList.toggle('active', active); tool.setAttribute('aria-pressed', String(active)); });
     const hint = sheet.querySelector('#strategy-board-hint'); if (hint) hint.textContent = strategyToolHints[state.strategyBoard.tool];
   },
