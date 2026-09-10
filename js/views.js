@@ -1,4 +1,4 @@
-import { STATS, STAT_DEFS, SHOT_ZONES, aggregate, aggregateGames, activeEvents, attackDirectionForPeriod, eventLabel, formatGame, isShotEvent, lineup, localDate, normalizeShotZone, percent } from './domain.js';
+import { STATS, STAT_DEFS, SHOT_ZONES, aggregate, aggregateGames, activeEvents, attackDirectionForPeriod, eventLabel, formatGame, isShotEvent, lineup, localDate, percent, shotZoneForEvent, shotZoneLabel } from './domain.js';
 
 export const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const paths = {
@@ -151,7 +151,7 @@ const shotType = type => ['2PM', '2PX', '3PM', '3PX'].includes(type);
 const BOX_STAT_KEYS = ['PTS', 'REB', 'AST', 'STL', 'BLK', 'TO', 'PF', 'FD'];
 const DETAIL_STAT_KEYS = ['OREB', 'DREB', 'REB', 'AST', 'STL', 'BLK', 'TO', 'PF', 'FD'];
 export function shotChartHTML(events, playerId = null) {
-  const shots = activeEvents(events).filter(event => shotType(event.eventType) && event.side !== 'opponent' && event.shotZone && (!playerId || event.playerId === playerId));
+  const shots = activeEvents(events).filter(event => shotType(event.eventType) && event.side !== 'opponent' && shotZoneForEvent(event) && (!playerId || event.playerId === playerId));
   if (!shots.length) return '';
   return `<section class="shot-chart"><div class="section-heading"><h2>ショットチャート</h2><span class="muted">成功数/試投数・成功率</span></div>${shotChartMapHTML(shots, playerId)}</section>`;
 }
@@ -284,7 +284,7 @@ export function shotZonePicker(playerName, stat) {
   return `<p class="picker-instruction">${esc(playerName)} · ${esc(stat?.name)}。コート上の位置をタップ</p><div class="shot-zone-legend"><span class="target-zone">${target}</span><span>薄いエリアは選べません</span></div><svg class="shot-court-map" viewBox="0 0 620 475" role="group" aria-label="ハーフコートのシュート位置。${target}"><defs><pattern id="court-wood" width="48" height="475" patternUnits="userSpaceOnUse"><rect width="48" height="475" fill="#f1dfb0"/><path d="M47 0V475M0 118H48M0 356H48" fill="none" stroke="#e4ce98" stroke-width="1" opacity=".58"/></pattern></defs><rect class="court-surface" x="10" y="10" width="600" height="455" rx="2"/>${zones}<g class="court-markings"><path d="M10 10H610V465H10ZM65 10V138M555 10V138M65 138C75 190 95 230 122 264C150 295 185 315 220 323C250 332 280 337 310 337C340 337 370 332 400 323C435 315 470 295 498 264C525 230 545 190 555 138M220 10V228H400V10M250 228A60 60 0 1 0 370 228M268 90A42 42 0 0 0 352 90M275 48H345M310 48V56"/><circle cx="310" cy="70" r="13"/><path class="lane-marks" d="M210 70H220M210 112H220M210 154H220M210 196H220M400 70H410M400 112H410M400 154H410M400 196H410"/></g></svg><button type="button" class="button secondary full spaced" data-action="cancel-shot-zone">入力をやめる</button>`;
 }
 function chartShot(shot) {
-  const zone = normalizeShotZone(shot?.zone || shot?.shotZone);
+  const zone = shotZoneForEvent(shot);
   if (!SHOT_ZONES.some(candidate => candidate.id === zone)) return null;
   const made = shot?.result ? shot.result === 'made' : shot?.eventType?.endsWith('M');
   const x = Number.isFinite(shot?.x) ? shot.x : Number.isFinite(shot?.shotX) ? shot.shotX : null;
@@ -305,7 +305,7 @@ function shotChartTotals(shots, playerId) {
 function fullCourtShotChartMapHTML(shots, playerId) {
   const totals = shotChartTotals(shots, playerId);
   if (!Object.values(totals).some(stats => stats.attempts)) return '';
-  const markerHTML = shots.filter(shot => !playerId || shot?.playerId === playerId).map(shot => ({ raw: shot, normalized: chartShot(shot) })).filter(({ normalized }) => normalized?.x !== undefined && normalized?.y !== undefined).map(({ raw, normalized }) => `<g class="pro-shot-chart-marker ${normalized.made ? 'made' : 'miss'}" transform="translate(${(normalized.x * 940).toFixed(1)} ${(normalized.y * 500).toFixed(1)})"><text text-anchor="middle" dy=".36em">${normalized.made ? '○' : '×'}</text><title>${esc(raw?.zone || 'シュート')}</title></g>`).join('');
+  const markerHTML = shots.filter(shot => !playerId || shot?.playerId === playerId).map(shot => ({ raw: shot, normalized: chartShot(shot) })).filter(({ normalized }) => normalized?.x !== undefined && normalized?.y !== undefined).map(({ raw, normalized }) => `<g class="pro-shot-chart-marker ${normalized.made ? 'made' : 'miss'}" transform="translate(${(normalized.x * 940).toFixed(1)} ${(normalized.y * 500).toFixed(1)})"><text text-anchor="middle" dy=".36em">${normalized.made ? '○' : '×'}</text><title>${esc(shotZoneLabel(normalized.zone) || 'シュート')}</title></g>`).join('');
   const summary = SHOT_ZONES.map(zone => { const stats = totals[zone.id]; return `<div class="pro-shot-zone-summary-item"><span>${esc(zone.label)}</span><strong>${stats.made}/${stats.attempts}</strong><b>${percent(stats.made, stats.attempts)}</b></div>`; }).join('');
   return `<svg class="shot-court-map shot-chart-map pro-shot-chart-map" viewBox="0 0 940 500" role="img" aria-label="ショットチャート。各シュートの成功・失敗とエリア別の成功率"><rect class="pro-chart-court-surface" x="24" y="24" width="892" height="452" rx="2"></rect><g class="pro-chart-court-markings">${PRO_COURT_MARKINGS}</g><g class="pro-shot-chart-markers">${markerHTML}</g></svg><div class="pro-shot-zone-summary">${summary}</div>`;
 }
@@ -329,6 +329,6 @@ export function eventsHTML(g, events) {
   return `<p class="help">タップして選手・項目・ピリオドを修正、または個別削除できます。</p><div class="event-list">${active.map(e => action('edit-event', `<span class="event-period">${esc(g.periods.find(p => p.id === e.periodId)?.label)}</span><span>${esc(eventLabel(g, e))}</span>${icon('chevron')}`, 'event-row', `data-id="${e.id}"`)).join('') || '<p class="empty-message">まだ記録がありません。</p>'}</div>`;
 }
 export function editEventHTML(g, e) {
-  const zoneField = e.eventType && shotType(e.eventType) ? `<label class="spaced">シュート位置<select name="shotZone"><option value="">位置なし</option>${SHOT_ZONES.map(zone => `<option value="${zone.id}" ${zone.id === normalizeShotZone(e.shotZone) ? 'selected' : ''}>${esc(zone.label)}</option>`).join('')}</select></label>` : '';
+  const zoneField = e.eventType && shotType(e.eventType) ? `<label class="spaced">シュート位置<select name="shotZone"><option value="">位置なし</option>${SHOT_ZONES.map(zone => `<option value="${zone.id}" ${zone.id === shotZoneForEvent(e) ? 'selected' : ''}>${esc(zone.label)}</option>`).join('')}</select></label>` : '';
   return `<form id="event-form" data-id="${e.id}"><p class="help">${esc(eventLabel(g, e))}</p><label>ピリオド<select name="periodId">${g.periods.map(p => `<option value="${p.id}" ${p.id === e.periodId ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}</select></label>${e.eventType === 'SUB' ? '<p class="notice">交代の選手を変更する場合は、この記録を削除して再入力してください。</p>' : e.eventType === 'OPP' ? `<label class="spaced">相手得点<select name="points">${[1, 2, 3].map(n => `<option ${e.points === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label>` : `<label class="spaced">スタッツ<select name="eventType">${STAT_DEFS.map(d => `<option value="${d.type}" ${e.eventType === d.type ? 'selected' : ''}>${d.label} · ${d.name}</option>`).join('')}</select></label><label class="spaced">選手<select name="playerId">${g.roster.map(p => `<option value="${p.id}" ${p.id === e.playerId ? 'selected' : ''}>${esc(p.number)} ${esc(p.name)}</option>`).join('')}</select></label>${zoneField}`}<button type="submit" class="button primary full spaced">変更を保存</button>${action('delete-event', 'この記録を削除', 'button danger full spaced', `type="button" data-id="${e.id}"`)}</form>`;
 }

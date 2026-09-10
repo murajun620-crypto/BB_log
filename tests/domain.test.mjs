@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, isBackcourtPoint, normalizeShotZone, percent, lineup, validateGame, validateTeam, makePeriods, shotPointsFromPoint, shotZoneFromPoint, uid } from '../js/domain.js';
+import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, isBackcourtPoint, normalizeShotZone, percent, lineup, validateGame, validateTeam, makePeriods, shotPointsFromPoint, shotZoneForEvent, shotZoneFromPoint, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
 import { proLiveView, shotZonePicker, shotChartMapHTML } from '../js/views.js';
@@ -46,6 +46,13 @@ test('Pro games preserve clock, opponent player stats and exact shot positions',
   assert.equal(a.team.PTS, 3); assert.equal(a.opponent, 2); assert.equal(a.opponentPlayers['opponent-1'].PTS, 2);
   assert.equal(events[0].shotZone, 'three-top'); assert.equal(events[0].shotX, .72); assert.equal(events[1].shotZone, 'rim');
   assert.equal(shotZoneFromPoint('3PM', .5, .25), 'three-left-wing');
+  assert.equal(shotZoneFromPoint('3PM', .3, 56 / 500), 'three-left-corner');
+  assert.equal(shotZoneFromPoint('3PM', .3, 60 / 500), 'three-left-wing');
+  assert.equal(shotZoneFromPoint(null, .27, 176 / 500), 'two-left-corner');
+  assert.equal(shotZoneFromPoint(null, .27, 180 / 500), 'two-left-wing');
+  assert.equal(shotZoneForEvent({ eventType: '3PM', shotZone: 'three-left-corner', shotX: .3, shotY: .15 }), 'three-left-wing');
+  const correctedShared = createSharedReport(game, [{ ...events[0], shotX: .3, shotY: .15, shotZone: 'three-left-corner' }]);
+  assert.equal(correctedShared.report.shots[0].zone, 'three-left-wing');
   assert.equal(shotPointsFromPoint(.5, .5), 3); assert.equal(shotPointsFromPoint(.2, .5), 2);
   assert.equal(shotPointsFromPoint(.12, .1), 3); assert.equal(shotPointsFromPoint(.3, .5), 2);
   assert.equal(shotPointsFromPoint(.31, .5), 3); assert.equal(shotPointsFromPoint(.7, .5), 2);

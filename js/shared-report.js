@@ -1,4 +1,4 @@
-import { aggregate, aggregateGames, blankStats, formatGame, normalizeShotZone, SHOT_ZONE_IDS } from './domain.js';
+import { aggregate, aggregateGames, blankStats, formatGame, normalizeShotZone, shotZoneForEvent, SHOT_ZONE_IDS } from './domain.js';
 
 const STAT_KEYS = Object.keys(blankStats());
 const BASE_STAT_KEYS = ['P2M', 'P2A', 'P3M', 'P3A', 'FTM', 'FTA', 'OREB', 'DREB', 'AST', 'STL', 'BLK', 'TO', 'PF', 'FD'];
@@ -8,8 +8,8 @@ const MAX_PAYLOAD_SIZE = 120000;
 const statsCopy = stats => Object.fromEntries(STAT_KEYS.map(key => [key, stats[key]]));
 function shotsCopy(game, events) {
   const playerIds = new Map(game.roster.map((player, index) => [player.id, `p${index + 1}`]));
-  return events.filter(event => !event.deletedAt && event.shotZone && playerIds.has(event.playerId) && ['2PM', '2PX', '3PM', '3PX'].includes(event.eventType)).map(event => {
-    const zone = normalizeShotZone(event.shotZone);
+  return events.filter(event => !event.deletedAt && playerIds.has(event.playerId) && ['2PM', '2PX', '3PM', '3PX'].includes(event.eventType)).map(event => {
+    const zone = shotZoneForEvent(event);
     if (!SHOT_ZONE_IDS.has(zone)) return null;
     const shot = { playerId: playerIds.get(event.playerId), zone, result: event.eventType.endsWith('M') ? 'made' : 'miss' };
     if ([event.shotX, event.shotY].every(value => Number.isFinite(value) && value >= 0 && value <= 1)) { shot.x = event.shotX; shot.y = event.shotY; }

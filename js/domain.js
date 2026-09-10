@@ -26,7 +26,7 @@ export const SHOT_ZONE_IDS = new Set([...SHOT_ZONES.map(zone => zone.id), ...Obj
 export const SHOT_EVENT_TYPES = new Set(['2PM', '2PX', '3PM', '3PX']);
 export const isShotEvent = event => SHOT_EVENT_TYPES.has(event?.eventType);
 export const isPointShotEvent = event => isShotEvent(event) || ['FTM', 'FTX'].includes(event?.eventType);
-const PRO_COURT = { width: 940, height: 500, centerX: 470, centerY: 250, leftBasketX: 74, rightBasketX: 866, threeCornerY: 56, threeRadius: 213, paintTop: 176, paintBottom: 324, leftFreeThrowX: 210, rightFreeThrowX: 730, rimRadius: 37 };
+const PRO_COURT = { width: 940, height: 500, centerX: 470, centerY: 250, leftBasketX: 74, rightBasketX: 866, threeCornerY: 56, threeRadius: 213, twoCornerY: 176, paintTop: 176, paintBottom: 324, leftFreeThrowX: 210, rightFreeThrowX: 730, rimRadius: 37 };
 export function attackDirectionForPeriod(game, periodId = game?.currentPeriodId) {
   const firstHalfDirection = game?.attackDirection === 'left' ? 'left' : 'right';
   const periodIndex = (game?.periods || []).findIndex(period => period?.id === periodId);
@@ -57,9 +57,15 @@ export function shotZoneFromPoint(type, x, y) {
   const inPaint = leftBasket ? px <= PRO_COURT.leftFreeThrowX : px >= PRO_COURT.rightFreeThrowX;
   if (prefix === 'two' && distanceToBasket <= PRO_COURT.rimRadius) return 'rim';
   if (prefix === 'two' && inPaint && py >= PRO_COURT.paintTop && py <= PRO_COURT.paintBottom) return 'paint';
-  if (distanceFromCenter > .76) return `${prefix}-${side < 0 ? 'left' : 'right'}-corner`;
+  const cornerBoundary = prefix === 'three' ? PRO_COURT.threeCornerY : PRO_COURT.twoCornerY;
+  if (py <= cornerBoundary || py >= PRO_COURT.height - cornerBoundary) return `${prefix}-${side < 0 ? 'left' : 'right'}-corner`;
   if (distanceFromCenter > .27) return `${prefix}-${side < 0 ? 'left' : 'right'}-wing`;
   return `${prefix}-top`;
+}
+export function shotZoneForEvent(event) {
+  const x = Number.isFinite(event?.shotX) ? event.shotX : event?.x;
+  const y = Number.isFinite(event?.shotY) ? event.shotY : event?.y;
+  return shotZoneFromPoint(null, x, y) || normalizeShotZone(event?.shotZone ?? event?.zone);
 }
 export const shotZoneLabel = zoneId => SHOT_ZONES.find(zone => zone.id === normalizeShotZone(zoneId))?.label || '';
 export const uid = () => crypto.randomUUID();
@@ -136,7 +142,8 @@ export function eventLabel(game, event) {
   const player = (id, side = 'home') => { const p = (side === 'opponent' ? game.opponentRoster || [] : game.roster).find(p => p.id === id); return p ? `${p.number} ${p.name}` : '不明'; };
   if (event.eventType === 'OPP') return `相手 +${event.points}`;
   if (event.eventType === 'SUB') return `${player(event.outPlayerId)} → ${player(event.inPlayerId)}`;
-  const zone = event.shotZone ? ` · ${shotZoneLabel(event.shotZone)}` : '';
+  const eventZone = shotZoneForEvent(event);
+  const zone = eventZone ? ` · ${shotZoneLabel(eventZone)}` : '';
   return `${event.side === 'opponent' ? '相手 ' : ''}${player(event.playerId, event.side)} · ${STATS[event.eventType]?.label || event.eventType}${zone}`;
 }
 function ensure(ok, message) { if (!ok) throw new Error(message); }
