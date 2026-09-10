@@ -10,7 +10,7 @@ import { cloudSettingsHTML, setupCloudShareUI } from './cloud-share-ui.js';
 const app = document.querySelector('#app');
 const sheet = document.querySelector('#sheet');
 const toastNode = document.querySelector('#toast');
-const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, advancedMode: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, historySelection: new Set(), aggregateMode: 'total', aggregateGameId: null, aggregatePlayerGameId: 'total', shotDisplayMode: 'points', proSelection: null, proSub: null, proOpponentSelection: null, page: 'home', gameId: null, busy: false, lastError: '' };
+const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, advancedMode: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, historySelection: new Set(), aggregateMode: 'total', aggregateGameId: null, aggregatePlayerGameId: 'total', shotDisplayMode: 'points', strategyBoard: null, proSelection: null, proSub: null, proOpponentSelection: null, page: 'home', gameId: null, busy: false, lastError: '' };
 let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, proClockTimer = null, proClockSaving = false, resolvedShareHash = '', sharePayloadPromise = null, pwaRegistration = null;
 const PRO_FIELD_SHOT_TYPES = new Set(['FGM', 'FGX']);
 const getSetting = key => state.data.settings.find(s => s.key === key)?.value;
@@ -127,7 +127,8 @@ function render() {
     html = page === 'live' ? g.mode === 'pro' ? view.proLiveView(state, g, gameEvents(g), currentClockSeconds(g)) : view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.1.9 · BUILT FOR THE SIDELINES`);
+  if (page === 'live') app.querySelector('.live-footer, .pro-footer')?.insertAdjacentHTML('beforeend', view.strategyBoardButtonHTML());
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.0 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -353,9 +354,78 @@ async function shareGameLink() {
   if (result === 'copy-failed') toast('リンクをコピーできませんでした。共有メニューから送ってください。', true);
   if (sheet.open) closeSheet();
 }
+const strategyToolHints = { player: '選手を選び、コートをタップして配置', ball: 'ボールを選び、コートをタップして配置', line: '始点から終点までドラッグしてラインを描く', arrow: '始点から終点までドラッグして矢印を描く', erase: '消したい選手・ボール・線をタップ' };
+function strategyPoint(svg, event) {
+  const rect = svg.getBoundingClientRect();
+  return { x: Math.max(20, Math.min(980, ((event.clientX - rect.left) / rect.width) * 1000)), y: Math.max(20, Math.min(580, ((event.clientY - rect.top) / rect.height) * 600)) };
+}
+function strategyDistance(a, b) { return Math.hypot(a.x - b.x, a.y - b.y); }
+function strategySegmentDistance(point, start, end) {
+  const dx = end.x - start.x; const dy = end.y - start.y;
+  if (!dx && !dy) return strategyDistance(point, start);
+  const t = Math.max(0, Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / (dx * dx + dy * dy)));
+  return strategyDistance(point, { x: start.x + t * dx, y: start.y + t * dy });
+}
+function refreshStrategyBoard(itemsOnly = false) {
+  const items = sheet.querySelector('[data-strategy-board-items]');
+  if (items) items.innerHTML = view.strategyBoardItemsHTML(state.strategyBoard);
+  if (!itemsOnly) sheet.querySelector('[data-strategy-board-draft]')?.replaceChildren();
+}
+function setupStrategyBoard() {
+  const svg = sheet.querySelector('[data-strategy-board]');
+  if (!svg) return;
+  let draft = null;
+  const renderDraft = () => { const node = sheet.querySelector('[data-strategy-board-draft]'); if (node) node.innerHTML = view.strategyBoardDraftHTML(draft); };
+  const endDraft = event => {
+    if (!draft || draft.pointerId !== event.pointerId) return;
+    const point = strategyPoint(svg, event); draft.endX = point.x; draft.endY = point.y;
+    if (strategyDistance({ x: draft.startX, y: draft.startY }, point) > 12) state.strategyBoard.items.push({ id: uid(), kind: draft.tool, startX: draft.startX, startY: draft.startY, endX: draft.endX, endY: draft.endY });
+    draft = null; renderDraft(); refreshStrategyBoard(true);
+    if (svg.hasPointerCapture?.(event.pointerId)) svg.releasePointerCapture(event.pointerId);
+  };
+  svg.addEventListener('pointerdown', event => {
+    if (event.pointerType === 'mouse' && event.button !== 0) return;
+    const point = strategyPoint(svg, event); const tool = state.strategyBoard.tool;
+    if (tool === 'player' || tool === 'ball') {
+      state.strategyBoard.items.push({ id: uid(), kind: 'marker', marker: tool, label: tool === 'player' ? String(state.strategyBoard.nextPlayer) : '●', x: point.x, y: point.y });
+      if (tool === 'player') state.strategyBoard.nextPlayer = state.strategyBoard.nextPlayer >= 5 ? 1 : state.strategyBoard.nextPlayer + 1;
+      refreshStrategyBoard(true); return;
+    }
+    if (tool === 'erase') {
+      let nearest = -1; let distance = 42;
+      state.strategyBoard.items.forEach((item, index) => {
+        const current = item.kind === 'marker' ? strategyDistance(point, { x: item.x, y: item.y }) : strategySegmentDistance(point, { x: item.startX, y: item.startY }, { x: item.endX, y: item.endY });
+        if (current < distance) { nearest = index; distance = current; }
+      });
+      if (nearest >= 0) { state.strategyBoard.items.splice(nearest, 1); refreshStrategyBoard(true); }
+      return;
+    }
+    draft = { tool, pointerId: event.pointerId, startX: point.x, startY: point.y, endX: point.x, endY: point.y };
+    svg.setPointerCapture?.(event.pointerId); renderDraft(); event.preventDefault();
+  });
+  svg.addEventListener('pointermove', event => { if (!draft || draft.pointerId !== event.pointerId) return; const point = strategyPoint(svg, event); draft.endX = point.x; draft.endY = point.y; renderDraft(); event.preventDefault(); });
+  svg.addEventListener('pointerup', endDraft);
+  svg.addEventListener('pointercancel', endDraft);
+}
+function openStrategyBoard() {
+  const g = game();
+  if (!g || g.status !== 'live') return toast('試合中に作戦ボードを開いてください。', true);
+  if (!state.strategyBoard || state.strategyBoard.gameId !== g.id) state.strategyBoard = { gameId: g.id, items: [], tool: 'player', nextPlayer: 1 };
+  showSheet('作戦ボード', view.strategyBoardHTML(state.strategyBoard), 'strategy-board-sheet');
+  setupStrategyBoard();
+}
 const handlers = {
   ...setupCloudShareUI({ showSheet, closeSheet, toast, refreshView: render, getGame: game, getEvents: gameEvents, getAggregate: aggregateShareContext, message: gameShareMessage }),
   'close-sheet': closeSheet,
+  'strategy-board': openStrategyBoard,
+  'strategy-tool': button => {
+    if (!state.strategyBoard) return;
+    state.strategyBoard.tool = ['player', 'ball', 'line', 'arrow', 'erase'].includes(button.dataset.tool) ? button.dataset.tool : 'player';
+    sheet.querySelectorAll('[data-action="strategy-tool"]').forEach(tool => { const active = tool.dataset.tool === state.strategyBoard.tool; tool.classList.toggle('active', active); tool.setAttribute('aria-pressed', String(active)); });
+    const hint = sheet.querySelector('#strategy-board-hint'); if (hint) hint.textContent = strategyToolHints[state.strategyBoard.tool];
+  },
+  'strategy-undo': () => { if (state.strategyBoard?.items.length) { state.strategyBoard.items.pop(); refreshStrategyBoard(); } },
+  'strategy-clear': () => { if (state.strategyBoard?.items.length) { state.strategyBoard.items = []; refreshStrategyBoard(); toast('作戦ボードを消去しました。'); } },
   'apply-update': applyPWAUpdate,
   'check-update': checkPWAUpdate,
   confirm: () => busy(async () => { const fn = confirmAction; if (fn) await fn(); }),

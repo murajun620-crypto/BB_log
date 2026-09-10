@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, isBackcourtPoint, normalizeShotZone, percent, lineup, validateGame, validateTeam, makePeriods, shotPointsFromPoint, shotZoneForEvent, shotZoneFromPoint, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
-import { proLiveView, shotZonePicker, shotChartMapHTML } from '../js/views.js';
+import { proLiveView, shotZonePicker, shotChartMapHTML, strategyBoardHTML } from '../js/views.js';
 
 const fixture = () => {
   const players = Array.from({ length: 6 }, (_, i) => ({ id: `player-${i}`, number: `${i + 4}`, name: `選手${i + 1}` }));
@@ -162,6 +162,19 @@ test('Pro shot input uses result buttons, auto-selects points and skips the cour
   assert.match(proLiveView(state, { ...game, currentPeriodId: game.periods[2].id }, events), /← 左ゴール/);
   const freeThrow = proLiveView({ ...state, proSelection: { type: 'FTM', playerId: 'player-0' } }, game, events);
   assert.doesNotMatch(freeThrow, /data-action="pro-shot-point"/);
+});
+test('strategy board exposes court tools and preserves placed items in its view', () => {
+  const board = { tool: 'arrow', nextPlayer: 2, items: [
+    { id: 'player-1', kind: 'marker', marker: 'player', label: '1', x: 240, y: 300 },
+    { id: 'arrow-1', kind: 'arrow', startX: 240, startY: 300, endX: 520, endY: 300 },
+  ] };
+  const html = strategyBoardHTML(board);
+  assert.match(html, /作戦ボードの道具/);
+  assert.equal((html.match(/data-action="strategy-tool"/g) || []).length, 5);
+  assert.match(html, /data-tool="arrow" aria-pressed="true"/);
+  assert.match(html, /data-strategy-board-items/);
+  assert.match(html, /data-strategy-item="player-1"/);
+  assert.match(html, /data-strategy-item="arrow-1"/);
 });
 test('selected games aggregate team and player stats by stable player identity', () => {
   const first = fixture(); first.add('3PM'); first.add('AST', { playerId: 'player-1' });

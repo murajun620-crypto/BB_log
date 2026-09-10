@@ -239,6 +239,28 @@ body.in-game { overscroll-behavior-y: none; }
 .undo-button .icon { width: 17px; }
 .box-button { display: flex; align-items: center; justify-content: center; gap: 5px; background: var(--surface); border: 1px solid var(--line); border-radius: 11px; padding: 8px 12px; font-size: 9px; font-weight: 750; }
 .box-button .icon { width: 17px; }
+.strategy-button { display: flex; align-items: center; justify-content: center; min-width: 104px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--accent); font-size: 10px; font-weight: 750; }
+.strategy-board-sheet { top: max(8px, env(safe-area-inset-top)); right: max(8px, env(safe-area-inset-right)); bottom: max(8px, env(safe-area-inset-bottom)); left: max(8px, env(safe-area-inset-left)); width: auto; max-width: 1100px; max-height: none; margin: auto; padding: 0 18px max(18px, env(safe-area-inset-bottom)); border-radius: 20px; }
+.strategy-board-sheet .sheet-content { display: flex; flex-direction: column; min-height: 0; }
+.strategy-board-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.strategy-board-tools, .strategy-board-actions { display: flex; gap: 4px; }
+.strategy-tool, .strategy-board-action { min-height: 42px; padding: 7px 11px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--muted); font-size: 11px; font-weight: 700; }
+.strategy-tool.active { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); box-shadow: inset 0 0 0 1px var(--accent); }
+.strategy-board-action { background: var(--surface); color: var(--text); }
+.strategy-board-action.danger { color: var(--danger); }
+.strategy-board-hint { min-height: 22px; margin: 8px 0; color: var(--muted); font-size: 11px; }
+.strategy-board-canvas { display: block; width: 100%; min-height: 200px; aspect-ratio: 1000 / 600; flex: 1; border: 1px solid #d6c08d; border-radius: 12px; background: #e4cf9a; touch-action: none; user-select: none; }
+.strategy-board-surface { fill: #e4cf9a; }
+.strategy-board-court { fill: none; stroke: rgba(255, 255, 255, .96); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.strategy-board-player circle { fill: #24584b; stroke: #fff; stroke-width: 3; }
+.strategy-board-player text { fill: #fff; font-size: 25px; font-weight: 800; pointer-events: none; }
+.strategy-board-ball circle { fill: #d98335; stroke: #fff; stroke-width: 3; }
+.strategy-board-ball text { fill: #fff; font-size: 16px; font-weight: 800; pointer-events: none; }
+.strategy-board-drawing, .strategy-board-draft { fill: none; stroke: #b74842; stroke-width: 7; stroke-linecap: round; pointer-events: none; }
+.strategy-board-drawing.arrow, .strategy-board-draft.arrow { marker-end: url(#strategy-board-arrow); }
+.strategy-board-draft { stroke-dasharray: 10 8; opacity: .72; }
+.strategy-board-canvas marker path { fill: #b74842; }
+.strategy-board-footnote { margin-top: 7px; color: var(--muted); font-size: 10px; }
 .pro-live-screen { width: 100%; max-width: 1500px; min-height: 100vh; min-height: 100dvh; margin: auto; padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-left)) max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-right)); display: flex; flex-direction: column; gap: 7px; }
 .pro-header { display: flex; align-items: center; gap: 7px; min-height: 38px; }
 .pro-header .icon-button { width: 36px; min-width: 36px; height: 36px; }
@@ -493,6 +515,8 @@ body:has(dialog[open]) #toast { bottom: auto; top: max(15px, env(safe-area-inset
   .pro-roster { max-height: none; grid-template-columns: 1fr; }
   .pro-player { min-height: 45px; }
   .pro-footer { margin-top: 0; }
+  .strategy-board-sheet { width: min(calc(100% - 16px), 1100px); height: min(calc(100dvh - 16px), 820px); }
+  .strategy-board-sheet .sheet-content { flex: 1; }
 }
 @media (min-width: 600px) and (max-width: 899px) { .main-column { max-width: 560px; margin: auto; } }
 @media (min-width: 900px) {
