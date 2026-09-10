@@ -46,6 +46,9 @@ test('Pro games preserve clock, opponent player stats and exact shot positions',
   assert.equal(events[0].shotZone, 'three-top'); assert.equal(events[0].shotX, .72); assert.equal(events[1].shotZone, 'rim');
   assert.equal(shotZoneFromPoint('3PM', .5, .25), 'three-left-wing');
   assert.equal(shotPointsFromPoint(.5, .5), 3); assert.equal(shotPointsFromPoint(.2, .5), 2);
+  assert.equal(shotPointsFromPoint(.12, .1), 3); assert.equal(shotPointsFromPoint(.3, .5), 2);
+  assert.equal(shotPointsFromPoint(.31, .5), 3); assert.equal(shotPointsFromPoint(.7, .5), 2);
+  assert.equal(shotZoneFromPoint(null, 74 / 940, .5), 'rim'); assert.equal(shotZoneFromPoint(null, 180 / 940, .5), 'paint');
 });
 test('advanced shot zones validate and survive file and link sharing', async () => {
   const { game, events, add } = fixture();

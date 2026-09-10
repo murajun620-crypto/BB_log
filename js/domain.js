@@ -26,11 +26,12 @@ export const SHOT_ZONE_IDS = new Set([...SHOT_ZONES.map(zone => zone.id), ...Obj
 export const SHOT_EVENT_TYPES = new Set(['2PM', '2PX', '3PM', '3PX']);
 export const isShotEvent = event => SHOT_EVENT_TYPES.has(event?.eventType);
 export const isPointShotEvent = event => isShotEvent(event) || ['FTM', 'FTX'].includes(event?.eventType);
-const shotArcX = y => 330 - 180 * Math.min(1, Math.abs(y - 250) / 140);
+const PRO_COURT = { width: 940, height: 500, centerX: 470, centerY: 250, leftBasketX: 74, rightBasketX: 866, threeCornerY: 56, threeRadius: 213, paintTop: 176, paintBottom: 324, leftFreeThrowX: 210, rightFreeThrowX: 730, rimRadius: 37 };
 function pointIsThree(x, y) {
-  const px = x * 940, py = y * 500;
-  if (py < 105 || py > 395) return true;
-  return px <= 470 ? px >= shotArcX(py) : px <= 940 - shotArcX(py);
+  const px = x * PRO_COURT.width, py = y * PRO_COURT.height;
+  if (py <= PRO_COURT.threeCornerY || py >= PRO_COURT.height - PRO_COURT.threeCornerY) return true;
+  const basketX = px <= PRO_COURT.centerX ? PRO_COURT.leftBasketX : PRO_COURT.rightBasketX;
+  return Math.hypot(px - basketX, py - PRO_COURT.centerY) >= PRO_COURT.threeRadius;
 }
 export function shotPointsFromPoint(x, y) {
   if (![x, y].every(value => Number.isFinite(value) && value >= 0 && value <= 1)) return null;
@@ -38,12 +39,14 @@ export function shotPointsFromPoint(x, y) {
 }
 export function shotZoneFromPoint(type, x, y) {
   if ((type !== null && type !== undefined && !SHOT_EVENT_TYPES.has(type) && !['FGM', 'FGX'].includes(type)) || ![x, y].every(value => Number.isFinite(value) && value >= 0 && value <= 1)) return null;
-  const px = x * 940, py = y * 500, leftBasket = px <= 470;
-  const depth = Math.max(0, Math.min(1, (leftBasket ? px - 60 : 880 - px) / 410));
-  const side = (py - 250) / 220, distanceFromCenter = Math.abs(side);
+  const px = x * PRO_COURT.width, py = y * PRO_COURT.height, leftBasket = px <= PRO_COURT.centerX;
+  const basketX = leftBasket ? PRO_COURT.leftBasketX : PRO_COURT.rightBasketX;
+  const side = (py - PRO_COURT.centerY) / ((PRO_COURT.height - 48) / 2), distanceFromCenter = Math.abs(side);
   const prefix = type?.startsWith('3') ? 'three' : type?.startsWith('2') ? 'two' : pointIsThree(x, y) ? 'three' : 'two';
-  if (prefix === 'two' && depth < .18 && distanceFromCenter < .3) return 'rim';
-  if (prefix === 'two' && depth < .42 && distanceFromCenter < .5) return 'paint';
+  const distanceToBasket = Math.hypot(px - basketX, py - PRO_COURT.centerY);
+  const inPaint = leftBasket ? px <= PRO_COURT.leftFreeThrowX : px >= PRO_COURT.rightFreeThrowX;
+  if (prefix === 'two' && distanceToBasket <= PRO_COURT.rimRadius) return 'rim';
+  if (prefix === 'two' && inPaint && py >= PRO_COURT.paintTop && py <= PRO_COURT.paintBottom) return 'paint';
   if (distanceFromCenter > .76) return `${prefix}-${side < 0 ? 'left' : 'right'}-corner`;
   if (distanceFromCenter > .27) return `${prefix}-${side < 0 ? 'left' : 'right'}-wing`;
   return `${prefix}-top`;
