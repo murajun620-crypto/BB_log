@@ -34,6 +34,27 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - name: Cancel stale Pages deployments
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const deployments = await github.paginate(
+              github.rest.repos.getPagesDeployments,
+              { owner: context.repo.owner, repo: context.repo.repo, per_page: 100 }
+            );
+            for (const deployment of deployments) {
+              if (deployment.status !== 'in_progress') continue;
+              core.info(`Canceling stale Pages deployment ${deployment.id} (${deployment.sha})`);
+              await github.request(
+                'POST /repos/{owner}/{repo}/pages/deployments/{pages_deployment_id}/cancel',
+                {
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  pages_deployment_id: deployment.id,
+                  headers: { 'X-GitHub-Api-Version': '2022-11-28' }
+                }
+              );
+            }
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
