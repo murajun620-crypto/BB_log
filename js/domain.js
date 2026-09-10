@@ -27,6 +27,11 @@ export const SHOT_EVENT_TYPES = new Set(['2PM', '2PX', '3PM', '3PX']);
 export const isShotEvent = event => SHOT_EVENT_TYPES.has(event?.eventType);
 export const isPointShotEvent = event => isShotEvent(event) || ['FTM', 'FTX'].includes(event?.eventType);
 const PRO_COURT = { width: 940, height: 500, centerX: 470, centerY: 250, leftBasketX: 74, rightBasketX: 866, threeCornerY: 56, threeRadius: 213, paintTop: 176, paintBottom: 324, leftFreeThrowX: 210, rightFreeThrowX: 730, rimRadius: 37 };
+export function attackDirectionForPeriod(game, periodId = game?.currentPeriodId) {
+  const firstHalfDirection = game?.attackDirection === 'left' ? 'left' : 'right';
+  const periodIndex = (game?.periods || []).findIndex(period => period?.id === periodId);
+  return game?.format === 'quarters' && periodIndex >= 2 ? (firstHalfDirection === 'left' ? 'right' : 'left') : firstHalfDirection;
+}
 function pointIsThree(x, y) {
   const px = x * PRO_COURT.width, py = y * PRO_COURT.height;
   if (py <= PRO_COURT.threeCornerY || py >= PRO_COURT.height - PRO_COURT.threeCornerY) return true;
@@ -156,6 +161,7 @@ export function validateGame(g, events) {
     if (g.opponentRoster.length) validatePlayers(g.opponentRoster);
   }
   if (g.mode !== undefined) ensure(['standard', 'pro'].includes(g.mode), '記録モードが不正です。');
+  if (g.attackDirection !== undefined) ensure(['left', 'right'].includes(g.attackDirection), '攻撃方向が不正です。');
   if (g.mode === 'pro') {
     ensure(typeof g.clockEnabled === 'boolean' && ['score', 'player'].includes(g.opponentTracking || 'score'), 'Proモード設定が不正です。');
     if (g.clockSeconds !== undefined) ensure(Number.isInteger(g.clockSeconds) && g.clockSeconds >= 0 && g.clockSeconds <= 36000, 'ゲームクロックが不正です。');

@@ -1,5 +1,5 @@
 import * as db from './db.js';
-import { uid, localDate, STATS, activeEvents, makePeriods, shotPointsFromPoint, shotZoneFromPoint, validateTeam, validateGame, lineup, eventLabel, aggregate, aggregateGames } from './domain.js';
+import { uid, localDate, STATS, activeEvents, attackDirectionForPeriod, makePeriods, shotPointsFromPoint, shotZoneFromPoint, validateTeam, validateGame, lineup, eventLabel, aggregate, aggregateGames } from './domain.js';
 import { backupObject, parseBackup, gameCSV, download, shareFile, shareUrl } from './transfer.js';
 import { boxScoreImage, playerStatsImage, safeFilename, shareImage } from './share-image.js';
 import { createSharedReport, createAggregateSharedReport, createCompressedSharePayload, parseSharePayload, parseSharedReport, sharedReportFile } from './shared-report.js';
@@ -127,7 +127,7 @@ function render() {
     html = page === 'live' ? g.mode === 'pro' ? view.proLiveView(state, g, gameEvents(g), currentClockSeconds(g)) : view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.1.5 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.1.6 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game())));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -401,6 +401,12 @@ const handlers = {
     return busy(async () => { const saved = await record(eventType, selection.playerId, shotExtra); if (isOpponent) state.proOpponentSelection = null; else state.proSelection = null; render(); if (!isOpponent) offerFollowup(saved); });
   },
   'pro-sub': () => { if (game()?.mode !== 'pro') return; state.proSelection = null; state.proSub = { outPlayerId: null }; state.proOpponentSelection = null; render(); },
+  'toggle-pro-attack': () => busy(async () => {
+    const g = game(); if (g?.mode !== 'pro') return;
+    const next = { ...g, attackDirection: g.attackDirection === 'left' ? 'right' : 'left' };
+    await saveGameChange(next);
+    toast(`自チームの攻撃：${attackDirectionForPeriod(next) === 'right' ? '右ゴール' : '左ゴール'}`);
+  }),
   'pro-opponent-action': button => {
     if (game()?.mode !== 'pro' || game().opponentTracking !== 'player') return;
     const playerId = state.proOpponentSelection?.playerId || null;
@@ -484,7 +490,7 @@ const handlers = {
   'period-menu': periodMenu,
   'change-period': button => {
     const g = game(); const p = g.periods[Number(button.dataset.index)]; if (!p) return;
-    confirm(`${p.label}へ移動しますか？`, `これ以降の入力を${p.label}に記録します。`, '移動する', async () => { const clock = g.mode === 'pro' && g.clockEnabled ? { clockSeconds: Math.round(p.minutes * 60), clockRunning: false, clockStartedAt: null } : {}; await saveGameChange({ ...g, currentPeriodId: p.id, ...clock }); closeSheet(); toast(`${p.label}に移動しました。`); });
+    confirm(`${p.label}へ移動しますか？`, `これ以降の入力を${p.label}に記録します。`, '移動する', async () => { const clock = g.mode === 'pro' && g.clockEnabled ? { clockSeconds: Math.round(p.minutes * 60), clockRunning: false, clockStartedAt: null } : {}; const next = { ...g, currentPeriodId: p.id, ...clock }; const directionChanged = g.mode === 'pro' && g.format === 'quarters' && attackDirectionForPeriod(g) !== attackDirectionForPeriod(next); await saveGameChange(next); closeSheet(); toast(`${p.label}に移動しました。${directionChanged ? ` 自チームの攻撃を${attackDirectionForPeriod(next) === 'right' ? '右ゴール' : '左ゴール'}へ自動変更しました。` : ''}`); });
   },
   'add-ot': () => {
     const g = game(); const label = `OT${g.periods.filter(p => p.overtime).length + 1}`;
@@ -632,7 +638,7 @@ document.addEventListener('submit', event => {
     const mode = gameDraft.mode === 'pro' ? 'pro' : 'standard';
     const opponentRoster = mode === 'pro' && gameDraft.opponentTracking === 'player' ? parseOpponentRoster(gameDraft.opponentRosterText) : [];
     if (mode === 'pro' && gameDraft.opponentTracking === 'player' && !opponentRoster.length) throw new Error('相手選手を1人以上入力してください。');
-    const g = { id: uid(), teamId: t.id, teamName: t.name, opponentName: gameDraft.opponentName.trim(), date: gameDraft.date, format: gameDraft.format, regulationCount: periods.length, minutes: Number(gameDraft.minutes), periods, currentPeriodId: periods[0]?.id, roster: structuredClone(t.players.filter(p => gameDraft.participants.includes(p.id))), starters: gameDraft.starters, mode, clockEnabled: mode === 'pro' && !!gameDraft.clockEnabled, clockSeconds: mode === 'pro' && gameDraft.clockEnabled ? Math.round(Number(gameDraft.minutes) * 60) : undefined, clockRunning: false, clockStartedAt: null, opponentTracking: mode === 'pro' ? gameDraft.opponentTracking : 'score', opponentRoster, status: 'live', nextSeq: 1, revision: 0, createdAt: now, updatedAt: now };
+    const g = { id: uid(), teamId: t.id, teamName: t.name, opponentName: gameDraft.opponentName.trim(), date: gameDraft.date, format: gameDraft.format, regulationCount: periods.length, minutes: Number(gameDraft.minutes), periods, currentPeriodId: periods[0]?.id, roster: structuredClone(t.players.filter(p => gameDraft.participants.includes(p.id))), starters: gameDraft.starters, mode, ...(mode === 'pro' ? { attackDirection: 'right' } : {}), clockEnabled: mode === 'pro' && !!gameDraft.clockEnabled, clockSeconds: mode === 'pro' && gameDraft.clockEnabled ? Math.round(Number(gameDraft.minutes) * 60) : undefined, clockRunning: false, clockStartedAt: null, opponentTracking: mode === 'pro' ? gameDraft.opponentTracking : 'score', opponentRoster, status: 'live', nextSeq: 1, revision: 0, createdAt: now, updatedAt: now };
     validateGame(g, []); await db.createGame(g); await refresh(); gameDraft = null; location.hash = `#live/${g.id}`;
   });
   if (form.id === 'live-member-form') busy(async () => {

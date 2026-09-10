@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { STATS, SHOT_ZONES, aggregate, aggregateGames, normalizeShotZone, percent, lineup, validateGame, validateTeam, makePeriods, shotPointsFromPoint, shotZoneFromPoint, uid } from '../js/domain.js';
+import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, normalizeShotZone, percent, lineup, validateGame, validateTeam, makePeriods, shotPointsFromPoint, shotZoneFromPoint, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
 import { proLiveView, shotZonePicker, shotChartMapHTML } from '../js/views.js';
@@ -37,6 +37,7 @@ test('edits and soft deletions change score, player totals and periods without d
 test('Pro games preserve clock, opponent player stats and exact shot positions', () => {
   const { game, events, add } = fixture();
   game.mode = 'pro'; game.clockEnabled = true; game.clockSeconds = 480; game.clockRunning = false; game.clockStartedAt = null;
+  game.attackDirection = 'right';
   game.opponentTracking = 'player'; game.opponentRoster = [{ id: 'opponent-1', number: '8', name: '相手選手' }];
   add('3PM', { shotX: .72, shotY: .5, shotZone: shotZoneFromPoint('3PM', .72, .5), clockSeconds: 431 });
   events.push({ id: uid(), gameId: game.id, periodId: game.currentPeriodId, eventType: '2PM', playerId: 'opponent-1', side: 'opponent', points: 2, timestamp: new Date().toISOString(), seq: game.nextSeq++, shotX: .1, shotY: .5, shotZone: shotZoneFromPoint('2PM', .1, .5), clockSeconds: 420 });
@@ -49,6 +50,8 @@ test('Pro games preserve clock, opponent player stats and exact shot positions',
   assert.equal(shotPointsFromPoint(.12, .1), 3); assert.equal(shotPointsFromPoint(.3, .5), 2);
   assert.equal(shotPointsFromPoint(.31, .5), 3); assert.equal(shotPointsFromPoint(.7, .5), 2);
   assert.equal(shotZoneFromPoint(null, 74 / 940, .5), 'rim'); assert.equal(shotZoneFromPoint(null, 180 / 940, .5), 'paint');
+  assert.equal(attackDirectionForPeriod(game), 'right'); assert.equal(attackDirectionForPeriod(game, game.periods[2].id), 'left');
+  game.attackDirection = 'left'; assert.equal(attackDirectionForPeriod(game, game.periods[2].id), 'right');
 });
 test('advanced shot zones validate and survive file and link sharing', async () => {
   const { game, events, add } = fixture();
@@ -124,6 +127,8 @@ test('Pro shot input uses result buttons, auto-selects points and skips the cour
   assert.match(field, /data-type="FGM"/); assert.match(field, /data-type="FGX"/);
   assert.doesNotMatch(field, /data-type="2PM"|data-type="3PM"/); assert.match(field, /data-action="pro-shot-point"/);
   assert.match(field, /pro-history-button/); assert.match(field, /pro-player on-court/); assert.doesNotMatch(field, /<strong>#/);
+  assert.match(field, /data-action="toggle-pro-attack"/); assert.match(field, /→ 右ゴール/);
+  assert.match(proLiveView(state, { ...game, currentPeriodId: game.periods[2].id }, events), /← 左ゴール/);
   const freeThrow = proLiveView({ ...state, proSelection: { type: 'FTM', playerId: 'player-0' } }, game, events);
   assert.doesNotMatch(freeThrow, /data-action="pro-shot-point"/);
 });
