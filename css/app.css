@@ -296,7 +296,6 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-court-surface { fill: #e4cf9a; }
 .pro-court-markings { fill: none; stroke: rgba(255,255,255,.96); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .pro-court-markings circle { fill: none; }
-.pro-court-zone-boundaries { fill: none; stroke: rgba(255,255,255,.28); stroke-width: 1.15; stroke-linecap: round; stroke-linejoin: round; }
 .pro-backcourt-overlay { fill: rgba(82, 91, 89, .62); cursor: not-allowed; pointer-events: all; }
 .pro-backcourt-label { fill: rgba(255,255,255,.88); font-size: 22px; font-weight: 800; letter-spacing: 2px; pointer-events: none; }
 .pro-shot-marker { pointer-events: none; }
@@ -421,6 +420,11 @@ dialog::backdrop { background: #07170f70; backdrop-filter: blur(3px); }
 .shot-map-zone.disabled { opacity: .58; filter: saturate(.86) brightness(1.03); pointer-events: none; }
 .shot-chart { margin-top: 24px; }
 .shot-chart .section-heading { margin-top: 0; }
+.shot-display-toggle { display: flex; justify-content: flex-end; gap: 4px; margin-top: 8px; }
+.shot-display-toggle .mode-toggle { min-height: 36px; }
+.shot-display-toggle .mode-toggle.active { color: var(--surface); background: var(--accent); border-color: var(--accent); }
+.shot-display-view { display: none; }
+[data-shot-display-mode="points"] .shot-display-view-points, [data-shot-display-mode="zones"] .shot-display-view-zones { display: block; }
 .shot-chart-map { margin-top: 8px; }
 .shot-chart-map .shot-map-zone { fill-opacity: .86; stroke: rgba(255, 255, 255, .9); stroke-width: 1.8; }
 .shot-chart-map .shot-chart-zone-label { pointer-events: none; }
@@ -431,7 +435,6 @@ dialog::backdrop { background: #07170f70; backdrop-filter: blur(3px); }
 .pro-chart-court-surface { fill: #f1dfb0; }
 .pro-chart-court-markings { fill: none; stroke: rgba(255, 255, 255, .96); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .pro-chart-court-markings circle { fill: none; }
-.pro-chart-court-markings .pro-court-zone-boundaries { fill: none; stroke: rgba(255, 255, 255, .28); stroke-width: 1.15; }
 .pro-shot-chart-markers { pointer-events: none; }
 .pro-shot-chart-marker { pointer-events: none; }
 .pro-shot-chart-marker text { fill: var(--accent); font-size: 28px; font-weight: 850; paint-order: stroke; stroke: rgba(255,255,255,.9); stroke-width: 4px; stroke-linejoin: round; }

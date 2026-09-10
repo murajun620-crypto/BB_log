@@ -134,8 +134,20 @@ test('exact Pro shot positions render as markers with an area summary', () => {
   assert.match(chart, /pro-shot-chart-map/);
   assert.equal((chart.match(/class="pro-shot-chart-marker [^"]+/g) || []).length, 2);
   assert.match(chart, /pro-shot-zone-summary/);
+  assert.equal((chart.match(/data-action="toggle-shot-display"/g) || []).length, 2);
+  assert.match(chart, /shot-display-view-zones/);
+  assert.doesNotMatch(chart, /pro-court-zone-boundaries/);
   assert.match(chart, /1\/2/);
   assert.match(chart, /50\.0%/);
+});
+test('shot chart display can start in area mode while keeping point and area views', () => {
+  const chart = shotChartMapHTML([
+    { playerId: 'player-0', zone: 'three-top', result: 'made', x: .5, y: .15 },
+  ], null, 'zones');
+  assert.match(chart, /data-shot-display-mode="zones"/);
+  assert.match(chart, /shot-display-view-points/);
+  assert.match(chart, /shot-display-view-zones/);
+  assert.match(chart, /data-mode="zones" aria-pressed="true"/);
 });
 test('Pro shot input uses result buttons, auto-selects points and skips the court for FT', () => {
   const { game, events } = fixture(); game.mode = 'pro'; game.clockEnabled = false; game.opponentTracking = 'score';
@@ -146,6 +158,7 @@ test('Pro shot input uses result buttons, auto-selects points and skips the cour
   assert.match(field, /pro-history-button/); assert.match(field, /pro-player on-court/); assert.doesNotMatch(field, /<strong>#/);
   assert.match(field, /data-action="toggle-pro-attack"/); assert.match(field, /→ 右ゴール/);
   assert.match(field, /pro-backcourt-overlay/); assert.match(field, /BACK COURT/);
+  assert.doesNotMatch(field, /pro-court-zone-boundaries/);
   assert.match(proLiveView(state, { ...game, currentPeriodId: game.periods[2].id }, events), /← 左ゴール/);
   const freeThrow = proLiveView({ ...state, proSelection: { type: 'FTM', playerId: 'player-0' } }, game, events);
   assert.doesNotMatch(freeThrow, /data-action="pro-shot-point"/);

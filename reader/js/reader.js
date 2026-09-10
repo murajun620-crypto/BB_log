@@ -9,6 +9,7 @@ let requestNumber = 0;
 let displayMode = 'total';
 let selectedGameIndex = null;
 let playerDisplay = 'total';
+let shotDisplayMode = 'points';
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const percent = (made, attempts) => attempts ? `${(made / attempts * 100).toFixed(1)}%` : '—';
@@ -26,14 +27,14 @@ function renderApp(html) {
     const detailGames = Array.isArray(report.games) && report.games.length === report.gameCount ? report.games : [];
     const currentGame = selectedGameIndex === null ? null : detailGames[selectedGameIndex];
     const source = currentGame || report;
-    [...app.querySelectorAll('.section-heading')].find(element => element.querySelector('h2')?.textContent === 'チーム・シューティング')?.insertAdjacentHTML('beforebegin', shotChart(source.shots || []));
+    [...app.querySelectorAll('.section-heading')].find(element => element.querySelector('h2')?.textContent === 'チーム・シューティング')?.insertAdjacentHTML('beforebegin', shotChart(source.shots || [], null, shotDisplayMode));
   }
 }
 function shooting(stats, games = 1) {
   return `<div class="shooting-grid">${[['FG', 'FGM', 'FGA'], ['2P', 'P2M', 'P2A'], ['3P', 'P3M', 'P3A'], ['FT', 'FTM', 'FTA']].map(([label, made, attempts]) => `<div><span>${label}</span><strong>${stats[made]}<small>/${stats[attempts]}</small></strong><b>${percent(stats[made], stats[attempts])}</b>${games > 1 ? `<em class="shooting-average">平均 ${average(stats[made], games)}/${average(stats[attempts], games)}</em>` : ''}</div>`).join('')}</div>`;
 }
-function shotChart(shots = [], playerId = null) {
-  const map = shotChartMapHTML(shots, playerId);
+function shotChart(shots = [], playerId = null, displayMode = 'points') {
+  const map = shotChartMapHTML(shots, playerId, displayMode);
   return map ? `<section class="shot-chart"><div class="section-heading"><h2>ショットチャート</h2><span>成功数/試投数・成功率</span></div>${map}</section>` : '';
 }
 
@@ -114,6 +115,7 @@ async function render(password = '') {
     report = parsed;
     selectedGameIndex = null;
     playerDisplay = displayMode;
+    shotDisplayMode = 'points';
     renderApp(readerReportView(parsed));
   } catch (error) {
     if (sequence !== requestNumber) return;
@@ -146,7 +148,7 @@ function openPlayer(playerId) {
   const playerValue = value => playerDisplay === 'average' && !selectedGame ? average(value, report.gameCount) : value;
   const options = detailGames.length > 1 ? `<div class="detail-mode-row"><span>表示する試合</span><select data-action="select-player-game" data-player-id="${esc(playerId)}" aria-label="選手スタッツの対象試合"><option value="total" ${playerDisplay === 'total' ? 'selected' : ''}>全試合集計</option><option value="average" ${playerDisplay === 'average' ? 'selected' : ''}>1試合平均</option>${detailGames.map((game, index) => `<option value="${index}" ${String(gameIndex) === String(index) ? 'selected' : ''}>${index + 1}試合目：${esc(formatDate(game.date))} vs. ${esc(game.opponentName)}</option>`).join('')}</select></div>` : '';
   const context = selectedGame ? `${selectedGame.teamName} vs ${selectedGame.opponentName} · ${formatDate(selectedGame.date)}` : `${report.teamName} vs ${report.opponentName} · ${report.gameCount > 1 ? '全試合集計' : formatDate(report.date)}`;
-  playerDialog.innerHTML = `<div class="dialog-handle"></div><button class="dialog-close" type="button" data-close-dialog aria-label="閉じる">×</button>${options}<p class="dialog-context">${esc(context)}</p><div class="player-detail"><span class="jersey">${esc(player.number)}</span><div><h2 id="player-dialog-title">${esc(player.name)}</h2><p><b>${playerValue(player.stats.PTS)}</b> PTS</p></div></div>${shooting(player.stats, selectedCount)}<div class="detail-stats">${DETAIL_STATS.map(key => `<span><small>${statLabel(key)}</small><b>${playerValue(player.stats[key])}</b></span>`).join('')}</div>${shotChart(source.shots || [], playerId)}`;
+  playerDialog.innerHTML = `<div class="dialog-handle"></div><button class="dialog-close" type="button" data-close-dialog aria-label="閉じる">×</button>${options}<p class="dialog-context">${esc(context)}</p><div class="player-detail"><span class="jersey">${esc(player.number)}</span><div><h2 id="player-dialog-title">${esc(player.name)}</h2><p><b>${playerValue(player.stats.PTS)}</b> PTS</p></div></div>${shooting(player.stats, selectedCount)}<div class="detail-stats">${DETAIL_STATS.map(key => `<span><small>${statLabel(key)}</small><b>${playerValue(player.stats[key])}</b></span>`).join('')}</div>${shotChart(source.shots || [], playerId, shotDisplayMode)}`;
   if (!playerDialog.open && typeof playerDialog.showModal === 'function') playerDialog.showModal();
   else if (!playerDialog.open) playerDialog.setAttribute('open', '');
 }
@@ -154,6 +156,18 @@ function openPlayer(playerId) {
 document.addEventListener('click', event => {
   const toggle = event.target.closest('[data-action]');
   if (toggle?.dataset.action === 'select-player-game') return;
+  if (toggle?.dataset.action === 'toggle-shot-display') {
+    const root = toggle.closest('[data-shot-display-root]');
+    if (!root) return;
+    shotDisplayMode = toggle.dataset.mode === 'zones' ? 'zones' : 'points';
+    root.dataset.shotDisplayMode = shotDisplayMode;
+    root.querySelectorAll('[data-action="toggle-shot-display"]').forEach(button => {
+      const active = button.dataset.mode === shotDisplayMode;
+      button.classList.toggle('active', active);
+      button.setAttribute('aria-pressed', String(active));
+    });
+    return;
+  }
   if (toggle?.dataset.action === 'toggle-stat-mode') { displayMode = displayMode === 'average' ? 'total' : 'average'; if (report) renderApp(readerReportView(report)); return; }
   if (toggle?.dataset.action === 'select-game') {
     const index = Number(toggle.dataset.gameIndex);

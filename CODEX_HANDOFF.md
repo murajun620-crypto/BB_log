@@ -1,6 +1,6 @@
 # Project Status
 
-バスケットボールの試合記録・共有を行うオフライン対応PWA。正規リポジトリは `Documents/Github/BB_log`、公開先は `https://murajun620-crypto.github.io/BB_log/`。現在のアプリ版は2.1.8。標準記録、Advanced（Bリーグ式12ゾーン）、iPad横向き中心のPro記録モードを実装済み。
+バスケットボールの試合記録・共有を行うオフライン対応PWA。正規リポジトリは `Documents/Github/BB_log`、公開先は `https://murajun620-crypto.github.io/BB_log/`。現在のアプリ版は2.1.9。標準記録、Advanced（Bリーグ式12ゾーン）、iPad横向き中心のPro記録モードを実装済み。
 
 # Recent Changes
 
@@ -8,13 +8,14 @@
 - Proの自チーム攻撃方向を表示・タップ切替可能にした。方向は前半の基準を保存し、4QではQ3開始時に自動反転する（延長はQ4の方向を継続）。
 - Proでフィールドゴールのシュート位置を選択するとき、攻撃方向と現在のピリオドからフロントコートを判定し、反対側のバックコートをグレーアウトして選択不可にした。センターライン上もバックコート扱いとし、相手選手のシュートでは選択可能なコートを自動的に反転する。
 - Proのシュートエリア分類を表示中のコート線に合わせ、3PコーナーをY=56/444、2PコーナーをY=176/324で判定。座標を持つ既存シュートは履歴・チャート・共有時にも座標を優先して再分類する。
+- Proの点指定・シュートチャートから細いゾーン境界線を除去。座標付きシュートの表示は、○×の点表示とエリア集計表示を本体・Readerの両方で切り替え可能にした。
 - プッシュ後にGitHub Pagesデプロイを必ず作成し、完了・成功まで確認する運用を `AGENTS.md` に追加。コミット `eed4e79` のRun 66は前回デプロイとの重複で失敗したため、前回Run 65の完了後に再デプロイを実施する。
 - Pagesの連続プッシュ競合を解消するため、`github-pages` concurrencyでデプロイを直列化する `.github/workflows/pages.yml` を追加。Pagesの公開元をGitHub Actionsへ切り替え、Run 3で成功を確認した。
 - 古いPagesデプロイがAPI上で `in_progress` のまま残る場合に備え、デプロイ直前にPages APIで停滞デプロイをキャンセルする処理を追加。Run 3で実際に旧デプロイを解放して公開できた。
 - 更新後の設定画面に現在のバージョンを表示することを運用ルールへ追加し、表示番号・`package.json`・ルートの`sw.js`の一致を確認する。
 - Proのスコア、チーム名、ゲームクロックを黒地・黄色の一体型電光掲示板に統一。ライト／ダークどちらでも同じ見た目にする。ショットクロックは実装しない。
 - LIVE中の試合メニューから、標準／Pro、ゲームクロック有無、相手記録（総得点／個人）を変更可能。選手得点・ファウル、交代順、シュート後の選択解除、クロック編集にも対応。
-- アプリ本体、Reader、Service Worker、package metadataのバージョンを2.1.8へ更新。
+- アプリ本体、Reader、Service Worker、package metadataのバージョンを2.1.9へ更新。
 
 # Current Issues
 
@@ -25,7 +26,7 @@
 
 # Next Tasks
 
-1. iPad／iPhone実機で2.1.8更新を適用し、Proコート、ゾーン境界、攻撃方向の手動／Q3自動反転、バックコートのグレーアウト、黒黄スコア／クロック、シュート位置、交代、共有Readerを確認する。
+1. iPad／iPhone実機で2.1.9更新を適用し、Proコート、ゾーン境界なしの点指定、○×／エリア表示切替、攻撃方向の手動／Q3自動反転、バックコートのグレーアウト、黒黄スコア／クロック、シュート位置、交代、共有Readerを確認する。
 2. 必要ならPro画面のボタン密度・コート表示を実機に合わせて微調整する。
 
 # Important Decisions
@@ -39,7 +40,7 @@
 # Environment / Testing Notes
 
 - Windows。Cloudflare Worker関連は `cloudflare/`。共有Workerは `https://courtside-share.murajun620.workers.dev`。
-- 単体／Workerテスト：`node --test tests/domain.test.mjs tests/cloud-share.test.mjs`。今回も `node --test tests/*.test.mjs`（26件成功）、変更JSの構文チェックを確認済み。ローカルPro画面でゾーン表示・攻撃方向の手動切替・Q3自動反転を確認済み。
+- 単体／Workerテスト：`node --test tests/domain.test.mjs tests/cloud-share.test.mjs`。今回も `node --test tests/*.test.mjs`（27件成功）、変更JSの構文チェックを確認済み。ローカルPro画面でゾーン表示・攻撃方向の手動切替・Q3自動反転を確認済み。
 - 自動ブラウザテスト：`node tests/browser.mjs`。実行にはPlaywrightが必要だが、この環境では未導入。
 - 手動確認用ローカルサーバーは `node scripts/serve.mjs`。Pro LIVEで実寸比のフルコート、3P直線・円弧、左右レーン、黒黄スコア／クロックを確認済み。
 - `Documents/ChatGPT/BB_log_` は退避フォルダーで開発対象外。管理キーなどの秘密情報はGitへ追加しない。

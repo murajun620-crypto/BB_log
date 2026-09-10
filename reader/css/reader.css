@@ -174,6 +174,11 @@ dialog::backdrop { background: rgba(14, 28, 23, .48); }
 .reader-shell > .rebound-total { margin-bottom: 4px; }
 .shot-chart { margin-top: 24px; }
 .shot-chart .section-heading { margin-top: 0; }
+.shot-display-toggle { display: flex; justify-content: flex-end; gap: 4px; margin-top: 8px; }
+.shot-display-toggle .mode-toggle { min-height: 36px; }
+.shot-display-toggle .mode-toggle.active { color: var(--surface); background: var(--accent); border-color: var(--accent); }
+.shot-display-view { display: none; }
+[data-shot-display-mode="points"] .shot-display-view-points, [data-shot-display-mode="zones"] .shot-display-view-zones { display: block; }
 .shot-chart-map { display: block; width: 100%; max-width: 620px; height: auto; margin: 8px auto 0; overflow: hidden; border: 1px solid #d6c08d; border-radius: 12px; background: #f1dfb0; }
 .shot-chart-map .court-surface { fill: #f1dfb0; }
 .shot-chart-map .court-markings { fill: none; stroke: rgba(255, 255, 255, .94); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
