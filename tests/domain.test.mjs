@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { STATS, SHOT_ZONES, aggregate, aggregateGames, normalizeShotZone, percent, lineup, validateGame, validateTeam, makePeriods, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
-import { shotZonePicker } from '../js/views.js';
+import { shotZonePicker, shotChartMapHTML } from '../js/views.js';
 
 const fixture = () => {
   const players = Array.from({ length: 6 }, (_, i) => ({ id: `player-${i}`, number: `${i + 4}`, name: `選手${i + 1}` }));
@@ -61,6 +61,18 @@ test('shot court map enables only matching two- or three-point zones', () => {
   assert.match(threePoint, /data-zone="three-top"/);
   assert.match(twoPoint, /viewBox="0 0 620 475"/);
   assert.doesNotMatch(twoPoint, /<text/);
+});
+test('shot chart map shows each zone as made-attempts and percentage', () => {
+  const chart = shotChartMapHTML([
+    { playerId: 'player-0', zone: 'two-top', result: 'made' },
+    { playerId: 'player-0', zone: 'two-top', result: 'miss' },
+    { playerId: 'player-0', zone: 'three-left-corner', result: 'made' },
+  ]);
+  assert.match(chart, /class="shot-court-map shot-chart-map"/);
+  assert.equal((chart.match(/class="shot-map-zone shot-chart-map-zone/g) || []).length, 12);
+  assert.match(chart, /50\.0%/);
+  assert.match(chart, /1\/2/);
+  assert.doesNotMatch(chart, /shot-marker|○|×/);
 });
 test('selected games aggregate team and player stats by stable player identity', () => {
   const first = fixture(); first.add('3PM'); first.add('AST', { playerId: 'player-1' });

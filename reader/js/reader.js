@@ -1,6 +1,6 @@
 import { parseSharePayload } from '../../js/shared-report.js';
 import { openCloudShare } from '../../js/cloud-share.js';
-import { normalizeShotZone, SHOT_ZONES } from '../../js/domain.js';
+import { shotChartMapHTML } from '../../js/views.js';
 
 const app = document.querySelector('#app');
 const playerDialog = document.querySelector('#player-dialog');
@@ -31,9 +31,8 @@ function shooting(stats, games = 1) {
   return `<div class="shooting-grid">${[['FG', 'FGM', 'FGA'], ['2P', 'P2M', 'P2A'], ['3P', 'P3M', 'P3A'], ['FT', 'FTM', 'FTA']].map(([label, made, attempts]) => `<div><span>${label}</span><strong>${stats[made]}<small>/${stats[attempts]}</small></strong><b>${percent(stats[made], stats[attempts])}</b>${games > 1 ? `<em class="shooting-average">平均 ${average(stats[made], games)}/${average(stats[attempts], games)}</em>` : ''}</div>`).join('')}</div>`;
 }
 function shotChart(shots = [], playerId = null) {
-  const filtered = shots.filter(shot => shot?.zone && (!playerId || shot.playerId === playerId));
-  if (!filtered.length) return '';
-  return `<section class="shot-chart"><div class="section-heading"><h2>ショットチャート</h2><span>○ 成功 / × 失敗</span></div><div class="shot-chart-grid">${SHOT_ZONES.map(zone => { const zoneShots = filtered.filter(shot => normalizeShotZone(shot.zone) === zone.id); return `<div class="shot-chart-zone" data-zone="${zone.id}"><span>${esc(zone.label)}</span>${zoneShots.length ? `<div class="shot-markers">${zoneShots.map(shot => `<span class="shot-marker ${shot.result === 'made' ? 'made' : 'miss'}">${shot.result === 'made' ? '○' : '×'}</span>`).join('')}</div><small>${zoneShots.filter(shot => shot.result === 'made').length}/${zoneShots.length}</small>` : '<small>—</small>'}</div>`; }).join('')}</div></section>`;
+  const map = shotChartMapHTML(shots, playerId);
+  return map ? `<section class="shot-chart"><div class="section-heading"><h2>ショットチャート</h2><span>成功数/試投数・成功率</span></div>${map}</section>` : '';
 }
 
 function statCells(stats, games = 1) {

@@ -73,22 +73,12 @@ const shotType = type => ['2PM', '2PX', '3PM', '3PX'].includes(type);
 export function shotChartHTML(events, playerId = null) {
   const shots = activeEvents(events).filter(event => shotType(event.eventType) && event.shotZone && (!playerId || event.playerId === playerId));
   if (!shots.length) return '';
-  const zones = SHOT_ZONES.map(zone => {
-    const zoneShots = shots.filter(event => normalizeShotZone(event.shotZone) === zone.id);
-    const markers = zoneShots.map(event => `<span class="shot-marker ${event.eventType.endsWith('M') ? 'made' : 'miss'}">${event.eventType.endsWith('M') ? '○' : '×'}</span>`).join('');
-    return `<div class="shot-chart-zone" data-zone="${zone.id}"><span>${esc(zone.label)}</span>${markers ? `<div class="shot-markers">${markers}</div><small>${zoneShots.filter(event => event.eventType.endsWith('M')).length}/${zoneShots.length}</small>` : '<small>—</small>'}</div>`;
-  }).join('');
-  return `<section class="shot-chart"><div class="section-heading"><h2>ショットチャート</h2><span class="muted">○ 成功 / × 失敗</span></div><div class="shot-chart-grid">${zones}</div></section>`;
+  return `<section class="shot-chart"><div class="section-heading"><h2>ショットチャート</h2><span class="muted">成功数/試投数・成功率</span></div>${shotChartMapHTML(shots, playerId)}</section>`;
 }
 export function sharedShotChartHTML(shots = [], playerId = null) {
   const filtered = shots.filter(shot => shot?.zone && (!playerId || shot.playerId === playerId));
   if (!filtered.length) return '';
-  const zones = SHOT_ZONES.map(zone => {
-    const zoneShots = filtered.filter(shot => normalizeShotZone(shot.zone) === zone.id);
-    const markers = zoneShots.map(shot => `<span class="shot-marker ${shot.result === 'made' ? 'made' : 'miss'}">${shot.result === 'made' ? '○' : '×'}</span>`).join('');
-    return `<div class="shot-chart-zone" data-zone="${zone.id}"><span>${esc(zone.label)}</span>${markers ? `<div class="shot-markers">${markers}</div><small>${zoneShots.filter(shot => shot.result === 'made').length}/${zoneShots.length}</small>` : '<small>—</small>'}</div>`;
-  }).join('');
-  return `<section class="shot-chart"><div class="section-heading"><h2>ショットチャート</h2><span class="muted">○ 成功 / × 失敗</span></div><div class="shot-chart-grid">${zones}</div></section>`;
+  return `<section class="shot-chart"><div class="section-heading"><h2>ショットチャート</h2><span class="muted">成功数/試投数・成功率</span></div>${shotChartMapHTML(filtered, playerId)}</section>`;
 }
 export function boxView(s, g, events) {
   const a = aggregate(g, events);
@@ -186,18 +176,18 @@ export function pickerHTML(g, events, type, options = {}) {
   return `<p class="picker-instruction">${esc(options.instruction || '記録する選手をタップ')}</p>${group(tracked ? players.filter(p => on.includes(p.id)) : players, tracked ? 'ON COURT' : 'PLAYERS')}${tracked ? `<details ${options.only || options.showBench ? 'open' : ''} class="bench-list"><summary>ベンチの選手を表示</summary>${group(players.filter(p => !on.includes(p.id)), 'BENCH')}</details>` : ''}`;
 }
 const SHOT_MAP_ZONES = [
-  { id: 'three-left-corner', path: 'M10 10H65V138H10Z' },
-  { id: 'three-left-wing', path: 'M10 138H65C75 190 95 230 122 264C150 295 185 315 220 323C223 324 227 325 231 326L92 465H10Z' },
-  { id: 'three-top', path: 'M231 326C255 332 280 337 310 337C340 337 365 332 389 326L528 465H92Z' },
-  { id: 'three-right-wing', path: 'M389 326C392 325 396 324 400 323C435 315 470 295 498 264C525 230 545 190 555 138H610V465H528Z' },
-  { id: 'three-right-corner', path: 'M555 10H610V138H555Z' },
-  { id: 'two-left-corner', path: 'M65 10H220V138H65Z' },
-  { id: 'two-left-wing', path: 'M65 138H220V228L175 306C155.9 295.6 137.8 281.5 122 264C95 230 75 190 65 138Z' },
-  { id: 'two-top', path: 'M220 228H400L445 306C430.4 313.8 415.2 319.5 400 323C370 332 340 337 310 337C280 337 250 332 220 323C204.8 319.5 189.6 313.8 175 306Z' },
-  { id: 'two-right-wing', path: 'M400 138H555C545 190 525 230 498 264C482.2 281.5 464.1 295.6 445 306L400 228Z' },
-  { id: 'two-right-corner', path: 'M400 10H555V138H400Z' },
-  { id: 'paint', path: 'M220 10H400V228H220Z' },
-  { id: 'rim', path: 'M268 10H352V90A42 42 0 0 1 268 90Z' },
+  { id: 'three-left-corner', path: 'M10 10H65V138H10Z', labelX: 38, labelY: 72 },
+  { id: 'three-left-wing', path: 'M10 138H65C75 190 95 230 122 264C150 295 185 315 220 323C223 324 227 325 231 326L92 465H10Z', labelX: 52, labelY: 218 },
+  { id: 'three-top', path: 'M231 326C255 332 280 337 310 337C340 337 365 332 389 326L528 465H92Z', labelX: 310, labelY: 420 },
+  { id: 'three-right-wing', path: 'M389 326C392 325 396 324 400 323C435 315 470 295 498 264C525 230 545 190 555 138H610V465H528Z', labelX: 568, labelY: 218 },
+  { id: 'three-right-corner', path: 'M555 10H610V138H555Z', labelX: 582, labelY: 72 },
+  { id: 'two-left-corner', path: 'M65 10H220V138H65Z', labelX: 142, labelY: 72 },
+  { id: 'two-left-wing', path: 'M65 138H220V228L175 306C155.9 295.6 137.8 281.5 122 264C95 230 75 190 65 138Z', labelX: 132, labelY: 220 },
+  { id: 'two-top', path: 'M220 228H400L445 306C430.4 313.8 415.2 319.5 400 323C370 332 340 337 310 337C280 337 250 332 220 323C204.8 319.5 189.6 313.8 175 306Z', labelX: 310, labelY: 278 },
+  { id: 'two-right-wing', path: 'M400 138H555C545 190 525 230 498 264C482.2 281.5 464.1 295.6 445 306L400 228Z', labelX: 488, labelY: 220 },
+  { id: 'two-right-corner', path: 'M400 10H555V138H400Z', labelX: 478, labelY: 72 },
+  { id: 'paint', path: 'M220 10H400V228H220Z', labelX: 310, labelY: 160 },
+  { id: 'rim', path: 'M268 10H352V90A42 42 0 0 1 268 90Z', labelX: 310, labelY: 72 },
 ];
 export function shotZonePicker(playerName, stat) {
   const isThreePoint = stat?.type?.startsWith('3');
@@ -209,6 +199,32 @@ export function shotZonePicker(playerName, stat) {
   }).join('');
   const target = isThreePoint ? '3Pエリアをタップ' : '2Pエリアをタップ';
   return `<p class="picker-instruction">${esc(playerName)} · ${esc(stat?.name)}。コート上の位置をタップ</p><div class="shot-zone-legend"><span class="target-zone">${target}</span><span>薄いエリアは選べません</span></div><svg class="shot-court-map" viewBox="0 0 620 475" role="group" aria-label="ハーフコートのシュート位置。${target}"><defs><pattern id="court-wood" width="48" height="475" patternUnits="userSpaceOnUse"><rect width="48" height="475" fill="#f1dfb0"/><path d="M47 0V475M0 118H48M0 356H48" fill="none" stroke="#e4ce98" stroke-width="1" opacity=".58"/></pattern></defs><rect class="court-surface" x="10" y="10" width="600" height="455" rx="2"/>${zones}<g class="court-markings"><path d="M10 10H610V465H10ZM65 10V138M555 10V138M65 138C75 190 95 230 122 264C150 295 185 315 220 323C250 332 280 337 310 337C340 337 370 332 400 323C435 315 470 295 498 264C525 230 545 190 555 138M220 10V228H400V10M250 228A60 60 0 1 0 370 228M268 90A42 42 0 0 0 352 90M275 48H345M310 48V56"/><circle cx="310" cy="70" r="13"/><path class="lane-marks" d="M210 70H220M210 112H220M210 154H220M210 196H220M400 70H410M400 112H410M400 154H410M400 196H410"/></g></svg><button type="button" class="button secondary full spaced" data-action="cancel-shot-zone">入力をやめる</button>`;
+}
+function chartShot(shot) {
+  const zone = normalizeShotZone(shot?.zone || shot?.shotZone);
+  if (!SHOT_ZONES.some(candidate => candidate.id === zone)) return null;
+  const made = shot?.result ? shot.result === 'made' : shot?.eventType?.endsWith('M');
+  return { zone, made };
+}
+export function shotChartMapHTML(shots = [], playerId = null) {
+  const totals = Object.fromEntries(SHOT_ZONES.map(zone => [zone.id, { made: 0, attempts: 0 }]));
+  for (const shot of shots) {
+    if (playerId && shot?.playerId !== playerId) continue;
+    const normalized = chartShot(shot);
+    if (!normalized) continue;
+    totals[normalized.zone].attempts += 1;
+    if (normalized.made) totals[normalized.zone].made += 1;
+  }
+  if (!Object.values(totals).some(stats => stats.attempts)) return '';
+  const zones = SHOT_MAP_ZONES.map(zone => {
+    const label = SHOT_ZONES.find(candidate => candidate.id === zone.id)?.label || zone.id;
+    return `<path class="shot-map-zone shot-chart-map-zone ${zone.id.startsWith('three-') ? 'three-point' : 'two-point'}" data-zone="${zone.id}" d="${zone.path}"><title>${esc(label)}</title></path>`;
+  }).join('');
+  const labels = SHOT_MAP_ZONES.map(zone => {
+    const stats = totals[zone.id];
+    return `<g class="shot-chart-zone-label" transform="translate(${zone.labelX} ${zone.labelY})"><text class="shot-chart-zone-rate" text-anchor="middle" y="0">${esc(percent(stats.made, stats.attempts))}</text><text class="shot-chart-zone-count" text-anchor="middle" y="18">${stats.made}/${stats.attempts}</text></g>`;
+  }).join('');
+  return `<svg class="shot-court-map shot-chart-map" viewBox="0 0 620 475" role="img" aria-label="ショットチャート。各エリアの成功率と成功数・試投数"><rect class="court-surface" x="10" y="10" width="600" height="455" rx="2"/>${zones}<g class="court-markings"><path d="M10 10H610V465H10ZM65 10V138M555 10V138M65 138C75 190 95 230 122 264C150 295 185 315 220 323C250 332 280 337 310 337C340 337 370 332 400 323C435 315 470 295 498 264C525 230 545 190 555 138M220 10V228H400V10M250 228A60 60 0 1 0 370 228M268 90A42 42 0 0 0 352 90M275 48H345M310 48V56"/><circle cx="310" cy="70" r="13"/><path class="lane-marks" d="M210 70H220M210 112H220M210 154H220M210 196H220M400 70H410M400 112H410M400 154H410M400 196H410"/></g>${labels}</svg>`;
 }
 export function eventsHTML(g, events) {
   const active = activeEvents(events).reverse();
