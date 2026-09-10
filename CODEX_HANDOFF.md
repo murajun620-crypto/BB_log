@@ -19,9 +19,8 @@
 
 # Next Tasks
 
-1. GitHub Pagesへ反映後、公開URLでService Worker v2.1.0の更新とPro画面を確認する。
-2. iPad／iPhone実機で、クロック、シュート位置、交代、共有Readerを確認する。
-3. 必要ならPro画面のボタン密度・コート表示を実機に合わせて微調整する。
+1. iPad／iPhone実機で、クロック、シュート位置、交代、共有Readerを確認する。
+2. 必要ならPro画面のボタン密度・コート表示を実機に合わせて微調整する。
 
 # Important Decisions
 
@@ -36,5 +35,5 @@
 - Windows。Cloudflare Worker関連は `cloudflare/`。共有Workerは `https://courtside-share.murajun620.workers.dev`。
 - 単体／Workerテスト：`node --test tests/domain.test.mjs tests/cloud-share.test.mjs`（現在24件成功）。構文チェックは変更したJS全ファイルで成功。
 - 自動ブラウザテスト：`node tests/browser.mjs`。実行にはPlaywrightが必要だが、この環境では未導入。
-- 手動確認用ローカルサーバーは `node scripts/serve.mjs`。今回、Pro設定、Pro記録、クロック、相手個人記録、BOX SCORE、位置付きチャート、コンソールエラーなしを確認した。
+- 手動確認用ローカルサーバーは `node scripts/serve.mjs`。今回、Pro設定、Pro記録、クロック、相手個人記録、BOX SCORE、位置付きチャート、コンソールエラーなしを確認した。公開URLの `sw.js` と `js/app.js` も2.1.0／Pro対応を確認済み。
 - `Documents/ChatGPT/BB_log_` は退避フォルダーで開発対象外。管理キーなどの秘密情報はGitへ追加しない。
