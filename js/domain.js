@@ -10,16 +10,22 @@ export const STAT_DEFS = [
 export const STATS = Object.fromEntries(STAT_DEFS.map(s => [s.type, s]));
 export const SHOT_ZONES = [
   ['rim', 'ゴール下'],
-  ['paint-left', '左ペイント'], ['paint-right', '右ペイント'],
-  ['short-left', '左ショート'], ['short-right', '右ショート'],
-  ['mid-left', '左ミドル'], ['mid-center', '正面ミドル'], ['mid-right', '右ミドル'],
-  ['three-left-corner', '左コーナー3P'], ['three-left-wing', '左ウイング3P'], ['three-top', '正面3P'],
+  ['paint', 'ペイント内'],
+  ['two-left-corner', '左コーナー2P'], ['two-left-wing', '左ウイング2P'], ['two-top', 'トップ2P'],
+  ['two-right-wing', '右ウイング2P'], ['two-right-corner', '右コーナー2P'],
+  ['three-left-corner', '左コーナー3P'], ['three-left-wing', '左ウイング3P'], ['three-top', 'トップ3P'],
   ['three-right-wing', '右ウイング3P'], ['three-right-corner', '右コーナー3P'],
 ].map(([id, label]) => ({ id, label }));
-export const SHOT_ZONE_IDS = new Set(SHOT_ZONES.map(zone => zone.id));
+const LEGACY_SHOT_ZONE_ALIASES = {
+  'paint-left': 'paint', 'paint-right': 'paint',
+  'short-left': 'two-left-corner', 'mid-left': 'two-left-wing', 'mid-center': 'two-top',
+  'mid-right': 'two-right-wing', 'short-right': 'two-right-corner',
+};
+export const normalizeShotZone = zoneId => LEGACY_SHOT_ZONE_ALIASES[zoneId] || zoneId;
+export const SHOT_ZONE_IDS = new Set([...SHOT_ZONES.map(zone => zone.id), ...Object.keys(LEGACY_SHOT_ZONE_ALIASES)]);
 export const SHOT_EVENT_TYPES = new Set(['2PM', '2PX', '3PM', '3PX']);
 export const isShotEvent = event => SHOT_EVENT_TYPES.has(event?.eventType);
-export const shotZoneLabel = zoneId => SHOT_ZONES.find(zone => zone.id === zoneId)?.label || '';
+export const shotZoneLabel = zoneId => SHOT_ZONES.find(zone => zone.id === normalizeShotZone(zoneId))?.label || '';
 export const uid = () => crypto.randomUUID();
 export const activeEvents = events => events.filter(e => !e.deletedAt).sort((a, b) => a.seq - b.seq);
 export const percent = (made, attempts) => attempts ? `${(made / attempts * 100).toFixed(1)}%` : '—';

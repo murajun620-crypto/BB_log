@@ -1,4 +1,4 @@
-import { aggregate, aggregateGames, blankStats, formatGame, SHOT_ZONE_IDS } from './domain.js';
+import { aggregate, aggregateGames, blankStats, formatGame, normalizeShotZone, SHOT_ZONE_IDS } from './domain.js';
 
 const STAT_KEYS = Object.keys(blankStats());
 const BASE_STAT_KEYS = ['P2M', 'P2A', 'P3M', 'P3A', 'FTM', 'FTA', 'OREB', 'DREB', 'AST', 'STL', 'BLK', 'TO', 'PF'];
@@ -8,7 +8,7 @@ const MAX_PAYLOAD_SIZE = 120000;
 const statsCopy = stats => Object.fromEntries(STAT_KEYS.map(key => [key, stats[key]]));
 function shotsCopy(game, events) {
   const playerIds = new Map(game.roster.map((player, index) => [player.id, `p${index + 1}`]));
-  return events.filter(event => !event.deletedAt && event.shotZone && playerIds.has(event.playerId) && ['2PM', '2PX', '3PM', '3PX'].includes(event.eventType)).map(event => ({ playerId: playerIds.get(event.playerId), zone: event.shotZone, result: event.eventType.endsWith('M') ? 'made' : 'miss' }));
+  return events.filter(event => !event.deletedAt && event.shotZone && playerIds.has(event.playerId) && ['2PM', '2PX', '3PM', '3PX'].includes(event.eventType)).map(event => ({ playerId: playerIds.get(event.playerId), zone: normalizeShotZone(event.shotZone), result: event.eventType.endsWith('M') ? 'made' : 'miss' }));
 }
 
 export function createSharedReport(game, events) {
@@ -157,6 +157,8 @@ export function parseSharedReport(text) {
   ensure(report.periods.reduce((sum, period) => sum + period.away, 0) === report.opponentScore);
   const normalized = structuredClone(report);
   normalized.gameCount = report.gameCount || 1;
+  if (Array.isArray(normalized.shots)) normalized.shots = normalized.shots.map(shot => ({ ...shot, zone: normalizeShotZone(shot.zone) }));
+  if (Array.isArray(normalized.games)) for (const detail of normalized.games) if (Array.isArray(detail.shots)) detail.shots = detail.shots.map(shot => ({ ...shot, zone: normalizeShotZone(shot.zone) }));
   return normalized;
 }
 

@@ -1,4 +1,4 @@
-const VERSION = 'v2.0.1';
+const VERSION = 'v2.0.2';
 const CACHE_NAME = `courtside-reader-${VERSION}`;
 const ASSETS = [
   '../js/cloud-config.js', '../js/cloud-share.js',

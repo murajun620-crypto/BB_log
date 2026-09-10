@@ -105,7 +105,7 @@ function render() {
     html = page === 'live' ? view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.0.1 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.0.2 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game())));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -555,7 +555,13 @@ document.addEventListener('submit', event => {
     const values = new FormData(form); const old = gameEvents().find(e => e.id === form.dataset.id);
     const e = { ...old, periodId: values.get('periodId'), updatedAt: new Date().toISOString() };
     if (old.eventType === 'OPP') e.points = Number(values.get('points'));
-    else if (old.eventType !== 'SUB') { e.eventType = values.get('eventType'); e.playerId = values.get('playerId'); e.points = STATS[e.eventType].points; if (!['2PM', '2PX', '3PM', '3PX'].includes(e.eventType)) delete e.shotZone; }
+    else if (old.eventType !== 'SUB') {
+      e.eventType = values.get('eventType'); e.playerId = values.get('playerId'); e.points = STATS[e.eventType].points;
+      if (['2PM', '2PX', '3PM', '3PX'].includes(e.eventType)) {
+        const zone = values.get('shotZone');
+        if (zone) e.shotZone = zone; else delete e.shotZone;
+      } else delete e.shotZone;
+    }
     await saveGameChange(game(), e); closeSheet(); toast('記録を修正しました。');
   });
   if (form.id === 'ot-form') busy(async () => {

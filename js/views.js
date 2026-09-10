@@ -1,4 +1,4 @@
-import { STATS, STAT_DEFS, SHOT_ZONES, aggregate, aggregateGames, activeEvents, eventLabel, formatGame, lineup, localDate, percent } from './domain.js';
+import { STATS, STAT_DEFS, SHOT_ZONES, aggregate, aggregateGames, activeEvents, eventLabel, formatGame, lineup, localDate, normalizeShotZone, percent } from './domain.js';
 
 export const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const paths = {
@@ -74,7 +74,7 @@ export function shotChartHTML(events, playerId = null) {
   const shots = activeEvents(events).filter(event => shotType(event.eventType) && event.shotZone && (!playerId || event.playerId === playerId));
   if (!shots.length) return '';
   const zones = SHOT_ZONES.map(zone => {
-    const zoneShots = shots.filter(event => event.shotZone === zone.id);
+    const zoneShots = shots.filter(event => normalizeShotZone(event.shotZone) === zone.id);
     const markers = zoneShots.map(event => `<span class="shot-marker ${event.eventType.endsWith('M') ? 'made' : 'miss'}">${event.eventType.endsWith('M') ? '○' : '×'}</span>`).join('');
     return `<div class="shot-chart-zone" data-zone="${zone.id}"><span>${esc(zone.label)}</span>${markers ? `<div class="shot-markers">${markers}</div><small>${zoneShots.filter(event => event.eventType.endsWith('M')).length}/${zoneShots.length}</small>` : '<small>—</small>'}</div>`;
   }).join('');
@@ -84,7 +84,7 @@ export function sharedShotChartHTML(shots = [], playerId = null) {
   const filtered = shots.filter(shot => shot?.zone && (!playerId || shot.playerId === playerId));
   if (!filtered.length) return '';
   const zones = SHOT_ZONES.map(zone => {
-    const zoneShots = filtered.filter(shot => shot.zone === zone.id);
+    const zoneShots = filtered.filter(shot => normalizeShotZone(shot.zone) === zone.id);
     const markers = zoneShots.map(shot => `<span class="shot-marker ${shot.result === 'made' ? 'made' : 'miss'}">${shot.result === 'made' ? '○' : '×'}</span>`).join('');
     return `<div class="shot-chart-zone" data-zone="${zone.id}"><span>${esc(zone.label)}</span>${markers ? `<div class="shot-markers">${markers}</div><small>${zoneShots.filter(shot => shot.result === 'made').length}/${zoneShots.length}</small>` : '<small>—</small>'}</div>`;
   }).join('');
@@ -177,7 +177,7 @@ export function aggregatePlayerDetailWithGames(report, id, mode = 'total', games
   return `${options}<p class="shared-game-context">${esc(context)}</p><div class="player-detail-name"><span class="jersey">${esc(basePlayer.number)}</span><h3>${esc(basePlayer.name)}</h3><div class="detail-points"><b>${value(playerStats.PTS)}</b> PTS</div></div>${shooting(playerStats, averageMode ? games.length : selectedDetail ? 1 : games.length)}<div class="detail-stats">${['OREB', 'DREB', 'REB', 'AST', 'STL', 'BLK', 'TO', 'PF'].map(key => `<div><span>${({ OREB: 'OR', DREB: 'DR', PF: 'F' }[key] || key)}</span><strong>${value(playerStats[key])}</strong></div>`).join('')}</div>`;
 }
 export function settingsView(s) {
-  return shell(s, `${heading('PREFERENCES', '設定とデータ')}<section class="panel settings-panel"><h2>入力・表示</h2><label class="setting-row"><span><strong>連続入力</strong><small>2P・3Pの後にAST / OR・DRを提案</small></span><input type="checkbox" role="switch" id="continuous" ${s.preferences.continuous ? 'checked' : ''}></label><label class="setting-row"><span><strong>外観</strong><small>見やすい明るさを選択</small></span><select id="theme" aria-label="外観">${[['system', '端末に合わせる'], ['light', 'ライト'], ['dark', 'ダーク']].map(([v, label]) => `<option value="${v}" ${s.preferences.theme === v ? 'selected' : ''}>${label}</option>`).join('')}</select></label></section><section class="panel settings-panel"><h2>受け取った共有レポート</h2><p class="help">共有された1試合のファイルを、データへ取り込まず読み取り専用で開きます。</p><label class="button primary full" for="shared-report-file">${icon('share')}共有レポートを開く</label><input type="file" id="shared-report-file" accept=".json,application/json" class="sr-only"></section><section class="panel settings-panel"><h2>バックアップ</h2><p class="help">試合・チーム・設定を1つのJSONに保存します。定期的に「ファイル」などへ書き出してください。</p>${action('export-json', `${icon('download')}全データを書き出す`, 'button primary full')}<label class="button secondary full spaced" for="restore-file">JSONから復元</label><input type="file" id="restore-file" accept=".json,application/json" class="sr-only"><p class="help">復元前に内容を検証し、件数を表示します。復元すると現在の全データが置き換わります。</p></section><section class="panel settings-panel"><h2>この端末の保存状態</h2><div class="storage-status">${statusChip(s)}<span>${s.data.teams.length}チーム / ${s.data.games.length}試合 / ${activeEvents(s.data.events).length}記録</span></div><p class="help">${s.pwa.error ? esc(s.pwa.error) : s.pwa.ready ? 'アプリ本体のキャッシュが完了しました。通信がなくても利用できます。' : '初回のキャッシュ完了までオンラインでお待ちください。'}</p>${s.pwa.update ? '<p class="notice">更新があります。下のボタンから適用できます。</p>' + action('apply-update', '最新版に更新', 'button primary full') : action('check-update', '最新版を確認', 'button secondary full')}${action('persist', '保存領域の保持をリクエスト', 'button secondary full')}<p class="help" id="persist-status">ブラウザのデータ削除や端末の故障に備え、JSONバックアップもご利用ください。</p></section><section class="panel settings-panel"><h2>iPhoneのホーム画面に追加</h2><ol class="install-steps"><li>Safariでこのアプリを開く</li><li>共有メニューから「ホーム画面に追加」</li><li>表示される場合は「Webアプリとして開く」をONにし、追加</li><li>追加したアプリを起動し、「オフライン利用OK」を確認</li></ol></section><p class="version-note">COURTSIDE 1.0.30 · BUILT FOR THE SIDELINES</p>`);
+  return shell(s, `${heading('PREFERENCES', '設定とデータ')}<section class="panel settings-panel"><h2>入力・表示</h2><label class="setting-row"><span><strong>連続入力</strong><small>2P・3Pの後にAST / OR・DRを提案</small></span><input type="checkbox" role="switch" id="continuous" ${s.preferences.continuous ? 'checked' : ''}></label><label class="setting-row"><span><strong>外観</strong><small>見やすい明るさを選択</small></span><select id="theme" aria-label="外観">${[['system', '端末に合わせる'], ['light', 'ライト'], ['dark', 'ダーク']].map(([v, label]) => `<option value="${v}" ${s.preferences.theme === v ? 'selected' : ''}>${label}</option>`).join('')}</select></label></section><section class="panel settings-panel"><h2>受け取った共有レポート</h2><p class="help">共有された1試合のファイルを、データへ取り込まず読み取り専用で開きます。</p><label class="button primary full" for="shared-report-file">${icon('share')}共有レポートを開く</label><input type="file" id="shared-report-file" accept=".json,application/json" class="sr-only"></section><section class="panel settings-panel"><h2>バックアップ</h2><p class="help">試合・チーム・設定を1つのJSONに保存します。定期的に「ファイル」などへ書き出してください。</p>${action('export-json', `${icon('download')}全データを書き出す`, 'button primary full')}<label class="button secondary full spaced" for="restore-file">JSONから復元</label><input type="file" id="restore-file" accept=".json,application/json" class="sr-only"><p class="help">復元前に内容を検証し、件数を表示します。復元すると現在の全データが置き換わります。</p></section><section class="panel settings-panel"><h2>この端末の保存状態</h2><div class="storage-status">${statusChip(s)}<span>${s.data.teams.length}チーム / ${s.data.games.length}試合 / ${activeEvents(s.data.events).length}記録</span></div><p class="help">${s.pwa.error ? esc(s.pwa.error) : s.pwa.ready ? 'アプリ本体のキャッシュが完了しました。通信がなくても利用できます。' : '初回のキャッシュ完了までオンラインでお待ちください。'}</p>${s.pwa.update ? '<p class="notice">更新があります。下のボタンから適用できます。</p>' + action('apply-update', '最新版に更新', 'button primary full') : action('check-update', '最新版を確認', 'button secondary full')}${action('persist', '保存領域の保持をリクエスト', 'button secondary full')}<p class="help" id="persist-status">ブラウザのデータ削除や端末の故障に備え、JSONバックアップもご利用ください。</p></section><section class="panel settings-panel"><h2>iPhoneのホーム画面に追加</h2><ol class="install-steps"><li>Safariでこのアプリを開く</li><li>共有メニューから「ホーム画面に追加」</li><li>表示される場合は「Webアプリとして開く」をONにし、追加</li><li>追加したアプリを起動し、「オフライン利用OK」を確認</li></ol></section><p class="version-note">COURTSIDE 2.0.2 · BUILT FOR THE SIDELINES</p>`);
 }
 export function pickerHTML(g, events, type, options = {}) {
   const on = lineup(g, events); const tracked = g.starters.length === 5 && !options.plain;
@@ -186,33 +186,35 @@ export function pickerHTML(g, events, type, options = {}) {
   return `<p class="picker-instruction">${esc(options.instruction || '記録する選手をタップ')}</p>${group(tracked ? players.filter(p => on.includes(p.id)) : players, tracked ? 'ON COURT' : 'PLAYERS')}${tracked ? `<details ${options.only || options.showBench ? 'open' : ''} class="bench-list"><summary>ベンチの選手を表示</summary>${group(players.filter(p => !on.includes(p.id)), 'BENCH')}</details>` : ''}`;
 }
 const SHOT_MAP_ZONES = [
-  { id: 'three-left-corner', path: 'M20 440H50V330H20Z', x: 35, y: 382, lines: ['左コーナー', '3P'] },
-  { id: 'three-left-wing', path: 'M20 20H120L112 205Q78 252 50 330H20Z', x: 72, y: 150, lines: ['左ウイング', '3P'] },
-  { id: 'three-top', path: 'M120 20H240L248 205Q180 145 112 205Z', x: 180, y: 95, lines: ['正面3P'] },
-  { id: 'three-right-wing', path: 'M240 20H340V330H310Q282 252 248 205Z', x: 288, y: 150, lines: ['右ウイング', '3P'] },
-  { id: 'three-right-corner', path: 'M310 330H340V440H310Z', x: 325, y: 382, lines: ['右コーナー', '3P'] },
-  { id: 'short-left', path: 'M50 330Q78 292 100 290L120 300V440H50Z', x: 86, y: 364, lines: ['左ショート'] },
-  { id: 'mid-left', path: 'M112 205Q138 182 160 180V300H120L100 290Q98 242 112 205Z', x: 133, y: 246, lines: ['左ミドル'] },
-  { id: 'mid-center', path: 'M160 180Q180 165 200 180V345H160Z', x: 180, y: 248, lines: ['正面ミドル'] },
-  { id: 'mid-right', path: 'M248 205Q222 182 200 180V300H240L260 290Q262 242 248 205Z', x: 227, y: 246, lines: ['右ミドル'] },
-  { id: 'short-right', path: 'M310 330Q282 292 260 290L240 300V440H310Z', x: 274, y: 364, lines: ['右ショート'] },
-  { id: 'paint-left', path: 'M120 300H160V440H120Z', x: 140, y: 372, lines: ['左ペイント'] },
-  { id: 'rim', path: 'M160 345H200V440H160Z', x: 180, y: 392, lines: ['ゴール下'] },
-  { id: 'paint-right', path: 'M200 300H240V440H200Z', x: 220, y: 372, lines: ['右ペイント'] },
+  { id: 'three-left-corner', path: 'M10 10H65V138H10Z' },
+  { id: 'three-left-wing', path: 'M10 138H65C75 190 95 230 122 264C150 295 185 315 220 323L92 465H10Z' },
+  { id: 'three-top', path: 'M220 323C250 332 280 337 310 337C340 337 370 332 400 323L528 465H92Z' },
+  { id: 'three-right-wing', path: 'M400 323C435 315 470 295 498 264C525 230 545 190 555 138H610V465H528Z' },
+  { id: 'three-right-corner', path: 'M555 10H610V138H555Z' },
+  { id: 'two-left-corner', path: 'M65 10H220V228L122 264C95 230 75 190 65 138Z' },
+  { id: 'two-left-wing', path: 'M122 264L220 228V323C185 315 150 295 122 264Z' },
+  { id: 'two-top', path: 'M220 228H400V323C370 332 340 337 310 337C280 337 250 332 220 323Z' },
+  { id: 'two-right-wing', path: 'M400 228L498 264C470 295 435 315 400 323Z' },
+  { id: 'two-right-corner', path: 'M400 10H555V138C545 190 525 230 498 264L400 228Z' },
+  { id: 'paint', path: 'M220 10H400V228H220Z' },
+  { id: 'rim', path: 'M268 10H352V90A42 42 0 0 1 268 90Z' },
 ];
 export function shotZonePicker(playerName, stat) {
   const isThreePoint = stat?.type?.startsWith('3');
   const active = zone => zone.id.startsWith('three-') === isThreePoint;
-  const zones = SHOT_MAP_ZONES.map(zone => `<path class="shot-map-zone ${zone.id.startsWith('three-') ? 'three-point' : 'two-point'} ${active(zone) ? 'active' : 'disabled'}" d="${zone.path}" ${active(zone) ? `data-action="shot-zone" data-zone="${zone.id}" role="button" tabindex="0" aria-label="${esc(zone.lines.join(' '))}"` : 'aria-hidden="true"'}/>`).join('');
-  const labels = SHOT_MAP_ZONES.map(zone => `<text class="shot-map-label ${active(zone) ? 'active' : 'disabled'}" x="${zone.x}" y="${zone.y}">${zone.lines.map((line, index) => `<tspan x="${zone.x}" dy="${index ? '1.25em' : '0'}">${esc(line)}</tspan>`).join('')}</text>`).join('');
+  const zones = SHOT_MAP_ZONES.map(zone => {
+    const label = SHOT_ZONES.find(candidate => candidate.id === zone.id)?.label || zone.id;
+    const interaction = active(zone) ? `data-action="shot-zone" role="button" tabindex="0" aria-label="${esc(label)}"` : 'aria-hidden="true"';
+    return `<path class="shot-map-zone ${zone.id.startsWith('three-') ? 'three-point' : 'two-point'} ${active(zone) ? 'active' : 'disabled'}" data-zone="${zone.id}" d="${zone.path}" ${interaction}><title>${esc(label)}</title></path>`;
+  }).join('');
   const target = isThreePoint ? '3Pエリアをタップ' : '2Pエリアをタップ';
-  return `<p class="picker-instruction">${esc(playerName)} · ${esc(stat?.name)}。${target}</p><div class="shot-zone-legend"><span class="target-zone">${target}</span><span>薄いエリアは選べません</span></div><svg class="shot-court-map" viewBox="0 0 360 460" role="img" aria-label="ハーフコートのシュート位置"><rect class="court-surface" x="20" y="20" width="320" height="420" rx="3"/>${zones}<g class="court-markings"><path d="M20 20H340V440H20ZM50 440V330M310 440V330M50 330Q180 135 310 330M120 392V300H240V392M120 300a60 60 0 1 0 120 0M155 405H205M145 420H215M168 420a12 12 0 1 0 24 0"/></g>${labels}</svg><button type="button" class="button secondary full spaced" data-action="cancel-shot-zone">入力をやめる</button>`;
+  return `<p class="picker-instruction">${esc(playerName)} · ${esc(stat?.name)}。コート上の位置をタップ</p><div class="shot-zone-legend"><span class="target-zone">${target}</span><span>薄いエリアは選べません</span></div><svg class="shot-court-map" viewBox="0 0 620 475" role="group" aria-label="ハーフコートのシュート位置。${target}"><defs><pattern id="court-wood" width="48" height="475" patternUnits="userSpaceOnUse"><rect width="48" height="475" fill="#f1dfb0"/><path d="M47 0V475M0 118H48M0 356H48" fill="none" stroke="#e4ce98" stroke-width="1" opacity=".58"/></pattern></defs><rect class="court-surface" x="10" y="10" width="600" height="455" rx="2"/>${zones}<g class="court-markings"><path d="M10 10H610V465H10ZM65 10V138M555 10V138M65 138C75 190 95 230 122 264C150 295 185 315 220 323C250 332 280 337 310 337C340 337 370 332 400 323C435 315 470 295 498 264C525 230 545 190 555 138M220 10V228H400V10M250 228A60 60 0 1 0 370 228M268 90A42 42 0 0 0 352 90M275 48H345M310 48V56"/><circle cx="310" cy="70" r="13"/><path class="lane-marks" d="M210 70H220M210 112H220M210 154H220M210 196H220M400 70H410M400 112H410M400 154H410M400 196H410"/></g></svg><button type="button" class="button secondary full spaced" data-action="cancel-shot-zone">入力をやめる</button>`;
 }
 export function eventsHTML(g, events) {
   const active = activeEvents(events).reverse();
   return `<p class="help">タップして選手・項目・ピリオドを修正、または個別削除できます。</p><div class="event-list">${active.map(e => action('edit-event', `<span class="event-period">${esc(g.periods.find(p => p.id === e.periodId)?.label)}</span><span>${esc(eventLabel(g, e))}</span>${icon('chevron')}`, 'event-row', `data-id="${e.id}"`)).join('') || '<p class="empty-message">まだ記録がありません。</p>'}</div>`;
 }
 export function editEventHTML(g, e) {
-  const zoneField = e.eventType && shotType(e.eventType) ? `<label class="spaced">シュート位置<select name="shotZone"><option value="">位置なし</option>${SHOT_ZONES.map(zone => `<option value="${zone.id}" ${zone.id === e.shotZone ? 'selected' : ''}>${esc(zone.label)}</option>`).join('')}</select></label>` : '';
+  const zoneField = e.eventType && shotType(e.eventType) ? `<label class="spaced">シュート位置<select name="shotZone"><option value="">位置なし</option>${SHOT_ZONES.map(zone => `<option value="${zone.id}" ${zone.id === normalizeShotZone(e.shotZone) ? 'selected' : ''}>${esc(zone.label)}</option>`).join('')}</select></label>` : '';
   return `<form id="event-form" data-id="${e.id}"><p class="help">${esc(eventLabel(g, e))}</p><label>ピリオド<select name="periodId">${g.periods.map(p => `<option value="${p.id}" ${p.id === e.periodId ? 'selected' : ''}>${esc(p.label)}</option>`).join('')}</select></label>${e.eventType === 'SUB' ? '<p class="notice">交代の選手を変更する場合は、この記録を削除して再入力してください。</p>' : e.eventType === 'OPP' ? `<label class="spaced">相手得点<select name="points">${[1, 2, 3].map(n => `<option ${e.points === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label>` : `<label class="spaced">スタッツ<select name="eventType">${STAT_DEFS.map(d => `<option value="${d.type}" ${e.eventType === d.type ? 'selected' : ''}>${d.label} · ${d.name}</option>`).join('')}</select></label><label class="spaced">選手<select name="playerId">${g.roster.map(p => `<option value="${p.id}" ${p.id === e.playerId ? 'selected' : ''}>#${esc(p.number)} ${esc(p.name)}</option>`).join('')}</select></label>${zoneField}`}<button type="submit" class="button primary full spaced">変更を保存</button>${action('delete-event', 'この記録を削除', 'button danger full spaced', `type="button" data-id="${e.id}"`)}</form>`;
 }

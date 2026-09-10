@@ -1,6 +1,6 @@
 import { parseSharePayload } from '../../js/shared-report.js';
 import { openCloudShare } from '../../js/cloud-share.js';
-import { SHOT_ZONES } from '../../js/domain.js';
+import { normalizeShotZone, SHOT_ZONES } from '../../js/domain.js';
 
 const app = document.querySelector('#app');
 const playerDialog = document.querySelector('#player-dialog');
@@ -33,7 +33,7 @@ function shooting(stats, games = 1) {
 function shotChart(shots = [], playerId = null) {
   const filtered = shots.filter(shot => shot?.zone && (!playerId || shot.playerId === playerId));
   if (!filtered.length) return '';
-  return `<section class="shot-chart"><div class="section-heading"><h2>ショットチャート</h2><span>○ 成功 / × 失敗</span></div><div class="shot-chart-grid">${SHOT_ZONES.map(zone => { const zoneShots = filtered.filter(shot => shot.zone === zone.id); return `<div class="shot-chart-zone" data-zone="${zone.id}"><span>${esc(zone.label)}</span>${zoneShots.length ? `<div class="shot-markers">${zoneShots.map(shot => `<span class="shot-marker ${shot.result === 'made' ? 'made' : 'miss'}">${shot.result === 'made' ? '○' : '×'}</span>`).join('')}</div><small>${zoneShots.filter(shot => shot.result === 'made').length}/${zoneShots.length}</small>` : '<small>—</small>'}</div>`; }).join('')}</div></section>`;
+  return `<section class="shot-chart"><div class="section-heading"><h2>ショットチャート</h2><span>○ 成功 / × 失敗</span></div><div class="shot-chart-grid">${SHOT_ZONES.map(zone => { const zoneShots = filtered.filter(shot => normalizeShotZone(shot.zone) === zone.id); return `<div class="shot-chart-zone" data-zone="${zone.id}"><span>${esc(zone.label)}</span>${zoneShots.length ? `<div class="shot-markers">${zoneShots.map(shot => `<span class="shot-marker ${shot.result === 'made' ? 'made' : 'miss'}">${shot.result === 'made' ? '○' : '×'}</span>`).join('')}</div><small>${zoneShots.filter(shot => shot.result === 'made').length}/${zoneShots.length}</small>` : '<small>—</small>'}</div>`; }).join('')}</div></section>`;
 }
 
 function statCells(stats, games = 1) {
