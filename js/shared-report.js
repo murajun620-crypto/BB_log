@@ -1,7 +1,7 @@
 import { aggregate, aggregateGames, blankStats, formatGame, normalizeShotZone, SHOT_ZONE_IDS } from './domain.js';
 
 const STAT_KEYS = Object.keys(blankStats());
-const BASE_STAT_KEYS = ['P2M', 'P2A', 'P3M', 'P3A', 'FTM', 'FTA', 'OREB', 'DREB', 'AST', 'STL', 'BLK', 'TO', 'PF'];
+const BASE_STAT_KEYS = ['P2M', 'P2A', 'P3M', 'P3A', 'FTM', 'FTA', 'OREB', 'DREB', 'AST', 'STL', 'BLK', 'TO', 'PF', 'FD'];
 const MAX_FILE_SIZE = 1024 * 1024;
 const MAX_PAYLOAD_SIZE = 120000;
 
@@ -10,7 +10,10 @@ function shotsCopy(game, events) {
   const playerIds = new Map(game.roster.map((player, index) => [player.id, `p${index + 1}`]));
   return events.filter(event => !event.deletedAt && event.shotZone && playerIds.has(event.playerId) && ['2PM', '2PX', '3PM', '3PX'].includes(event.eventType)).map(event => {
     const zone = normalizeShotZone(event.shotZone);
-    return SHOT_ZONE_IDS.has(zone) ? { playerId: playerIds.get(event.playerId), zone, result: event.eventType.endsWith('M') ? 'made' : 'miss' } : null;
+    if (!SHOT_ZONE_IDS.has(zone)) return null;
+    const shot = { playerId: playerIds.get(event.playerId), zone, result: event.eventType.endsWith('M') ? 'made' : 'miss' };
+    if ([event.shotX, event.shotY].every(value => Number.isFinite(value) && value >= 0 && value <= 1)) { shot.x = event.shotX; shot.y = event.shotY; }
+    return shot;
   }).filter(Boolean);
 }
 
@@ -90,7 +93,7 @@ function validText(value, max) {
 }
 
 function validateStats(stats) {
-  ensure(stats && typeof stats === 'object' && STAT_KEYS.every(key => Number.isSafeInteger(stats[key]) && stats[key] >= 0 && stats[key] <= 999999));
+  ensure(stats && typeof stats === 'object' && STAT_KEYS.every(key => key === 'FD' && stats[key] === undefined || Number.isSafeInteger(stats[key]) && stats[key] >= 0 && stats[key] <= 999999));
   ensure(stats.FGM === stats.P2M + stats.P3M && stats.FGA === stats.P2A + stats.P3A);
   ensure(stats.FGM <= stats.FGA && stats.P2M <= stats.P2A && stats.P3M <= stats.P3A && stats.FTM <= stats.FTA);
   ensure(stats.REB === stats.OREB + stats.DREB && stats.PTS === stats.P2M * 2 + stats.P3M * 3 + stats.FTM);
@@ -111,7 +114,10 @@ function validateShots(shots, players) {
   if (shots === undefined) return;
   ensure(Array.isArray(shots) && shots.length <= 2000);
   const ids = new Set(players.map(player => player.id));
-  for (const shot of shots) ensure(shot && ids.has(shot.playerId) && SHOT_ZONE_IDS.has(shot.zone) && ['made', 'miss'].includes(shot.result));
+  for (const shot of shots) {
+    ensure(shot && ids.has(shot.playerId) && SHOT_ZONE_IDS.has(shot.zone) && ['made', 'miss'].includes(shot.result));
+    if (shot.x !== undefined || shot.y !== undefined) ensure([shot.x, shot.y].every(value => Number.isFinite(value) && value >= 0 && value <= 1));
+  }
 }
 
 export function parseSharedReport(text) {
@@ -149,17 +155,21 @@ export function parseSharedReport(text) {
       validatePlayers(detail.players);
       validateShots(detail.shots, detail.players);
       ensure(detail.players.length === report.players.length && detail.players.every((player, index) => player.id === report.players[index].id));
-      for (const key of STAT_KEYS) ensure(detail.players.reduce((sum, player) => sum + player.stats[key], 0) === detail.team[key]);
+      for (const key of STAT_KEYS) ensure(detail.players.reduce((sum, player) => sum + (player.stats[key] ?? 0), 0) === (detail.team[key] ?? 0));
       ensure(detail.periods.reduce((sum, period) => sum + period.home, 0) === detail.team.PTS);
       ensure(detail.periods.reduce((sum, period) => sum + period.away, 0) === detail.opponentScore);
     }
   }
   validateStats(report.team);
-  for (const key of STAT_KEYS) ensure(report.players.reduce((sum, player) => sum + player.stats[key], 0) === report.team[key]);
+  for (const key of STAT_KEYS) ensure(report.players.reduce((sum, player) => sum + (player.stats[key] ?? 0), 0) === (report.team[key] ?? 0));
   ensure(report.periods.reduce((sum, period) => sum + period.home, 0) === report.team.PTS);
   ensure(report.periods.reduce((sum, period) => sum + period.away, 0) === report.opponentScore);
   const normalized = structuredClone(report);
   normalized.gameCount = report.gameCount || 1;
+  const normalizeStats = stats => { if (stats && stats.FD === undefined) stats.FD = 0; };
+  normalizeStats(normalized.team);
+  normalized.players.forEach(player => normalizeStats(player.stats));
+  normalized.games?.forEach(detail => { normalizeStats(detail.team); detail.players.forEach(player => normalizeStats(player.stats)); });
   if (Array.isArray(normalized.shots)) normalized.shots = normalized.shots.map(shot => ({ ...shot, zone: normalizeShotZone(shot.zone) }));
   if (Array.isArray(normalized.games)) for (const detail of normalized.games) if (Array.isArray(detail.shots)) detail.shots = detail.shots.map(shot => ({ ...shot, zone: normalizeShotZone(shot.zone) }));
   return normalized;
@@ -170,8 +180,8 @@ function statsArray(stats) {
 }
 
 function statsObject(values) {
-  ensure(Array.isArray(values) && values.length === STAT_KEYS.length);
-  return Object.fromEntries(STAT_KEYS.map((key, index) => [key, values[index]]));
+  ensure(Array.isArray(values) && (values.length === STAT_KEYS.length || values.length === STAT_KEYS.length - 1));
+  return Object.fromEntries(STAT_KEYS.map((key, index) => [key, values[index] || 0]));
 }
 
 function bytesToBase64(bytes) {
@@ -199,7 +209,7 @@ function compactReport(game, events) {
     p: report.periods.map(period => [period.label, period.home, period.away]),
     a: statsArray(report.team),
     r: report.players.map(player => [player.number, player.name, statsArray(player.stats)]),
-    z: report.shots?.map(shot => [Number(shot.playerId.slice(1)) - 1, shot.zone, shot.result === 'made' ? 1 : 0]),
+    z: report.shots?.map(shot => [Number(shot.playerId.slice(1)) - 1, shot.zone, shot.result === 'made' ? 1 : 0, shot.x, shot.y]),
   };
 }
 
@@ -250,8 +260,8 @@ function periodLabel(format, regulationCount, index) {
 }
 
 function expandBaseStats(values) {
-  ensure(Array.isArray(values) && values.length === BASE_STAT_KEYS.length);
-  const stats = Object.fromEntries(BASE_STAT_KEYS.map((key, index) => [key, values[index]]));
+  ensure(Array.isArray(values) && (values.length === BASE_STAT_KEYS.length || values.length === BASE_STAT_KEYS.length - 1));
+  const stats = Object.fromEntries(BASE_STAT_KEYS.map((key, index) => [key, values[index] || 0]));
   stats.FGM = stats.P2M + stats.P3M;
   stats.FGA = stats.P2A + stats.P3A;
   stats.PTS = stats.P2M * 2 + stats.P3M * 3 + stats.FTM;
@@ -314,7 +324,7 @@ export async function parseSharePayload(payload) {
     periods: compact.p.map(period => ({ label: period[0], home: period[1], away: period[2] })),
     team: statsObject(compact.a),
     players: compact.r.map((player, index) => ({ id: `p${index + 1}`, number: player[0], name: player[1], stats: statsObject(player[2]) })),
-    shots: Array.isArray(compact.z) ? compact.z.map(shot => ({ playerId: `p${shot[0] + 1}`, zone: shot[1], result: shot[2] ? 'made' : 'miss' })) : undefined,
+    shots: Array.isArray(compact.z) ? compact.z.map(shot => ({ playerId: `p${shot[0] + 1}`, zone: shot[1], result: shot[2] ? 'made' : 'miss', ...(Number.isFinite(shot[3]) && Number.isFinite(shot[4]) ? { x: shot[3], y: shot[4] } : {}) })) : undefined,
   };
   return parseSharedReport(JSON.stringify({ app: 'courtside-report', schemaVersion: 1, report }));
 }

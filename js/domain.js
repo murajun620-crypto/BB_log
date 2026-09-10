@@ -5,7 +5,7 @@ export const STAT_DEFS = [
   ['OREB', 'OR', 'オフェンスリバウンド', 0, 'other'], ['DREB', 'DR', 'ディフェンスリバウンド', 0, 'other'],
   ['AST', 'AST', 'アシスト', 0, 'other'], ['STL', 'STL', 'スティール', 0, 'other'],
   ['BLK', 'BLK', 'ブロック', 0, 'other'], ['TO', 'TO', 'ターンオーバー', 0, 'other'],
-  ['PF', 'F', 'ファウル', 0, 'foul'],
+  ['PF', 'F', 'ファウル', 0, 'foul'], ['FD', 'FD', 'ファウルドローン', 0, 'other'],
 ].map(([type, label, name, points, tone]) => ({ type, label, name, points, tone }));
 export const STATS = Object.fromEntries(STAT_DEFS.map(s => [s.type, s]));
 export const SHOT_ZONES = [
@@ -25,6 +25,19 @@ export const normalizeShotZone = zoneId => LEGACY_SHOT_ZONE_ALIASES[zoneId] || z
 export const SHOT_ZONE_IDS = new Set([...SHOT_ZONES.map(zone => zone.id), ...Object.keys(LEGACY_SHOT_ZONE_ALIASES)]);
 export const SHOT_EVENT_TYPES = new Set(['2PM', '2PX', '3PM', '3PX']);
 export const isShotEvent = event => SHOT_EVENT_TYPES.has(event?.eventType);
+export const isPointShotEvent = event => isShotEvent(event) || ['FTM', 'FTX'].includes(event?.eventType);
+export function shotZoneFromPoint(type, x, y) {
+  if (!SHOT_EVENT_TYPES.has(type) || ![x, y].every(value => Number.isFinite(value) && value >= 0 && value <= 1)) return null;
+  const px = x * 940, py = y * 500, leftBasket = px <= 470;
+  const depth = Math.max(0, Math.min(1, (leftBasket ? px - 60 : 880 - px) / 410));
+  const side = (py - 250) / 220, distanceFromCenter = Math.abs(side);
+  const prefix = type.startsWith('3') ? 'three' : 'two';
+  if (prefix === 'two' && depth < .18 && distanceFromCenter < .3) return 'rim';
+  if (prefix === 'two' && depth < .42 && distanceFromCenter < .5) return 'paint';
+  if (distanceFromCenter > .76) return `${prefix}-${side < 0 ? 'left' : 'right'}-corner`;
+  if (distanceFromCenter > .27) return `${prefix}-${side < 0 ? 'left' : 'right'}-wing`;
+  return `${prefix}-top`;
+}
 export const shotZoneLabel = zoneId => SHOT_ZONES.find(zone => zone.id === normalizeShotZone(zoneId))?.label || '';
 export const uid = () => crypto.randomUUID();
 export const activeEvents = events => events.filter(e => !e.deletedAt).sort((a, b) => a.seq - b.seq);
@@ -36,7 +49,7 @@ export function makePeriods(format, count, minutes) {
   return Array.from({ length: n }, (_, i) => ({ id: uid(), label: format === 'quarters' ? `Q${i + 1}` : format === 'halves' ? `${i + 1}H` : `P${i + 1}`, minutes: Number(minutes), overtime: false }));
 }
 export function blankStats() {
-  return { PTS: 0, FGM: 0, FGA: 0, P2M: 0, P2A: 0, P3M: 0, P3A: 0, FTM: 0, FTA: 0, OREB: 0, DREB: 0, REB: 0, AST: 0, STL: 0, BLK: 0, TO: 0, PF: 0 };
+  return { PTS: 0, FGM: 0, FGA: 0, P2M: 0, P2A: 0, P3M: 0, P3A: 0, FTM: 0, FTA: 0, OREB: 0, DREB: 0, REB: 0, AST: 0, STL: 0, BLK: 0, TO: 0, PF: 0, FD: 0 };
 }
 function accumulate(s, type) {
   s.PTS += STATS[type]?.points || 0;
@@ -50,18 +63,24 @@ function accumulate(s, type) {
 }
 export function aggregate(game, events) {
   const players = Object.fromEntries(game.roster.map(p => [p.id, blankStats()]));
+  const opponentPlayers = Object.fromEntries((game.opponentRoster || []).map(p => [p.id, blankStats()]));
+  const opponentTeam = blankStats();
   const team = blankStats();
   const periods = game.periods.map(p => ({ ...p, home: 0, away: 0 }));
   let opponent = 0;
   for (const e of activeEvents(events)) {
     const p = periods.find(p => p.id === e.periodId);
     if (e.eventType === 'OPP') { opponent += e.points; if (p) p.away += e.points; }
+    else if (e.side === 'opponent' && STATS[e.eventType] && opponentPlayers[e.playerId]) {
+      accumulate(opponentPlayers[e.playerId], e.eventType); accumulate(opponentTeam, e.eventType);
+      opponent += STATS[e.eventType].points; if (p) p.away += STATS[e.eventType].points;
+    }
     else if (STATS[e.eventType] && players[e.playerId]) {
       accumulate(players[e.playerId], e.eventType); accumulate(team, e.eventType);
       if (p) p.home += STATS[e.eventType].points;
     }
   }
-  return { players, team, opponent, periods };
+  return { players, team, opponentPlayers, opponentTeam, opponent, periods };
 }
 function addStats(target, source) {
   for (const key of Object.keys(target)) target[key] += source[key] || 0;
@@ -91,11 +110,11 @@ export function lineup(game, events, strict = false) {
   return [...on];
 }
 export function eventLabel(game, event) {
-  const player = id => { const p = game.roster.find(p => p.id === id); return p ? `#${p.number} ${p.name}` : '不明'; };
+  const player = (id, side = 'home') => { const p = (side === 'opponent' ? game.opponentRoster || [] : game.roster).find(p => p.id === id); return p ? `#${p.number} ${p.name}` : '不明'; };
   if (event.eventType === 'OPP') return `相手 +${event.points}`;
   if (event.eventType === 'SUB') return `${player(event.outPlayerId)} → ${player(event.inPlayerId)}`;
   const zone = event.shotZone ? ` · ${shotZoneLabel(event.shotZone)}` : '';
-  return `${player(event.playerId)} · ${STATS[event.eventType]?.label || event.eventType}${zone}`;
+  return `${event.side === 'opponent' ? '相手 ' : ''}${player(event.playerId, event.side)} · ${STATS[event.eventType]?.label || event.eventType}${zone}`;
 }
 function ensure(ok, message) { if (!ok) throw new Error(message); }
 const isText = (s, max = 80) => typeof s === 'string' && s.trim().length > 0 && s.length <= max;
@@ -119,7 +138,19 @@ export function validateGame(g, events) {
   ensure(Number.isFinite(g.minutes) && g.minutes >= 1 && g.minutes <= 60, 'ピリオド時間は1〜60分にしてください。');
   ensure(Number.isInteger(g.revision) && g.revision >= 0 && Number.isInteger(g.nextSeq) && g.nextSeq >= 1 && validTime(g.createdAt) && validTime(g.updatedAt), '試合メタデータが不正です。');
   validatePlayers(g.roster);
+  if (g.opponentRoster !== undefined) {
+    ensure(Array.isArray(g.opponentRoster) && g.opponentRoster.length <= 60, '相手選手情報が不正です。');
+    if (g.opponentRoster.length) validatePlayers(g.opponentRoster);
+  }
+  if (g.mode !== undefined) ensure(['standard', 'pro'].includes(g.mode), '記録モードが不正です。');
+  if (g.mode === 'pro') {
+    ensure(typeof g.clockEnabled === 'boolean' && ['score', 'player'].includes(g.opponentTracking || 'score'), 'Proモード設定が不正です。');
+    if (g.clockSeconds !== undefined) ensure(Number.isInteger(g.clockSeconds) && g.clockSeconds >= 0 && g.clockSeconds <= 36000, 'ゲームクロックが不正です。');
+    if (g.clockRunning !== undefined) ensure(typeof g.clockRunning === 'boolean', 'ゲームクロックが不正です。');
+    if (g.clockStartedAt !== undefined && g.clockStartedAt !== null) ensure(validTime(g.clockStartedAt), 'ゲームクロックが不正です。');
+  }
   const ids = new Set(g.roster.map(p => p.id));
+  const opponentIds = new Set((g.opponentRoster || []).map(p => p.id));
   ensure(Array.isArray(g.starters) && (g.starters.length === 0 || g.starters.length === 5) && unique(g.starters) && g.starters.every(id => ids.has(id)), '先発は未設定または5人を選択してください。');
   ensure(Array.isArray(g.periods) && g.periods.length >= g.regulationCount && g.periods.length <= 50, 'ピリオド情報が不正です。');
   for (const p of g.periods) ensure(p && isId(p.id) && isText(p.label, 16) && Number.isFinite(p.minutes) && p.minutes >= 1 && p.minutes <= 60 && typeof p.overtime === 'boolean', 'ピリオド情報が不正です。');
@@ -127,12 +158,15 @@ export function validateGame(g, events) {
   ensure(Array.isArray(events) && unique(events.map(e => e.id)) && unique(events.map(e => e.seq)), 'イベントが重複しています。');
   for (const e of events) {
     ensure(e && isId(e.id) && e.gameId === g.id && g.periods.some(p => p.id === e.periodId) && validTime(e.timestamp) && Number.isInteger(e.seq) && e.seq > 0 && e.seq < g.nextSeq && (!e.deletedAt || validTime(e.deletedAt)), 'イベント情報が不正です。');
-    if (e.eventType === 'OPP') ensure([1, 2, 3].includes(e.points) && e.playerId == null, '相手得点が不正です。');
+    if (e.side === 'opponent') ensure(g.mode === 'pro' && g.opponentTracking === 'player' && Object.hasOwn(STATS, e.eventType) && opponentIds.has(e.playerId) && e.points === STATS[e.eventType].points, '相手選手スタッツが不正です。');
+    else if (e.eventType === 'OPP') ensure([1, 2, 3].includes(e.points) && e.playerId == null, '相手得点が不正です。');
     else if (e.eventType === 'SUB') ensure(ids.has(e.outPlayerId) && ids.has(e.inPlayerId) && e.outPlayerId !== e.inPlayerId && e.points === 0, '交代選手が不正です。');
     else {
       ensure(Object.hasOwn(STATS, e.eventType) && ids.has(e.playerId) && e.points === STATS[e.eventType].points, 'スタッツイベントが不正です。');
-      if (e.shotZone !== undefined) ensure(isShotEvent(e) && SHOT_ZONE_IDS.has(e.shotZone), 'シュート位置が不正です。');
     }
+    if (e.shotZone !== undefined) ensure(isShotEvent(e) && SHOT_ZONE_IDS.has(e.shotZone), 'シュート位置が不正です。');
+    if (e.shotX !== undefined || e.shotY !== undefined) ensure(isPointShotEvent(e) && [e.shotX, e.shotY].every(value => Number.isFinite(value) && value >= 0 && value <= 1), 'シュート位置が不正です。');
+    if (e.clockSeconds !== undefined) ensure(Number.isInteger(e.clockSeconds) && e.clockSeconds >= 0 && e.clockSeconds <= 36000, 'ゲームクロックが不正です。');
   }
   lineup(g, events, true);
 }

@@ -196,6 +196,21 @@ dialog::backdrop { background: rgba(14, 28, 23, .48); }
 .shot-chart-map .shot-chart-zone-rate, .shot-chart-map .shot-chart-zone-count { fill: #173c32; font-family: inherit; paint-order: stroke; stroke: rgba(255, 255, 255, .68); stroke-linejoin: round; }
 .shot-chart-map .shot-chart-zone-rate { font-size: 16px; font-weight: 800; stroke-width: 3px; }
 .shot-chart-map .shot-chart-zone-count { font-size: 16px; font-weight: 650; stroke-width: 2px; }
+.pro-shot-chart-map { max-width: 680px; border-color: var(--line); }
+.pro-chart-court-surface { fill: #f1dfb0; }
+.pro-chart-court-markings { fill: none; stroke: rgba(255, 255, 255, .96); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.pro-chart-court-markings circle { fill: none; }
+.pro-shot-chart-markers { pointer-events: none; }
+.pro-shot-chart-marker { pointer-events: none; }
+.pro-shot-chart-marker circle { fill: var(--surface); stroke-width: 3; }
+.pro-shot-chart-marker text { fill: var(--text); font-size: 20px; font-weight: 800; }
+.pro-shot-chart-marker.made circle { stroke: var(--accent); }
+.pro-shot-chart-marker.miss circle { stroke: #a44139; }
+.pro-shot-zone-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-top: 7px; }
+.pro-shot-zone-summary-item { display: grid; gap: 2px; min-width: 0; padding: 7px 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); text-align: center; }
+.pro-shot-zone-summary-item span { overflow: hidden; color: var(--muted); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }
+.pro-shot-zone-summary-item strong { font-size: 13px; line-height: 1.1; }
+.pro-shot-zone-summary-item b { color: var(--accent); font-size: 10px; }
 .player-detail { margin: 6px 0 25px; }
 .player-detail .jersey { min-width: 52px; height: auto; padding: 8px 12px; color: var(--accent); background: var(--accent-soft); }
 .player-detail h2 { flex: 1; overflow-wrap: anywhere; }

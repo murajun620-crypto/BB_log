@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { STATS, SHOT_ZONES, aggregate, aggregateGames, normalizeShotZone, percent, lineup, validateGame, validateTeam, makePeriods, uid } from '../js/domain.js';
+import { STATS, SHOT_ZONES, aggregate, aggregateGames, normalizeShotZone, percent, lineup, validateGame, validateTeam, makePeriods, shotZoneFromPoint, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
 import { shotZonePicker, shotChartMapHTML } from '../js/views.js';
@@ -15,12 +15,12 @@ const fixture = () => {
   return { team, game, events, add };
 };
 
-test('all 13 stat types aggregate accurately, independently of event input order', () => {
+test('all 14 stat types aggregate accurately, independently of event input order', () => {
   const { game, events, add } = fixture();
   Object.keys(STATS).forEach(t => add(t)); add('OPP', { points: 3 });
   validateGame(game, events);
   const a = aggregate(game, [...events].reverse());
-  assert.deepEqual(a.players['player-0'], { PTS: 6, FGM: 2, FGA: 4, P2M: 1, P2A: 2, P3M: 1, P3A: 2, FTM: 1, FTA: 2, OREB: 1, DREB: 1, REB: 2, AST: 1, STL: 1, BLK: 1, TO: 1, PF: 1 });
+  assert.deepEqual(a.players['player-0'], { PTS: 6, FGM: 2, FGA: 4, P2M: 1, P2A: 2, P3M: 1, P3A: 2, FTM: 1, FTA: 2, OREB: 1, DREB: 1, REB: 2, AST: 1, STL: 1, BLK: 1, TO: 1, PF: 1, FD: 1 });
   assert.deepEqual(a.team, a.players['player-0']); assert.equal(a.opponent, 3);
   assert.equal(a.periods[0].home, 6); assert.equal(a.periods[0].away, 3);
   assert.equal(percent(24, 53), '45.3%'); assert.equal(percent(0, 0), '—'); assert.equal(percent(0, 1), '0.0%');
@@ -33,6 +33,18 @@ test('edits and soft deletions change score, player totals and periods without d
   validateGame(game, events); const a = aggregate(game, events);
   assert.equal(a.team.PTS, 2); assert.equal(a.team.FGA, 2); assert.equal(a.team.FGM, 1);
   assert.equal(a.opponent, 0); assert.equal(events.length, 3);
+});
+test('Pro games preserve clock, opponent player stats and exact shot positions', () => {
+  const { game, events, add } = fixture();
+  game.mode = 'pro'; game.clockEnabled = true; game.clockSeconds = 480; game.clockRunning = false; game.clockStartedAt = null;
+  game.opponentTracking = 'player'; game.opponentRoster = [{ id: 'opponent-1', number: '8', name: '相手選手' }];
+  add('3PM', { shotX: .72, shotY: .5, shotZone: shotZoneFromPoint('3PM', .72, .5), clockSeconds: 431 });
+  events.push({ id: uid(), gameId: game.id, periodId: game.currentPeriodId, eventType: '2PM', playerId: 'opponent-1', side: 'opponent', points: 2, timestamp: new Date().toISOString(), seq: game.nextSeq++, shotX: .1, shotY: .5, shotZone: shotZoneFromPoint('2PM', .1, .5), clockSeconds: 420 });
+  validateGame(game, events);
+  const a = aggregate(game, events);
+  assert.equal(a.team.PTS, 3); assert.equal(a.opponent, 2); assert.equal(a.opponentPlayers['opponent-1'].PTS, 2);
+  assert.equal(events[0].shotZone, 'three-top'); assert.equal(events[0].shotX, .72); assert.equal(events[1].shotZone, 'rim');
+  assert.equal(shotZoneFromPoint('3PM', .5, .25), 'three-left-wing');
 });
 test('advanced shot zones validate and survive file and link sharing', async () => {
   const { game, events, add } = fixture();
@@ -56,6 +68,14 @@ test('sharing a legacy game ignores an unknown shot position without losing its 
   assert.equal(shared.report.team.PTS, 2);
   assert.deepEqual(shared.report.shots, []);
   assert.doesNotThrow(() => parseSharedReport(JSON.stringify(shared)));
+});
+test('shared reports created before FD was added remain readable', () => {
+  const { game, events, add } = fixture(); add('3PM');
+  const legacy = createSharedReport(game, events);
+  delete legacy.report.team.FD;
+  legacy.report.players.forEach(player => delete player.stats.FD);
+  const parsed = parseSharedReport(JSON.stringify(legacy));
+  assert.equal(parsed.team.FD, 0); assert.equal(parsed.players[0].stats.FD, 0);
 });
 test('shot court map enables only matching two- or three-point zones', () => {
   const twoPoint = shotZonePicker('選手1', STATS['2PM']);
@@ -81,6 +101,17 @@ test('shot chart map shows each zone as made-attempts and percentage', () => {
   assert.match(chart, /50\.0%/);
   assert.match(chart, /1\/2/);
   assert.doesNotMatch(chart, /shot-marker|○|×/);
+});
+test('exact Pro shot positions render as markers with an area summary', () => {
+  const chart = shotChartMapHTML([
+    { playerId: 'player-0', zone: 'three-top', result: 'made', x: .5, y: .15 },
+    { playerId: 'player-0', zone: 'three-top', result: 'miss', x: .6, y: .2 },
+  ]);
+  assert.match(chart, /pro-shot-chart-map/);
+  assert.equal((chart.match(/class="pro-shot-chart-marker [^"]+/g) || []).length, 2);
+  assert.match(chart, /pro-shot-zone-summary/);
+  assert.match(chart, /1\/2/);
+  assert.match(chart, /50\.0%/);
 });
 test('selected games aggregate team and player stats by stable player identity', () => {
   const first = fixture(); first.add('3PM'); first.add('AST', { playerId: 'player-1' });
