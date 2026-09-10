@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, fullCourtPointFromHalf, halfCourtPointFromFull, isBackcourtPoint, normalizeShotZone, oppositeDirection, percent, lineup, validateGame, validateTeam, makePeriods, shotPointsFromPoint, shotZoneForEvent, shotZoneFromPoint, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
-import { proLiveView, shotZonePicker, shotChartMapHTML, strategyBoardHTML } from '../js/views.js';
+import { isIPhoneUserAgent, proLiveView, shotZonePicker, shotChartMapHTML, strategyBoardHTML } from '../js/views.js';
 
 const fixture = () => {
   const players = Array.from({ length: 6 }, (_, i) => ({ id: `player-${i}`, number: `${i + 4}`, name: `選手${i + 1}` }));
@@ -70,6 +70,12 @@ test('phone landscape half-court mapping puts either attacking basket at the top
   assert.ok(Math.abs(leftShot.x - 74 / 940) < 1e-12); assert.equal(leftShot.y, .5);
   assert.ok(Math.abs(rightShot.x - 866 / 940) < 1e-12); assert.equal(rightShot.y, .5);
   assert.equal(oppositeDirection('left'), 'right'); assert.equal(oppositeDirection('right'), 'left');
+});
+test('iPhone devices use the half court independently of orientation', () => {
+  assert.equal(isIPhoneUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)'), true);
+  assert.equal(isIPhoneUserAgent('Mozilla/5.0 (iPod touch; CPU iPhone OS 15_0 like Mac OS X)'), true);
+  assert.equal(isIPhoneUserAgent('Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)'), false);
+  assert.equal(isIPhoneUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 15_0)'), false);
 });
 test('Pro shot selection treats the center line and the defending half as backcourt', () => {
   assert.equal(isBackcourtPoint('right', .5), true);

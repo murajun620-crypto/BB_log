@@ -327,6 +327,7 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-direction-button b { color: var(--accent); font-size: 10px; }
 .pro-direction-button small { color: var(--muted); font-size: 8px; }
 .pro-court { display: block; width: 100%; max-height: 48vh; border: 1px solid var(--line); border-radius: 12px; background: #d8c38f; touch-action: none; }
+.pro-court.pro-court-half { width: min(100%, 48vh); width: min(100%, 48dvh); max-height: none; aspect-ratio: 1 / 1; align-self: center; }
 .pro-court-surface { fill: #e4cf9a; }
 .pro-court-markings { fill: none; stroke: rgba(255,255,255,.96); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .pro-court-markings circle { fill: none; }
@@ -528,7 +529,7 @@ body:has(dialog[open]) #toast { bottom: auto; top: max(15px, env(safe-area-inset
   .pro-player { min-height: 45px; }
   .pro-footer { margin-top: 0; }
 }
-@media (orientation: landscape) and (max-width: 899px) and (max-height: 500px) {
+@media (orientation: landscape) and (max-height: 500px) {
   .pro-live-screen { height: 100dvh; overflow: hidden; padding: max(5px, env(safe-area-inset-top)) max(8px, env(safe-area-inset-right)) max(5px, env(safe-area-inset-bottom)) max(8px, env(safe-area-inset-left)); }
   .pro-layout { display: grid; grid-template-columns: minmax(140px, .72fr) minmax(0, 2.5fr) minmax(140px, .72fr); align-items: stretch; gap: 6px; }
   .pro-center { order: 0; min-height: 0; }
@@ -536,7 +537,7 @@ body:has(dialog[open]) #toast { bottom: auto; top: max(15px, env(safe-area-inset
   .pro-roster { max-height: none; grid-template-columns: 1fr; }
   .pro-player { min-height: 38px; }
   .pro-footer { margin-top: 0; }
-  .pro-court-half { width: min(100%, 65vh); width: min(100%, 65dvh); max-height: none; aspect-ratio: 1 / 1; align-self: center; }
+  .pro-court.pro-court-half { width: min(100%, 65vh); width: min(100%, 65dvh); }
   .pro-center { gap: 4px; }
   .pro-action-panel, .pro-action-row { gap: 3px; }
   .pro-action-button { min-height: 34px; padding: 3px 4px; font-size: 10px; }

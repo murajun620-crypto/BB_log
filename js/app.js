@@ -145,7 +145,7 @@ function render() {
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
   if (page === 'live') app.querySelector('.live-footer, .pro-footer')?.insertAdjacentHTML('beforeend', view.strategyBoardButtonHTML());
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.2 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.3 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
