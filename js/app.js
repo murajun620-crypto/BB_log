@@ -58,7 +58,7 @@ function syncProClockTimer() {
   proClockTimer = setInterval(() => {
     const value = currentClockSeconds(game());
     const node = document.querySelector('#pro-clock-value');
-    if (node) node.textContent = view.clockText(value);
+    if (node) node.innerHTML = view.digitalText(view.clockText(value));
     if (value <= 0 && !proClockSaving) {
       proClockSaving = true;
       void saveGameChange({ ...game(), clockSeconds: 0, clockRunning: false, clockStartedAt: null }).then(() => toast('ゲームクロックが終了しました。')).catch(reportError).finally(() => { proClockSaving = false; });
@@ -127,7 +127,7 @@ function render() {
     html = page === 'live' ? g.mode === 'pro' ? view.proLiveView(state, g, gameEvents(g), currentClockSeconds(g)) : view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.1.3 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.1.4 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game())));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));

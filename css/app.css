@@ -248,11 +248,32 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-scoreboard span { display: block; color: var(--muted); font-size: 9px; font-weight: 750; letter-spacing: 1px; }
 .pro-scoreboard strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: clamp(13px, 2vw, 20px); }
 .pro-scoreboard > b { display: flex; align-items: center; gap: 10px; font-size: clamp(32px, 5vw, 54px); line-height: 1; letter-spacing: -2px; font-variant-numeric: tabular-nums; }
+.pro-score-digits, .pro-clock-digits { font-family: "Roboto Mono", "Share Tech Mono", "Arial Narrow", "Courier New", monospace; font-weight: 900; font-variant-numeric: tabular-nums; letter-spacing: .03em; text-shadow: 0 1px 0 currentColor; }
+.digital-display { display: inline-flex; align-items: center; gap: .08em; height: 1em; }
+.digital-digit { position: relative; display: inline-block; width: .58em; height: 1em; flex: 0 0 .58em; }
+.digital-segment { position: absolute; display: block; margin: 0; background: currentColor; opacity: .12; }
+.digital-segment.on { opacity: .96; }
+.digital-segment.a, .digital-segment.g, .digital-segment.d { left: .1em; width: .38em; height: .1em; clip-path: polygon(14% 0, 86% 0, 100% 50%, 86% 100%, 14% 100%, 0 50%); }
+.digital-segment.a { top: .02em; }
+.digital-segment.g { top: .45em; }
+.digital-segment.d { bottom: .02em; }
+.digital-segment.b, .digital-segment.c, .digital-segment.e, .digital-segment.f { width: .1em; height: .38em; clip-path: polygon(50% 0, 100% 14%, 100% 86%, 50% 100%, 0 86%, 0 14%); }
+.digital-segment.f { top: .1em; left: .02em; }
+.digital-segment.b { top: .1em; right: .02em; }
+.digital-segment.e { bottom: .1em; left: .02em; }
+.digital-segment.c { bottom: .1em; right: .02em; }
+.digital-colon { position: relative; display: inline-block; width: .18em; height: 1em; flex: 0 0 .18em; }
+.digital-colon i { position: absolute; left: .035em; display: block; width: .11em; height: .11em; margin: 0; border-radius: 50%; background: currentColor; color: inherit; font-size: inherit; font-style: normal; }
+.digital-colon i:first-child { top: .29em; }
+.digital-colon i:last-child { bottom: .29em; }
+.pro-score-digits .digital-display { display: inline-flex; color: inherit; font-size: 1em; font-weight: inherit; letter-spacing: normal; }
+.pro-score-digits .digital-display > span { display: inline-block; color: inherit; font-size: 1em; }
+.pro-score-digits .digital-display i { color: inherit; font-size: 1em; font-style: normal; font-weight: inherit; }
 .pro-scoreboard > b i { color: var(--muted); font-size: .6em; font-style: normal; font-weight: 450; }
 .pro-meta { display: flex; align-items: center; justify-content: center; gap: 10px; min-height: 36px; color: var(--muted); font-size: 11px; }
 .pro-meta .period-button { min-height: 32px; }
 .pro-clock { display: inline-flex; align-items: baseline; justify-content: center; gap: 7px; min-width: 118px; min-height: 42px; padding: 7px 11px; border: 2px solid #314b3d; border-radius: 7px; background: #17241e; color: #f3f7f1; box-shadow: inset 0 0 0 1px #0d1712; }
-.pro-clock span { font: 850 25px/1 ui-monospace, SFMono-Regular, Consolas, monospace; font-variant-numeric: tabular-nums; letter-spacing: .04em; }
+.pro-clock span { font-size: 25px; line-height: 1; }
 .pro-clock small { color: #a9b9ae; font-size: 8px; font-weight: 750; letter-spacing: .7px; }
 .pro-clock.running { border-color: var(--accent); color: #e6f5bc; }
 .pro-clock-toggle { min-width: 50px; min-height: 34px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--muted); }
@@ -272,6 +293,7 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-court-surface { fill: #e4cf9a; }
 .pro-court-markings { fill: none; stroke: rgba(255,255,255,.96); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .pro-court-markings circle { fill: none; }
+.pro-court-zone-boundaries { fill: none; stroke: rgba(255,255,255,.28); stroke-width: 1.15; stroke-linecap: round; stroke-linejoin: round; }
 .pro-shot-marker { pointer-events: none; }
 .pro-shot-marker text { fill: var(--accent); font-size: 28px; font-weight: 850; paint-order: stroke; stroke: rgba(255,255,255,.9); stroke-width: 4px; stroke-linejoin: round; }
 .pro-shot-marker.miss text { fill: #c7483f; }
@@ -404,6 +426,7 @@ dialog::backdrop { background: #07170f70; backdrop-filter: blur(3px); }
 .pro-chart-court-surface { fill: #f1dfb0; }
 .pro-chart-court-markings { fill: none; stroke: rgba(255, 255, 255, .96); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .pro-chart-court-markings circle { fill: none; }
+.pro-chart-court-markings .pro-court-zone-boundaries { fill: none; stroke: rgba(255, 255, 255, .28); stroke-width: 1.15; }
 .pro-shot-chart-markers { pointer-events: none; }
 .pro-shot-chart-marker { pointer-events: none; }
 .pro-shot-chart-marker text { fill: var(--accent); font-size: 28px; font-weight: 850; paint-order: stroke; stroke: rgba(255,255,255,.9); stroke-width: 4px; stroke-linejoin: round; }

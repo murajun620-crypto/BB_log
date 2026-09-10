@@ -1,14 +1,13 @@
 # Project Status
 
-バスケットボールの試合記録・共有を行うオフライン対応PWA。正規リポジトリは `Documents/Github/BB_log`、公開先は `https://murajun620-crypto.github.io/BB_log/`。現在のアプリ版は2.1.3。標準記録、Advanced（Bリーグ式12ゾーン）、iPad横向き中心のPro記録モードを実装済み。
+バスケットボールの試合記録・共有を行うオフライン対応PWA。正規リポジトリは `Documents/Github/BB_log`、公開先は `https://murajun620-crypto.github.io/BB_log/`。現在のアプリ版は2.1.4。標準記録、Advanced（Bリーグ式12ゾーン）、iPad横向き中心のPro記録モードを実装済み。
 
 # Recent Changes
 
-- Pro LIVEのコートを、Advancedの形状を参考にした左右対称の3P直線＋円弧へ更新。
-- LIVE中の試合メニューから、標準／Pro、ゲームクロック有無、相手記録（総得点／個人）を変更可能にした。相手個人記録が既にある場合は、履歴を壊す切替を拒否する。
-- Pro LIVEの選手一覧に得点・ファウルを表示し、コート上の選手を上位に表示。シュート記録後は選手選択を解除する。
-- ゲームクロックをデジタル表示に調整し、編集は分・秒の `select`（iPhoneではドラム式ピッカー）に変更。
-- 標準の選手選択画面にも得点・ファウルを表示。アプリ本体、Reader、Service Worker、package metadataのバージョンを2.1.3に統一。
+- Pro LIVEとProショットチャートのコート線を、標準モードのハーフコート線を左右反転して構成。3Pの直線部分、円弧、フリースローレーンを左右対称に表示し、ゾーン境界は塗り分けなし・薄線にした。
+- Proのスコアとゲームクロックを7セグメント風の角形数字に変更。ショットクロックは実装しない。
+- LIVE中の試合メニューから、標準／Pro、ゲームクロック有無、相手記録（総得点／個人）を変更可能。選手得点・ファウル、交代順、シュート後の選択解除、クロック編集にも対応。
+- アプリ本体、Reader、Service Worker、package metadataのバージョンを2.1.4へ更新。
 
 # Current Issues
 
@@ -18,7 +17,7 @@
 
 # Next Tasks
 
-1. iPad／iPhone実機で、円弧コート、クロック、シュート位置、交代、共有Readerを確認する。
+1. GitHub Pagesの2.1.4反映後、iPad／iPhone実機でProコート、クロック、シュート位置、交代、共有Readerを確認する。
 2. 必要ならPro画面のボタン密度・コート表示を実機に合わせて微調整する。
 
 # Important Decisions
@@ -32,7 +31,7 @@
 # Environment / Testing Notes
 
 - Windows。Cloudflare Worker関連は `cloudflare/`。共有Workerは `https://courtside-share.murajun620.workers.dev`。
-- 単体／Workerテスト：`node --test tests/domain.test.mjs tests/cloud-share.test.mjs`（25件成功）。変更したJSの構文チェックも成功。
+- 単体／Workerテスト：`node --test tests/domain.test.mjs tests/cloud-share.test.mjs`（25件成功）。今回も `node --test tests/*.test.mjs`（25件成功）と変更JSの構文チェックに成功。
 - 自動ブラウザテスト：`node tests/browser.mjs`。実行にはPlaywrightが必要だが、この環境では未導入。
-- 手動確認用ローカルサーバーは `node scripts/serve.mjs`。Pro LIVE、試合設定切替、クロック選択式編集、シュート後の選択解除、選手の得点・F表示、相手個人記録切替を確認済み。
+- 手動確認用ローカルサーバーは `node scripts/serve.mjs`。Pro LIVEで左右コート、3P直線・円弧、フリースローレーン、7セグメント風スコア／クロックを確認済み。
 - `Documents/ChatGPT/BB_log_` は退避フォルダーで開発対象外。管理キーなどの秘密情報はGitへ追加しない。
