@@ -127,7 +127,7 @@ function render() {
     html = page === 'live' ? g.mode === 'pro' ? view.proLiveView(state, g, gameEvents(g), currentClockSeconds(g)) : view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.1.2 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.1.3 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game())));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -384,7 +384,7 @@ const handlers = {
     const selection = state.proSelection;
     if (!selection?.type) return toast('先に記録するプレーを選んでください。', true);
     if (PRO_FIELD_SHOT_TYPES.has(selection.type)) { state.proSelection = { ...selection, playerId: id }; render(); return; }
-    return busy(async () => { await record(selection.type, id); state.proSelection = { ...selection, playerId: id }; render(); });
+    return busy(async () => { await record(selection.type, id); state.proSelection = null; render(); });
   },
   'pro-shot-point': (button, event) => {
     const g = game(), ownSelection = state.proSelection, opponentSelection = state.proOpponentSelection;
@@ -398,7 +398,7 @@ const handlers = {
     const eventType = `${points}${selection.type.endsWith('M') ? 'PM' : 'PX'}`;
     const zone = shotZoneFromPoint(null, x, y);
     const shotExtra = { ...(zone ? { shotZone: zone } : {}), shotX: x, shotY: y, ...(isOpponent ? { side: 'opponent' } : {}) };
-    return busy(async () => { const saved = await record(eventType, selection.playerId, shotExtra); if (isOpponent) state.proOpponentSelection = { ...selection }; else state.proSelection = { ...selection }; render(); if (!isOpponent) offerFollowup(saved); });
+    return busy(async () => { const saved = await record(eventType, selection.playerId, shotExtra); if (isOpponent) state.proOpponentSelection = null; else state.proSelection = null; render(); if (!isOpponent) offerFollowup(saved); });
   },
   'pro-sub': () => { if (game()?.mode !== 'pro') return; state.proSelection = null; state.proSub = { outPlayerId: null }; state.proOpponentSelection = null; render(); },
   'pro-opponent-action': button => {
@@ -410,13 +410,15 @@ const handlers = {
     const g = game(), selection = state.proOpponentSelection;
     if (g?.mode !== 'pro' || g.opponentTracking !== 'player' || !selection?.type) return toast('先に相手のプレーを選んでください。', true);
     if (PRO_FIELD_SHOT_TYPES.has(selection.type)) { state.proOpponentSelection = { ...selection, playerId: button.dataset.id }; render(); return; }
-    return busy(async () => { await record(selection.type, button.dataset.id, { side: 'opponent' }); state.proOpponentSelection = { ...selection, playerId: button.dataset.id }; render(); });
+    return busy(async () => { await record(selection.type, button.dataset.id, { side: 'opponent' }); state.proOpponentSelection = null; render(); });
   },
   'pro-clock-edit': () => {
     const g = game(); if (g?.mode !== 'pro' || !g.clockEnabled) return;
     const seconds = Math.max(0, Math.floor(currentClockSeconds(g) ?? 0));
     const minutes = Math.floor(seconds / 60); const remainder = seconds % 60;
-    showSheet('ゲームクロックを編集', `<p class="help">分と秒を入力してください。設定後も現在の開始・停止状態を引き継ぎます。</p><form id="pro-clock-form"><div class="clock-edit-grid"><label>分<input name="minutes" type="number" min="0" max="600" step="1" inputmode="numeric" required value="${minutes}"></label><label>秒<input name="seconds" type="number" min="0" max="59" step="1" inputmode="numeric" required value="${remainder}"></label></div><button type="submit" class="button primary full spaced">設定する</button></form>`);
+    const minuteOptions = Array.from({ length: 601 }, (_, value) => `<option value="${value}" ${value === minutes ? 'selected' : ''}>${String(value).padStart(2, '0')}分</option>`).join('');
+    const secondOptions = Array.from({ length: 60 }, (_, value) => `<option value="${value}" ${value === remainder ? 'selected' : ''}>${String(value).padStart(2, '0')}秒</option>`).join('');
+    showSheet('ゲームクロックを編集', `<p class="help">分と秒をタップすると、ドラム式の選択画面が開きます。設定後も現在の開始・停止状態を引き継ぎます。</p><form id="pro-clock-form"><div class="clock-drum-grid"><label>分<select name="minutes" required>${minuteOptions}</select></label><label>秒<select name="seconds" required>${secondOptions}</select></label></div><button type="submit" class="button primary full spaced">設定する</button></form>`);
   },
   'pro-clock-toggle': () => busy(async () => {
     const g = game(); if (g?.mode !== 'pro' || !g.clockEnabled) return;
@@ -489,7 +491,8 @@ const handlers = {
     showSheet(`${label}を追加`, `<form id="ot-form"><p class="help">新しい延長ピリオドを追加し、入力先を切り替えます。</p><label>延長時間（分）<input type="number" name="minutes" value="5" min="1" max="60" step="0.5" required></label><button class="button primary full spaced" type="submit">${label}を追加して移動</button></form>`);
   },
   'add-member': addMemberMenu,
-  'game-menu': () => showSheet('試合メニュー', `<div class="card-list"><a class="button secondary full" href="#box/${game().id}">BOX SCOREを表示</a><button class="button secondary full" data-action="add-member">メンバーを追加</button><button class="button secondary full" data-action="period-menu">ピリオド操作</button><button class="button secondary full" data-action="events">イベント履歴・編集</button><button class="button primary full" data-action="finish">試合を終了する</button><a class="button secondary full" href="#home">保存してホームへ</a></div><p class="help">追加した選手はベンチメンバーとして記録できます。すべての入力はその都度保存されています。</p>`),
+  'game-menu': () => showSheet('試合メニュー', `<div class="card-list"><a class="button secondary full" href="#box/${game().id}">BOX SCOREを表示</a><button class="button secondary full" data-action="game-settings">試合設定</button><button class="button secondary full" data-action="add-member">メンバーを追加</button><button class="button secondary full" data-action="period-menu">ピリオド操作</button><button class="button secondary full" data-action="events">イベント履歴・編集</button><button class="button primary full" data-action="finish">試合を終了する</button><a class="button secondary full" href="#home">保存してホームへ</a></div><p class="help">試合中の設定変更も、その場で保存されます。</p>`),
+  'game-settings': () => { const g = game(); if (g) showSheet('試合設定', view.liveSettingsHTML(g)); },
   'aggregate-selected': () => {
     const selected = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
     if (selected.length < 2) return toast('2試合以上を選択してください。', true);
@@ -653,6 +656,22 @@ document.addEventListener('submit', event => {
     if (selected.length !== 5) throw new Error('コート上の選手を5人選択してください。');
     await saveGameChange({ ...game(), starters: selected });
     closeSheet(); toast('コート上の5人を設定しました。'); subStart();
+  });
+  if (form.id === 'live-settings-form') busy(async () => {
+    const g = game(); if (!g || g.status !== 'live') throw new Error('記録中の試合を開いてください。');
+    const values = new FormData(form);
+    const mode = values.get('mode') === 'pro' ? 'pro' : 'standard';
+    const opponentTracking = values.get('opponentTracking') === 'player' ? 'player' : 'score';
+    const opponentPlayerEvents = activeEvents(gameEvents(g)).filter(event => event.side === 'opponent');
+    if ((mode !== 'pro' || opponentTracking !== 'player') && opponentPlayerEvents.length) throw new Error('相手選手の個人記録があるため、標準モード／総得点のみに変更できません。先に履歴から該当記録を削除してください。');
+    const opponentRoster = mode === 'pro' && opponentTracking === 'player' ? parseOpponentRoster(values.get('opponentRosterText')) : [];
+    const clockEnabled = mode === 'pro' && values.get('clockEnabled') === 'on';
+    const currentSeconds = currentClockSeconds(g);
+    const period = g.periods.find(candidate => candidate.id === g.currentPeriodId);
+    const clockSeconds = clockEnabled ? Math.max(0, Math.round(currentSeconds ?? Number(period?.minutes || g.minutes) * 60)) : undefined;
+    const clockRunning = clockEnabled && g.clockRunning && clockSeconds > 0;
+    await saveGameChange({ ...g, mode, clockEnabled, clockSeconds, clockRunning, clockStartedAt: clockRunning ? g.clockStartedAt : null, opponentTracking: mode === 'pro' ? opponentTracking : 'score', opponentRoster });
+    closeSheet(); toast('試合設定を保存しました。');
   });
   if (form.id === 'event-form') busy(async () => {
     const values = new FormData(form); const old = gameEvents().find(e => e.id === form.dataset.id);

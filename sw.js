@@ -1,5 +1,5 @@
 // Bump this version whenever any app-shell asset changes.
-const VERSION = 'v2.1.2';
+const VERSION = 'v2.1.3';
 const CACHE_PREFIX = 'courtside-shell-';
 // Include scope in the name so multiple GitHub Pages projects cannot clear each other's caches.
 const CACHE_BASE = `${CACHE_PREFIX}${encodeURIComponent(self.registration.scope)}-`;
