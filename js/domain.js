@@ -27,6 +27,20 @@ export const SHOT_EVENT_TYPES = new Set(['2PM', '2PX', '3PM', '3PX']);
 export const isShotEvent = event => SHOT_EVENT_TYPES.has(event?.eventType);
 export const isPointShotEvent = event => isShotEvent(event) || ['FTM', 'FTX'].includes(event?.eventType);
 const PRO_COURT = { width: 940, height: 500, centerX: 470, centerY: 250, leftBasketX: 74, rightBasketX: 866, threeCornerY: 56, threeRadius: 213, twoCornerY: 176, paintTop: 176, paintBottom: 324, leftFreeThrowX: 210, rightFreeThrowX: 730, rimRadius: 37 };
+export const oppositeDirection = direction => direction === 'left' ? 'right' : 'left';
+export function halfCourtPointFromFull(x, y, direction) {
+  if (![x, y].every(value => Number.isFinite(value))) return null;
+  const px = x * PRO_COURT.width, py = y * PRO_COURT.height;
+  return direction === 'left'
+    ? { x: PRO_COURT.height - py, y: px }
+    : { x: py, y: PRO_COURT.width - px };
+}
+export function fullCourtPointFromHalf(x, y, direction) {
+  if (![x, y].every(value => Number.isFinite(value))) return null;
+  const px = direction === 'left' ? y : PRO_COURT.width - y;
+  const py = direction === 'left' ? PRO_COURT.height - x : x;
+  return { x: px / PRO_COURT.width, y: py / PRO_COURT.height };
+}
 export function attackDirectionForPeriod(game, periodId = game?.currentPeriodId) {
   const firstHalfDirection = game?.attackDirection === 'left' ? 'left' : 'right';
   const periodIndex = (game?.periods || []).findIndex(period => period?.id === periodId);

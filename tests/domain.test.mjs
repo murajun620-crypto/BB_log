@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, isBackcourtPoint, normalizeShotZone, percent, lineup, validateGame, validateTeam, makePeriods, shotPointsFromPoint, shotZoneForEvent, shotZoneFromPoint, uid } from '../js/domain.js';
+import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, fullCourtPointFromHalf, halfCourtPointFromFull, isBackcourtPoint, normalizeShotZone, oppositeDirection, percent, lineup, validateGame, validateTeam, makePeriods, shotPointsFromPoint, shotZoneForEvent, shotZoneFromPoint, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
 import { proLiveView, shotZonePicker, shotChartMapHTML, strategyBoardHTML } from '../js/views.js';
@@ -59,6 +59,17 @@ test('Pro games preserve clock, opponent player stats and exact shot positions',
   assert.equal(shotZoneFromPoint(null, 74 / 940, .5), 'rim'); assert.equal(shotZoneFromPoint(null, 180 / 940, .5), 'paint');
   assert.equal(attackDirectionForPeriod(game), 'right'); assert.equal(attackDirectionForPeriod(game, game.periods[2].id), 'left');
   game.attackDirection = 'left'; assert.equal(attackDirectionForPeriod(game, game.periods[2].id), 'right');
+});
+test('phone landscape half-court mapping puts either attacking basket at the top', () => {
+  const leftBasket = halfCourtPointFromFull(74 / 940, .5, 'left');
+  const rightBasket = halfCourtPointFromFull(866 / 940, .5, 'right');
+  assert.deepEqual(leftBasket, { x: 250, y: 74 });
+  assert.deepEqual(rightBasket, { x: 250, y: 74 });
+  const leftShot = fullCourtPointFromHalf(250, 74, 'left');
+  const rightShot = fullCourtPointFromHalf(250, 74, 'right');
+  assert.ok(Math.abs(leftShot.x - 74 / 940) < 1e-12); assert.equal(leftShot.y, .5);
+  assert.ok(Math.abs(rightShot.x - 866 / 940) < 1e-12); assert.equal(rightShot.y, .5);
+  assert.equal(oppositeDirection('left'), 'right'); assert.equal(oppositeDirection('right'), 'left');
 });
 test('Pro shot selection treats the center line and the defending half as backcourt', () => {
   assert.equal(isBackcourtPoint('right', .5), true);

@@ -1,5 +1,5 @@
 import * as db from './db.js';
-import { uid, localDate, STATS, activeEvents, attackDirectionForPeriod, isBackcourtPoint, makePeriods, shotPointsFromPoint, shotZoneFromPoint, validateTeam, validateGame, lineup, eventLabel, aggregate, aggregateGames } from './domain.js';
+import { uid, localDate, STATS, activeEvents, attackDirectionForPeriod, fullCourtPointFromHalf, isBackcourtPoint, makePeriods, oppositeDirection, shotPointsFromPoint, shotZoneFromPoint, validateTeam, validateGame, lineup, eventLabel, aggregate, aggregateGames } from './domain.js';
 import { backupObject, parseBackup, gameCSV, download, shareFile, shareUrl } from './transfer.js';
 import { boxScoreImage, playerStatsImage, safeFilename, shareImage } from './share-image.js';
 import { createSharedReport, createAggregateSharedReport, createCompressedSharePayload, parseSharePayload, parseSharedReport, sharedReportFile } from './shared-report.js';
@@ -13,6 +13,23 @@ const toastNode = document.querySelector('#toast');
 const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, advancedMode: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, historySelection: new Set(), aggregateMode: 'total', aggregateGameId: null, aggregatePlayerGameId: 'total', shotDisplayMode: 'points', strategyBoard: null, proSelection: null, proSub: null, proOpponentSelection: null, page: 'home', gameId: null, busy: false, lastError: '' };
 let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, proClockTimer = null, proClockSaving = false, resolvedShareHash = '', sharePayloadPromise = null, pwaRegistration = null;
 const PRO_FIELD_SHOT_TYPES = new Set(['FGM', 'FGX']);
+function proShotPointFromEvent(button, event, direction) {
+  const rect = button.getBoundingClientRect();
+  const clientX = event?.clientX || rect.left + rect.width / 2;
+  const clientY = event?.clientY || rect.top + rect.height / 2;
+  if (!button.classList.contains('pro-court-half')) {
+    return {
+      x: Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)),
+      y: Math.max(0, Math.min(1, (clientY - rect.top) / rect.height)),
+    };
+  }
+  const scale = Math.min(rect.width / 500, rect.height / 500) || 1;
+  const offsetX = (rect.width - 500 * scale) / 2;
+  const offsetY = (rect.height - 500 * scale) / 2;
+  const localX = Math.max(0, Math.min(500, (clientX - rect.left - offsetX) / scale));
+  const localY = Math.max(0, Math.min(500, (clientY - rect.top - offsetY) / scale));
+  return fullCourtPointFromHalf(localX, localY, direction);
+}
 const getSetting = key => state.data.settings.find(s => s.key === key)?.value;
 const game = () => state.data.games.find(g => g.id === state.gameId);
 const gameEvents = (g = game()) => state.data.events.filter(e => e.gameId === g?.id);
@@ -128,7 +145,7 @@ function render() {
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
   if (page === 'live') app.querySelector('.live-footer, .pro-footer')?.insertAdjacentHTML('beforeend', view.strategyBoardButtonHTML());
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.1 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.2 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -502,10 +519,11 @@ const handlers = {
     const isOpponent = g?.opponentTracking === 'player' && !ownSelection?.playerId && opponentSelection?.playerId;
     const selection = isOpponent ? opponentSelection : ownSelection;
     if (g?.mode !== 'pro' || !selection?.type || !selection.playerId || !PRO_FIELD_SHOT_TYPES.has(selection.type)) return toast('FGの○／×と選手を先に選んでください。FTは選手をタップすると記録されます。', true);
-    const rect = button.getBoundingClientRect();
-    const x = Math.max(0, Math.min(1, ((event?.clientX || rect.left + rect.width / 2) - rect.left) / rect.width));
-    const y = Math.max(0, Math.min(1, ((event?.clientY || rect.top + rect.height / 2) - rect.top) / rect.height));
-    if (isBackcourtPoint(attackDirectionForPeriod(g), x, isOpponent)) return toast('バックコートは選択できません。', true);
+    const attackDirection = attackDirectionForPeriod(g);
+    const shotDirection = isOpponent ? oppositeDirection(attackDirection) : attackDirection;
+    const point = proShotPointFromEvent(button, event, shotDirection);
+    const x = point.x, y = point.y;
+    if (isBackcourtPoint(attackDirection, x, isOpponent)) return toast('バックコートは選択できません。', true);
     const points = shotPointsFromPoint(x, y);
     const eventType = `${points}${selection.type.endsWith('M') ? 'PM' : 'PX'}`;
     const zone = shotZoneFromPoint(null, x, y);
