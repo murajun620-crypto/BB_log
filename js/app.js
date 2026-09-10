@@ -1,5 +1,5 @@
 import * as db from './db.js';
-import { uid, localDate, STATS, activeEvents, isPointShotEvent, isShotEvent, makePeriods, shotZoneFromPoint, validateTeam, validateGame, lineup, eventLabel, aggregate, aggregateGames } from './domain.js';
+import { uid, localDate, STATS, activeEvents, makePeriods, shotPointsFromPoint, shotZoneFromPoint, validateTeam, validateGame, lineup, eventLabel, aggregate, aggregateGames } from './domain.js';
 import { backupObject, parseBackup, gameCSV, download, shareFile, shareUrl } from './transfer.js';
 import { boxScoreImage, playerStatsImage, safeFilename, shareImage } from './share-image.js';
 import { createSharedReport, createAggregateSharedReport, createCompressedSharePayload, parseSharePayload, parseSharedReport, sharedReportFile } from './shared-report.js';
@@ -12,6 +12,7 @@ const sheet = document.querySelector('#sheet');
 const toastNode = document.querySelector('#toast');
 const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, advancedMode: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, historySelection: new Set(), aggregateMode: 'total', aggregateGameId: null, aggregatePlayerGameId: 'total', proSelection: null, proSub: null, proOpponentSelection: null, page: 'home', gameId: null, busy: false, lastError: '' };
 let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, proClockTimer = null, proClockSaving = false, resolvedShareHash = '', sharePayloadPromise = null, pwaRegistration = null;
+const PRO_FIELD_SHOT_TYPES = new Set(['FGM', 'FGX']);
 const getSetting = key => state.data.settings.find(s => s.key === key)?.value;
 const game = () => state.data.games.find(g => g.id === state.gameId);
 const gameEvents = (g = game()) => state.data.events.filter(e => e.gameId === g?.id);
@@ -126,7 +127,7 @@ function render() {
     html = page === 'live' ? g.mode === 'pro' ? view.proLiveView(state, g, gameEvents(g), currentClockSeconds(g)) : view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.1.0 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.1.1 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game())));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -365,7 +366,8 @@ const handlers = {
   'follow-reb': button => pickStat(button.dataset.type, { followup: true }),
   'pro-action': button => {
     if (game()?.mode !== 'pro') return;
-    state.proSub = null; state.proOpponentSelection = null; state.proSelection = { type: button.dataset.type, playerId: null }; render();
+    const playerId = state.proSelection?.playerId || null;
+    state.proSub = null; state.proOpponentSelection = null; state.proSelection = { type: button.dataset.type, playerId }; render();
   },
   'pro-select-player': button => {
     const g = game(); if (g?.mode !== 'pro') return;
@@ -381,31 +383,34 @@ const handlers = {
     }
     const selection = state.proSelection;
     if (!selection?.type) return toast('先に記録するプレーを選んでください。', true);
-    if (isPointShotEvent({ eventType: selection.type })) { state.proSelection = { ...selection, playerId: id }; render(); return; }
-    return busy(async () => { await record(selection.type, id); state.proSelection = null; render(); });
+    if (PRO_FIELD_SHOT_TYPES.has(selection.type)) { state.proSelection = { ...selection, playerId: id }; render(); return; }
+    return busy(async () => { await record(selection.type, id); state.proSelection = { ...selection, playerId: id }; render(); });
   },
   'pro-shot-point': (button, event) => {
     const g = game(), ownSelection = state.proSelection, opponentSelection = state.proOpponentSelection;
     const isOpponent = g?.opponentTracking === 'player' && !ownSelection?.playerId && opponentSelection?.playerId;
     const selection = isOpponent ? opponentSelection : ownSelection;
-    if (g?.mode !== 'pro' || !selection?.type || !selection.playerId || !isPointShotEvent({ eventType: selection.type })) return toast('シュートの種類と選手を先に選んでください。', true);
+    if (g?.mode !== 'pro' || !selection?.type || !selection.playerId || !PRO_FIELD_SHOT_TYPES.has(selection.type)) return toast('FGの○／×と選手を先に選んでください。FTは選手をタップすると記録されます。', true);
     const rect = button.getBoundingClientRect();
     const x = Math.max(0, Math.min(1, ((event?.clientX || rect.left + rect.width / 2) - rect.left) / rect.width));
     const y = Math.max(0, Math.min(1, ((event?.clientY || rect.top + rect.height / 2) - rect.top) / rect.height));
-    const zone = shotZoneFromPoint(selection.type, x, y);
+    const points = shotPointsFromPoint(x, y);
+    const eventType = `${points}${selection.type.endsWith('M') ? 'PM' : 'PX'}`;
+    const zone = shotZoneFromPoint(null, x, y);
     const shotExtra = { ...(zone ? { shotZone: zone } : {}), shotX: x, shotY: y, ...(isOpponent ? { side: 'opponent' } : {}) };
-    return busy(async () => { await record(selection.type, selection.playerId, shotExtra); if (isOpponent) state.proOpponentSelection = null; else state.proSelection = null; render(); });
+    return busy(async () => { const saved = await record(eventType, selection.playerId, shotExtra); if (isOpponent) state.proOpponentSelection = { ...selection }; else state.proSelection = { ...selection }; render(); if (!isOpponent) offerFollowup(saved); });
   },
   'pro-sub': () => { if (game()?.mode !== 'pro') return; state.proSelection = null; state.proSub = { outPlayerId: null }; state.proOpponentSelection = null; render(); },
   'pro-opponent-action': button => {
     if (game()?.mode !== 'pro' || game().opponentTracking !== 'player') return;
-    state.proOpponentSelection = { type: button.dataset.type, playerId: null }; state.proSelection = null; state.proSub = null; render();
+    const playerId = state.proOpponentSelection?.playerId || null;
+    state.proOpponentSelection = { type: button.dataset.type, playerId }; state.proSelection = null; state.proSub = null; render();
   },
   'pro-select-opponent': button => {
     const g = game(), selection = state.proOpponentSelection;
     if (g?.mode !== 'pro' || g.opponentTracking !== 'player' || !selection?.type) return toast('先に相手のプレーを選んでください。', true);
-    if (isPointShotEvent({ eventType: selection.type })) { state.proOpponentSelection = { ...selection, playerId: button.dataset.id }; render(); return; }
-    return busy(async () => { await record(selection.type, button.dataset.id, { side: 'opponent' }); state.proOpponentSelection = null; render(); });
+    if (PRO_FIELD_SHOT_TYPES.has(selection.type)) { state.proOpponentSelection = { ...selection, playerId: button.dataset.id }; render(); return; }
+    return busy(async () => { await record(selection.type, button.dataset.id, { side: 'opponent' }); state.proOpponentSelection = { ...selection, playerId: button.dataset.id }; render(); });
   },
   'pro-clock-toggle': () => busy(async () => {
     const g = game(); if (g?.mode !== 'pro' || !g.clockEnabled) return;

@@ -26,12 +26,22 @@ export const SHOT_ZONE_IDS = new Set([...SHOT_ZONES.map(zone => zone.id), ...Obj
 export const SHOT_EVENT_TYPES = new Set(['2PM', '2PX', '3PM', '3PX']);
 export const isShotEvent = event => SHOT_EVENT_TYPES.has(event?.eventType);
 export const isPointShotEvent = event => isShotEvent(event) || ['FTM', 'FTX'].includes(event?.eventType);
+const shotArcX = y => 330 - 180 * Math.min(1, Math.abs(y - 250) / 140);
+function pointIsThree(x, y) {
+  const px = x * 940, py = y * 500;
+  if (py < 105 || py > 395) return true;
+  return px <= 470 ? px >= shotArcX(py) : px <= 940 - shotArcX(py);
+}
+export function shotPointsFromPoint(x, y) {
+  if (![x, y].every(value => Number.isFinite(value) && value >= 0 && value <= 1)) return null;
+  return pointIsThree(x, y) ? 3 : 2;
+}
 export function shotZoneFromPoint(type, x, y) {
-  if (!SHOT_EVENT_TYPES.has(type) || ![x, y].every(value => Number.isFinite(value) && value >= 0 && value <= 1)) return null;
+  if ((type !== null && type !== undefined && !SHOT_EVENT_TYPES.has(type) && !['FGM', 'FGX'].includes(type)) || ![x, y].every(value => Number.isFinite(value) && value >= 0 && value <= 1)) return null;
   const px = x * 940, py = y * 500, leftBasket = px <= 470;
   const depth = Math.max(0, Math.min(1, (leftBasket ? px - 60 : 880 - px) / 410));
   const side = (py - 250) / 220, distanceFromCenter = Math.abs(side);
-  const prefix = type.startsWith('3') ? 'three' : 'two';
+  const prefix = type?.startsWith('3') ? 'three' : type?.startsWith('2') ? 'two' : pointIsThree(x, y) ? 'three' : 'two';
   if (prefix === 'two' && depth < .18 && distanceFromCenter < .3) return 'rim';
   if (prefix === 'two' && depth < .42 && distanceFromCenter < .5) return 'paint';
   if (distanceFromCenter > .76) return `${prefix}-${side < 0 ? 'left' : 'right'}-corner`;

@@ -202,10 +202,8 @@ dialog::backdrop { background: rgba(14, 28, 23, .48); }
 .pro-chart-court-markings circle { fill: none; }
 .pro-shot-chart-markers { pointer-events: none; }
 .pro-shot-chart-marker { pointer-events: none; }
-.pro-shot-chart-marker circle { fill: var(--surface); stroke-width: 3; }
-.pro-shot-chart-marker text { fill: var(--text); font-size: 20px; font-weight: 800; }
-.pro-shot-chart-marker.made circle { stroke: var(--accent); }
-.pro-shot-chart-marker.miss circle { stroke: #a44139; }
+.pro-shot-chart-marker text { fill: var(--accent); font-size: 28px; font-weight: 850; paint-order: stroke; stroke: rgba(255,255,255,.9); stroke-width: 4px; stroke-linejoin: round; }
+.pro-shot-chart-marker.miss text { fill: #c7483f; }
 .pro-shot-zone-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-top: 7px; }
 .pro-shot-zone-summary-item { display: grid; gap: 2px; min-width: 0; padding: 7px 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); text-align: center; }
 .pro-shot-zone-summary-item span { overflow: hidden; color: var(--muted); font-size: 8px; text-overflow: ellipsis; white-space: nowrap; }

@@ -263,15 +263,13 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-court-status b { color: var(--accent); font-size: 11px; font-weight: 650; text-align: right; overflow-wrap: anywhere; }
 .pro-court { display: block; width: 100%; max-height: 48vh; border: 1px solid var(--line); border-radius: 12px; background: #d8c38f; touch-action: none; }
 .pro-court-surface { fill: #e4cf9a; }
-.pro-court-markings { fill: none; stroke: rgba(255,255,255,.94); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
+.pro-court-markings { fill: none; stroke: rgba(255,255,255,.96); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .pro-court-markings circle { fill: none; }
 .pro-shot-marker { pointer-events: none; }
-.pro-shot-marker circle { fill: var(--surface); stroke-width: 3; }
-.pro-shot-marker text { fill: var(--text); font-size: 20px; font-weight: 800; }
-.pro-shot-marker.made circle { stroke: var(--accent); }
-.pro-shot-marker.miss circle { stroke: var(--danger); }
+.pro-shot-marker text { fill: var(--accent); font-size: 28px; font-weight: 850; paint-order: stroke; stroke: rgba(255,255,255,.9); stroke-width: 4px; stroke-linejoin: round; }
+.pro-shot-marker.miss text { fill: #c7483f; }
 .pro-action-panel { display: grid; gap: 5px; }
-.pro-action-row { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 5px; }
+.pro-action-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
 .pro-other-row { grid-template-columns: repeat(8, minmax(0, 1fr)); }
 .pro-action-button { display: flex; align-items: center; justify-content: center; gap: 5px; min-height: 40px; padding: 4px 5px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 11px; font-weight: 700; }
 .pro-action-button b { font-size: 18px; line-height: 1; }
@@ -291,7 +289,7 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-sub-button { min-height: 39px; margin-top: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--muted); font-size: 11px; font-weight: 700; }
 .pro-opponent-score { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
 .pro-opponent-score .opponent-button { min-height: 44px; }
-.pro-opponent-actions { grid-template-columns: repeat(3, minmax(0, 1fr)); margin-top: 4px; }
+.pro-opponent-actions { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 4px; }
 .pro-footer { display: flex; gap: 7px; min-height: 48px; }
 .pro-footer > * { min-height: 48px; }
 .pro-footer .undo-button { flex: 1; }
@@ -388,10 +386,8 @@ dialog::backdrop { background: #07170f70; backdrop-filter: blur(3px); }
 .pro-chart-court-markings circle { fill: none; }
 .pro-shot-chart-markers { pointer-events: none; }
 .pro-shot-chart-marker { pointer-events: none; }
-.pro-shot-chart-marker circle { fill: var(--surface); stroke-width: 3; }
-.pro-shot-chart-marker text { fill: var(--text); font-size: 20px; font-weight: 800; }
-.pro-shot-chart-marker.made circle { stroke: var(--accent); }
-.pro-shot-chart-marker.miss circle { stroke: var(--danger); }
+.pro-shot-chart-marker text { fill: var(--accent); font-size: 28px; font-weight: 850; paint-order: stroke; stroke: rgba(255,255,255,.9); stroke-width: 4px; stroke-linejoin: round; }
+.pro-shot-chart-marker.miss text { fill: #c7483f; }
 .pro-shot-zone-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-top: 7px; }
 .pro-shot-zone-summary-item { display: grid; gap: 2px; min-width: 0; padding: 7px 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); text-align: center; }
 .pro-shot-zone-summary-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 8px; }

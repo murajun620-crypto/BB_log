@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { STATS, SHOT_ZONES, aggregate, aggregateGames, normalizeShotZone, percent, lineup, validateGame, validateTeam, makePeriods, shotZoneFromPoint, uid } from '../js/domain.js';
+import { STATS, SHOT_ZONES, aggregate, aggregateGames, normalizeShotZone, percent, lineup, validateGame, validateTeam, makePeriods, shotPointsFromPoint, shotZoneFromPoint, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
-import { shotZonePicker, shotChartMapHTML } from '../js/views.js';
+import { proLiveView, shotZonePicker, shotChartMapHTML } from '../js/views.js';
 
 const fixture = () => {
   const players = Array.from({ length: 6 }, (_, i) => ({ id: `player-${i}`, number: `${i + 4}`, name: `選手${i + 1}` }));
@@ -45,6 +45,7 @@ test('Pro games preserve clock, opponent player stats and exact shot positions',
   assert.equal(a.team.PTS, 3); assert.equal(a.opponent, 2); assert.equal(a.opponentPlayers['opponent-1'].PTS, 2);
   assert.equal(events[0].shotZone, 'three-top'); assert.equal(events[0].shotX, .72); assert.equal(events[1].shotZone, 'rim');
   assert.equal(shotZoneFromPoint('3PM', .5, .25), 'three-left-wing');
+  assert.equal(shotPointsFromPoint(.5, .5), 3); assert.equal(shotPointsFromPoint(.2, .5), 2);
 });
 test('advanced shot zones validate and survive file and link sharing', async () => {
   const { game, events, add } = fixture();
@@ -112,6 +113,15 @@ test('exact Pro shot positions render as markers with an area summary', () => {
   assert.match(chart, /pro-shot-zone-summary/);
   assert.match(chart, /1\/2/);
   assert.match(chart, /50\.0%/);
+});
+test('Pro shot input uses result buttons, auto-selects points and skips the court for FT', () => {
+  const { game, events } = fixture(); game.mode = 'pro'; game.clockEnabled = false; game.opponentTracking = 'score';
+  const state = { proSelection: { type: 'FGM', playerId: 'player-0' }, proSub: null, proOpponentSelection: null };
+  const field = proLiveView(state, game, events);
+  assert.match(field, /data-type="FGM"/); assert.match(field, /data-type="FGX"/);
+  assert.doesNotMatch(field, /data-type="2PM"|data-type="3PM"/); assert.match(field, /data-action="pro-shot-point"/);
+  const freeThrow = proLiveView({ ...state, proSelection: { type: 'FTM', playerId: 'player-0' } }, game, events);
+  assert.doesNotMatch(freeThrow, /data-action="pro-shot-point"/);
 });
 test('selected games aggregate team and player stats by stable player identity', () => {
   const first = fixture(); first.add('3PM'); first.add('AST', { playerId: 'player-1' });
