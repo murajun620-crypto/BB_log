@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, fullCourtPointFromHalf, halfCourtPointFromFull, isBackcourtPoint, normalizeShotZone, oppositeDirection, percent, lineup, validateGame, validateTeam, makePeriods, shotPointsFromPoint, shotZoneForEvent, shotZoneFromPoint, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
-import { isIPhoneUserAgent, proLiveView, shotZonePicker, shotChartMapHTML, strategyBoardHTML } from '../js/views.js';
+import { isIPhonePortrait, isIPhoneUserAgent, PRO_HALF_COURT_MARKINGS, proLiveView, shotZonePicker, shotChartMapHTML, strategyBoardHTML } from '../js/views.js';
 
 const fixture = () => {
   const players = Array.from({ length: 6 }, (_, i) => ({ id: `player-${i}`, number: `${i + 4}`, name: `選手${i + 1}` }));
@@ -71,11 +71,17 @@ test('phone landscape half-court mapping puts either attacking basket at the top
   assert.ok(Math.abs(rightShot.x - 866 / 940) < 1e-12); assert.equal(rightShot.y, .5);
   assert.equal(oppositeDirection('left'), 'right'); assert.equal(oppositeDirection('right'), 'left');
 });
-test('iPhone devices use the half court independently of orientation', () => {
+test('only portrait iPhones use the Pro half court and its markings face the upper basket', () => {
   assert.equal(isIPhoneUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)'), true);
   assert.equal(isIPhoneUserAgent('Mozilla/5.0 (iPod touch; CPU iPhone OS 15_0 like Mac OS X)'), true);
   assert.equal(isIPhoneUserAgent('Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)'), false);
   assert.equal(isIPhoneUserAgent('Mozilla/5.0 (Macintosh; Intel Mac OS X 15_0)'), false);
+  assert.equal(isIPhonePortrait('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', true), true);
+  assert.equal(isIPhonePortrait('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', false), false);
+  assert.equal(isIPhonePortrait('Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)', true), false);
+  assert.match(PRO_HALF_COURT_MARKINGS, /M444 163A214 214 0 0 1 56 163/);
+  assert.match(PRO_HALF_COURT_MARKINGS, /M304 210A54 54 0 0 1 196 210/);
+  assert.match(PRO_HALF_COURT_MARKINGS, /M287 74A37 37 0 0 1 213 74/);
 });
 test('Pro shot selection treats the center line and the defending half as backcourt', () => {
   assert.equal(isBackcourtPoint('right', .5), true);
@@ -195,9 +201,14 @@ test('strategy board exposes court tools and preserves placed items in its view'
   assert.match(html, /相手 <b>1\/5<\/b>/);
   assert.match(html, /ボール <b>1\/1<\/b>/);
   assert.match(html, /data-strategy-board-items/);
+  assert.match(html, /strategy-board-side-left/);
+  assert.match(html, /strategy-board-side-right/);
+  assert.match(html, /strategy-board-bottom/);
   assert.match(html, /strategy-board-uniform strategy-board-home/);
   assert.match(html, /strategy-board-uniform strategy-board-away/);
   assert.match(html, /strategy-board-ball/);
+  assert.equal((html.match(/data-strategy-movable="true"/g) || []).length, 3);
+  assert.match(html, /ドラッグで移動/);
   assert.match(html, /data-strategy-item="home-1"/);
   assert.match(html, /data-strategy-item="arrow-1"/);
 });

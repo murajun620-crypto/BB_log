@@ -144,8 +144,8 @@ function render() {
     html = page === 'live' ? g.mode === 'pro' ? view.proLiveView(state, g, gameEvents(g), currentClockSeconds(g)) : view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
-  if (page === 'live') app.querySelector('.live-footer, .pro-footer')?.insertAdjacentHTML('beforeend', view.strategyBoardButtonHTML());
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.3 · BUILT FOR THE SIDELINES`);
+  if (page === 'live') app.querySelector('.live-footer, .pro-footer')?.insertAdjacentHTML('afterend', view.strategyBoardButtonHTML());
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.4 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -173,10 +173,11 @@ function render() {
   }
   syncProClockTimer();
 }
-function closeSheet() { sheet.close(); pending = null; confirmAction = null; }
+function closeSheet() { if (sheet.open) sheet.close(); pending = null; confirmAction = null; }
 function showSheet(title, html, cls = '') {
   sheet.className = cls;
-  sheet.innerHTML = `<div class="sheet-handle"></div><header class="sheet-header"><h2 id="sheet-title">${view.esc(title)}</h2><button class="icon-button" data-action="close-sheet" aria-label="閉じる">${view.icon('close')}</button></header><div class="sheet-content">${html}</div>`;
+  sheet.innerHTML = `<div class="sheet-handle"></div><header class="sheet-header"><h2 id="sheet-title">${view.esc(title)}</h2><button type="button" class="icon-button" data-action="close-sheet" aria-label="閉じる">${view.icon('close')}</button></header><div class="sheet-content">${html}</div>`;
+  sheet.querySelector('[data-action="close-sheet"]')?.addEventListener('click', event => { event.preventDefault(); event.stopPropagation(); closeSheet(); });
   if (!sheet.open) sheet.showModal();
   sheet.scrollTop = 0;
 }
@@ -371,7 +372,7 @@ async function shareGameLink() {
   if (result === 'copy-failed') toast('リンクをコピーできませんでした。共有メニューから送ってください。', true);
   if (sheet.open) closeSheet();
 }
-const strategyToolHints = { home: '味方を選び、コートをタップして配置（最大5人）', away: '相手を選び、コートをタップして配置（最大5人）', ball: 'ボールをタップして配置（1個。もう一度タップで移動）', line: '始点から終点までドラッグしてラインを描く', arrow: '始点から終点までドラッグして矢印を描く', erase: '消したいユニフォーム・ボール・線をタップ' };
+const strategyToolHints = { home: '味方を選び、コートをタップして配置（最大5人）。配置済みはドラッグで移動', away: '相手を選び、コートをタップして配置（最大5人）。配置済みはドラッグで移動', ball: '空いている場所をタップしてボールを配置・移動。配置済みはドラッグで移動', line: '始点から終点までドラッグしてラインを描く', arrow: '始点から終点までドラッグして矢印を描く', erase: '消したいユニフォーム・ボール・線をタップ' };
 const strategyBoardTools = new Set(Object.keys(strategyToolHints));
 function strategyPoint(svg, event) {
   const rect = svg.getBoundingClientRect();
@@ -408,7 +409,15 @@ function normalizeStrategyBoard(board) {
     return items;
   }, []);
   board.tool = board.tool === 'player' ? 'home' : strategyBoardTools.has(board.tool) ? board.tool : 'home';
+  board.history = Array.isArray(board.history) ? board.history.slice(-40) : [];
   return board;
+}
+function rememberStrategyBoard(snapshot = state.strategyBoard?.items) {
+  const board = state.strategyBoard;
+  if (!board || !snapshot) return;
+  const history = Array.isArray(board.history) ? board.history : (board.history = []);
+  history.push(structuredClone(snapshot));
+  if (history.length > 40) history.shift();
 }
 function strategyNextUniformNumber(team) {
   const used = new Set(state.strategyBoard.items.filter(item => item.kind === 'athlete' && item.team === team).map(item => String(item.label)));
@@ -424,28 +433,42 @@ function refreshStrategyBoard(itemsOnly = false) {
 function setupStrategyBoard() {
   const svg = sheet.querySelector('[data-strategy-board]');
   if (!svg) return;
-  let draft = null;
+  let draft = null, dragging = null;
   const renderDraft = () => { const node = sheet.querySelector('[data-strategy-board-draft]'); if (node) node.innerHTML = view.strategyBoardDraftHTML(draft); };
+  const releasePointer = pointerId => { if (svg.hasPointerCapture?.(pointerId)) svg.releasePointerCapture(pointerId); };
+  const setDragPosition = (point, updateElement = true) => {
+    if (!dragging) return;
+    const { item, startX, startY, originX, originY, element } = dragging;
+    item.x = Math.max(20, Math.min(980, originX + point.x - startX));
+    item.y = Math.max(20, Math.min(580, originY + point.y - startY));
+    if (updateElement) element.setAttribute('transform', `translate(${item.x} ${item.y})`);
+  };
+  const endDrag = event => {
+    if (!dragging || dragging.pointerId !== event.pointerId) return false;
+    const move = dragging;
+    setDragPosition(strategyPoint(svg, event));
+    if (Math.abs(move.item.x - move.originX) > .1 || Math.abs(move.item.y - move.originY) > .1) rememberStrategyBoard(move.before);
+    move.element.classList.remove('dragging');
+    dragging = null;
+    refreshStrategyBoard(true);
+    releasePointer(event.pointerId);
+    return true;
+  };
   const endDraft = event => {
     if (!draft || draft.pointerId !== event.pointerId) return;
     const point = strategyPoint(svg, event); draft.endX = point.x; draft.endY = point.y;
-    if (strategyDistance({ x: draft.startX, y: draft.startY }, point) > 12) state.strategyBoard.items.push({ id: uid(), kind: draft.tool, startX: draft.startX, startY: draft.startY, endX: draft.endX, endY: draft.endY });
-    draft = null; renderDraft(); refreshStrategyBoard(true);
-    if (svg.hasPointerCapture?.(event.pointerId)) svg.releasePointerCapture(event.pointerId);
+    if (strategyDistance({ x: draft.startX, y: draft.startY }, point) > 12) {
+      rememberStrategyBoard();
+      state.strategyBoard.items.push({ id: uid(), kind: draft.tool, startX: draft.startX, startY: draft.startY, endX: draft.endX, endY: draft.endY });
+    }
+    draft = null; renderDraft(); refreshStrategyBoard(true); releasePointer(event.pointerId);
   };
   svg.addEventListener('pointerdown', event => {
     if (event.pointerType === 'mouse' && event.button !== 0) return;
     const point = strategyPoint(svg, event); const tool = state.strategyBoard.tool;
-    if (tool === 'home' || tool === 'away') {
-      const count = state.strategyBoard.items.filter(item => item.kind === 'athlete' && item.team === tool).length;
-      if (count >= 5) return toast(`${tool === 'home' ? '味方' : '相手'}は5人まで配置できます。`);
-      state.strategyBoard.items.push({ id: uid(), kind: 'athlete', team: tool, label: strategyNextUniformNumber(tool), x: point.x, y: point.y });
-      refreshStrategyBoard(true); return;
-    }
-    if (tool === 'ball') {
-      const ball = state.strategyBoard.items.find(item => item.kind === 'ball');
-      if (ball) { ball.x = point.x; ball.y = point.y; } else state.strategyBoard.items.push({ id: uid(), kind: 'ball', x: point.x, y: point.y });
-      refreshStrategyBoard(true); return;
+    if (['line', 'arrow'].includes(tool)) {
+      draft = { tool, pointerId: event.pointerId, startX: point.x, startY: point.y, endX: point.x, endY: point.y };
+      svg.setPointerCapture?.(event.pointerId); renderDraft(); event.preventDefault(); return;
     }
     if (tool === 'erase') {
       let nearest = -1; let distance = 42;
@@ -453,21 +476,42 @@ function setupStrategyBoard() {
         const current = item.kind === 'athlete' || item.kind === 'ball' || item.kind === 'marker' ? strategyDistance(point, { x: item.x, y: item.y }) : strategySegmentDistance(point, { x: item.startX, y: item.startY }, { x: item.endX, y: item.endY });
         if (current < distance) { nearest = index; distance = current; }
       });
-      if (nearest >= 0) { state.strategyBoard.items.splice(nearest, 1); refreshStrategyBoard(true); }
+      if (nearest >= 0) { rememberStrategyBoard(); state.strategyBoard.items.splice(nearest, 1); refreshStrategyBoard(true); }
       return;
     }
-    if (!['line', 'arrow'].includes(tool)) return;
-    draft = { tool, pointerId: event.pointerId, startX: point.x, startY: point.y, endX: point.x, endY: point.y };
-    svg.setPointerCapture?.(event.pointerId); renderDraft(); event.preventDefault();
+    const element = event.target.closest?.('[data-strategy-movable="true"]');
+    const item = element && state.strategyBoard.items.find(candidate => candidate.id === element.dataset.strategyItem);
+    if (item && (item.kind === 'athlete' || item.kind === 'ball')) {
+      dragging = { pointerId: event.pointerId, item, element, startX: point.x, startY: point.y, originX: Number(item.x), originY: Number(item.y), before: structuredClone(state.strategyBoard.items) };
+      element.classList.add('dragging'); svg.setPointerCapture?.(event.pointerId); event.preventDefault(); return;
+    }
+    if (tool === 'home' || tool === 'away') {
+      const count = state.strategyBoard.items.filter(item => item.kind === 'athlete' && item.team === tool).length;
+      if (count >= 5) return toast(`${tool === 'home' ? '味方' : '相手'}は5人まで配置できます。`);
+      rememberStrategyBoard();
+      state.strategyBoard.items.push({ id: uid(), kind: 'athlete', team: tool, label: strategyNextUniformNumber(tool), x: point.x, y: point.y });
+      refreshStrategyBoard(true); return;
+    }
+    if (tool === 'ball') {
+      const ball = state.strategyBoard.items.find(item => item.kind === 'ball');
+      rememberStrategyBoard();
+      if (ball) { ball.x = point.x; ball.y = point.y; } else state.strategyBoard.items.push({ id: uid(), kind: 'ball', x: point.x, y: point.y });
+      refreshStrategyBoard(true); return;
+    }
   });
-  svg.addEventListener('pointermove', event => { if (!draft || draft.pointerId !== event.pointerId) return; const point = strategyPoint(svg, event); draft.endX = point.x; draft.endY = point.y; renderDraft(); event.preventDefault(); });
-  svg.addEventListener('pointerup', endDraft);
-  svg.addEventListener('pointercancel', endDraft);
+  svg.addEventListener('pointermove', event => {
+    if (dragging?.pointerId === event.pointerId) { setDragPosition(strategyPoint(svg, event)); event.preventDefault(); return; }
+    if (!draft || draft.pointerId !== event.pointerId) return;
+    const point = strategyPoint(svg, event); draft.endX = point.x; draft.endY = point.y; renderDraft(); event.preventDefault();
+  });
+  const endInteraction = event => { if (!endDrag(event)) endDraft(event); };
+  svg.addEventListener('pointerup', endInteraction);
+  svg.addEventListener('pointercancel', endInteraction);
 }
 function openStrategyBoard() {
   const g = game();
   if (!g || g.status !== 'live') return toast('試合中に作戦ボードを開いてください。', true);
-  if (!state.strategyBoard || state.strategyBoard.gameId !== g.id) state.strategyBoard = { gameId: g.id, items: [], tool: 'home' };
+  if (!state.strategyBoard || state.strategyBoard.gameId !== g.id) state.strategyBoard = { gameId: g.id, items: [], history: [], tool: 'home' };
   normalizeStrategyBoard(state.strategyBoard);
   showSheet('作戦ボード', view.strategyBoardHTML(state.strategyBoard), 'strategy-board-sheet');
   setupStrategyBoard();
@@ -482,8 +526,15 @@ const handlers = {
     sheet.querySelectorAll('[data-action="strategy-tool"]').forEach(tool => { const active = tool.dataset.tool === state.strategyBoard.tool; tool.classList.toggle('active', active); tool.setAttribute('aria-pressed', String(active)); });
     const hint = sheet.querySelector('#strategy-board-hint'); if (hint) hint.textContent = strategyToolHints[state.strategyBoard.tool];
   },
-  'strategy-undo': () => { if (state.strategyBoard?.items.length) { state.strategyBoard.items.pop(); refreshStrategyBoard(); } },
-  'strategy-clear': () => { if (state.strategyBoard?.items.length) { state.strategyBoard.items = []; refreshStrategyBoard(); toast('作戦ボードを消去しました。'); } },
+  'strategy-undo': () => {
+    const board = state.strategyBoard;
+    if (!board) return;
+    if (board.history?.length) board.items = board.history.pop();
+    else if (board.items.length) board.items.pop();
+    else return;
+    refreshStrategyBoard();
+  },
+  'strategy-clear': () => { if (state.strategyBoard?.items.length) { rememberStrategyBoard(); state.strategyBoard.items = []; refreshStrategyBoard(); toast('作戦ボードを消去しました。'); } },
   'apply-update': applyPWAUpdate,
   'check-update': checkPWAUpdate,
   confirm: () => busy(async () => { const fn = confirmAction; if (fn) await fn(); }),
@@ -849,7 +900,7 @@ document.addEventListener('submit', event => {
     closeSheet(); toast('ゲームクロックを変更しました。');
   });
 });
-sheet.addEventListener('cancel', event => { if (state.busy) event.preventDefault(); else { pending = null; confirmAction = null; } });
+sheet.addEventListener('cancel', event => { event.preventDefault(); if (!state.busy) closeSheet(); });
 sheet.addEventListener('click', event => { if (event.target === sheet && !state.busy) { const r = sheet.getBoundingClientRect(); if (event.clientX < r.left || event.clientX > r.right || event.clientY < r.top || event.clientY > r.bottom) closeSheet(); } });
 window.addEventListener('hashchange', () => { resolvedShareHash = ''; closeSheet(); state.lastError = ''; render(); window.scrollTo(0, 0); });
 document.addEventListener('visibilitychange', () => { void syncWakeLock(); });
