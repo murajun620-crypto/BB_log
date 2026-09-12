@@ -1,5 +1,5 @@
 import * as db from './db.js';
-import { uid, localDate, STATS, activeEvents, attackDirectionForPeriod, fullCourtPointFromHalf, isBackcourtPoint, makePeriods, oppositeDirection, shotPointsFromPoint, shotZoneFromPoint, validateTeam, validateGame, lineup, eventLabel, aggregate, aggregateGames } from './domain.js';
+import { uid, localDate, STATS, activeEvents, attackDirectionForPeriod, fullCourtPointFromHalf, isBackcourtPoint, makePeriods, opponentLineup, oppositeDirection, shotPointsFromPoint, shotZoneFromPoint, validateTeam, validateGame, lineup, eventLabel, aggregate, aggregateGames } from './domain.js';
 import { backupObject, parseBackup, gameCSV, download, copyText, shareFile, shareUrl } from './transfer.js';
 import { boxScoreImage, playerStatsImage, safeFilename, shareImage } from './share-image.js';
 import { createSharedReport, createAggregateSharedReport, createCompressedSharePayload, parseSharePayload, parseSharedReport, sharedReportFile } from './shared-report.js';
@@ -10,7 +10,7 @@ import { cloudSettingsHTML, setupCloudShareUI } from './cloud-share-ui.js';
 const app = document.querySelector('#app');
 const sheet = document.querySelector('#sheet');
 const toastNode = document.querySelector('#toast');
-const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, advancedMode: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, historySelection: new Set(), aggregateMode: 'total', aggregateGameId: null, aggregatePlayerGameId: 'total', shotDisplayMode: 'points', strategyBoard: null, proSelection: null, proSub: null, proOpponentSelection: null, page: 'home', gameId: null, busy: false, lastError: '' };
+const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, advancedMode: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, historySelection: new Set(), aggregateMode: 'total', aggregateGameId: null, aggregatePlayerGameId: 'total', shotDisplayMode: 'points', strategyBoard: null, proSelection: null, proSub: null, proOpponentSelection: null, proOpponentSub: null, page: 'home', gameId: null, busy: false, lastError: '' };
 let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, proClockTimer = null, proClockSaving = false, resolvedShareHash = '', sharePayloadPromise = null, pwaRegistration = null;
 const PRO_FIELD_SHOT_TYPES = new Set(['FGM', 'FGX']);
 function proShotPointFromEvent(button, event, direction) {
@@ -144,7 +144,7 @@ function render() {
     html = page === 'live' ? g.mode === 'pro' ? view.proLiveView(state, g, gameEvents(g), currentClockSeconds(g)) : view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.13 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.14 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -227,20 +227,22 @@ function readTeamForm() {
 function readGameForm() {
   const form = document.querySelector('#game-form'); if (!form) return;
   const d = new FormData(form);
-  gameDraft = { ...gameDraft, date: d.get('date'), teamId: d.get('teamId'), opponentName: d.get('opponentName'), format: d.get('format'), count: d.get('count') || 4, minutes: d.get('minutes'), mode: d.get('mode') || 'standard', clockEnabled: d.get('clockEnabled') === 'on', opponentTracking: d.get('opponentTracking') || 'score', opponentRosterText: d.get('opponentRosterText') || '', participants: d.getAll('participants'), starters: d.getAll('starters') };
+  const opponentNumbers = d.getAll('opponentRosterNumber');
+  gameDraft = { ...gameDraft, date: d.get('date'), teamId: d.get('teamId'), opponentName: d.get('opponentName'), format: d.get('format'), count: d.get('count') || 4, minutes: d.get('minutes'), mode: d.get('mode') || 'standard', clockEnabled: d.get('clockEnabled') === 'on', opponentTracking: d.get('opponentTracking') || 'score', opponentRosterText: opponentNumbers.length ? opponentNumbers.filter(Boolean).join('\n') : gameDraft.opponentRosterText || '', participants: d.getAll('participants'), starters: d.getAll('starters') };
 }
 function selectTeam(id) {
   const t = state.data.teams.find(t => t.id === id);
   gameDraft.teamId = id; gameDraft.participants = t.players.map(p => p.id); gameDraft.starters = t.players.length >= 5 ? t.players.slice(0, 5).map(p => p.id) : [];
 }
-function parseOpponentRoster(text) {
+function parseOpponentRoster(text, previousRoster = []) {
   const lines = String(text || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+  const existing = new Map(previousRoster.map(player => [String(player.number), player.id]));
   const numbers = new Set();
   return lines.map((line, index) => {
     if (!/^\d{1,3}$/.test(line)) throw new Error(`相手選手${index + 1}は背番号（1〜3桁）だけで入力してください。`);
     if (numbers.has(line)) throw new Error('相手選手の背番号が重複しています。');
     numbers.add(line);
-    return { id: uid(), number: line };
+    return { id: existing.get(line) || uid(), number: line };
   });
 }
 async function saveGameChange(next, event = null) {
@@ -546,7 +548,7 @@ const handlers = {
   'pro-action': button => {
     if (game()?.mode !== 'pro') return;
     const playerId = state.proSelection?.playerId || null;
-    state.proSub = null; state.proOpponentSelection = null; state.proSelection = { type: button.dataset.type, playerId }; render();
+    state.proSub = null; state.proOpponentSelection = null; state.proOpponentSub = null; state.proSelection = { type: button.dataset.type, playerId }; render();
   },
   'pro-select-player': button => {
     const g = game(); if (g?.mode !== 'pro') return;
@@ -582,7 +584,7 @@ const handlers = {
     return busy(async () => { const saved = await record(eventType, selection.playerId, shotExtra); if (isOpponent) state.proOpponentSelection = null; else state.proSelection = null; render(); if (!isOpponent) offerFollowup(saved); });
   },
   'pro-backcourt': () => toast('バックコートは選択できません。', true),
-  'pro-sub': () => { if (game()?.mode !== 'pro') return; state.proSelection = null; state.proSub = { outPlayerId: null }; state.proOpponentSelection = null; render(); },
+  'pro-sub': () => { if (game()?.mode !== 'pro') return; state.proSelection = null; state.proSub = { outPlayerId: null }; state.proOpponentSelection = null; state.proOpponentSub = null; render(); },
   'toggle-pro-attack': () => busy(async () => {
     const g = game(); if (g?.mode !== 'pro') return;
     const next = { ...g, attackDirection: g.attackDirection === 'left' ? 'right' : 'left' };
@@ -592,10 +594,27 @@ const handlers = {
   'pro-opponent-action': button => {
     if (game()?.mode !== 'pro' || game().opponentTracking !== 'player') return;
     const playerId = state.proOpponentSelection?.playerId || null;
-    state.proOpponentSelection = { type: button.dataset.type, playerId }; state.proSelection = null; state.proSub = null; render();
+    state.proOpponentSelection = { type: button.dataset.type, playerId }; state.proSelection = null; state.proSub = null; state.proOpponentSub = null; render();
+  },
+  'pro-opponent-sub': () => {
+    const g = game();
+    if (g?.mode !== 'pro' || g.opponentTracking !== 'player') return;
+    if ((g.opponentRoster || []).length < 5) return toast('相手選手は5人以上入力してください。', true);
+    if ((g.opponentRoster || []).length <= 5) return toast('交代できる相手ベンチ選手がいません。', true);
+    state.proOpponentSelection = null; state.proSelection = null; state.proSub = null; state.proOpponentSub = { outPlayerId: null }; render();
   },
   'pro-select-opponent': button => {
     const g = game(), selection = state.proOpponentSelection;
+    const on = new Set(opponentLineup(g, gameEvents(g)));
+    if (state.proOpponentSub) {
+      if (!state.proOpponentSub.outPlayerId) {
+        if (!on.has(button.dataset.id)) return toast('交代するコート上の相手選手を選んでください。', true);
+        state.proOpponentSub = { outPlayerId: button.dataset.id }; render(); return;
+      }
+      if (on.has(button.dataset.id)) return toast('コートに入る相手のベンチ選手を選んでください。', true);
+      const outPlayerId = state.proOpponentSub.outPlayerId;
+      return busy(async () => { await record('SUB', null, { side: 'opponent', outPlayerId, inPlayerId: button.dataset.id }); state.proOpponentSub = null; state.proOpponentSelection = null; render(); });
+    }
     if (g?.mode !== 'pro' || g.opponentTracking !== 'player' || !selection?.type) return toast('先に相手のプレーを選んでください。', true);
     if (PRO_FIELD_SHOT_TYPES.has(selection.type)) { state.proOpponentSelection = { ...selection, playerId: button.dataset.id }; render(); return; }
     return busy(async () => { await record(selection.type, button.dataset.id, { side: 'opponent' }); state.proOpponentSelection = null; render(); });
@@ -834,7 +853,7 @@ document.addEventListener('submit', event => {
     const mode = gameDraft.mode === 'pro' ? 'pro' : 'standard';
     const opponentRoster = mode === 'pro' && gameDraft.opponentTracking === 'player' ? parseOpponentRoster(gameDraft.opponentRosterText) : [];
     if (mode === 'pro' && gameDraft.opponentTracking === 'player' && !opponentRoster.length) throw new Error('相手選手を1人以上入力してください。');
-    const g = { id: uid(), teamId: t.id, teamName: t.name, opponentName: gameDraft.opponentName.trim(), date: gameDraft.date, format: gameDraft.format, regulationCount: periods.length, minutes: Number(gameDraft.minutes), periods, currentPeriodId: periods[0]?.id, roster: structuredClone(t.players.filter(p => gameDraft.participants.includes(p.id))), starters: gameDraft.starters, mode, ...(mode === 'pro' ? { attackDirection: 'right' } : {}), clockEnabled: mode === 'pro' && !!gameDraft.clockEnabled, clockSeconds: mode === 'pro' && gameDraft.clockEnabled ? Math.round(Number(gameDraft.minutes) * 60) : undefined, clockRunning: false, clockStartedAt: null, opponentTracking: mode === 'pro' ? gameDraft.opponentTracking : 'score', opponentRoster, status: 'live', nextSeq: 1, revision: 0, createdAt: now, updatedAt: now };
+    const g = { id: uid(), teamId: t.id, teamName: t.name, opponentName: gameDraft.opponentName.trim(), date: gameDraft.date, format: gameDraft.format, regulationCount: periods.length, minutes: Number(gameDraft.minutes), periods, currentPeriodId: periods[0]?.id, roster: structuredClone(t.players.filter(p => gameDraft.participants.includes(p.id))), starters: gameDraft.starters, mode, ...(mode === 'pro' ? { attackDirection: 'right' } : {}), clockEnabled: mode === 'pro' && !!gameDraft.clockEnabled, clockSeconds: mode === 'pro' && gameDraft.clockEnabled ? Math.round(Number(gameDraft.minutes) * 60) : undefined, clockRunning: false, clockStartedAt: null, opponentTracking: mode === 'pro' ? gameDraft.opponentTracking : 'score', opponentRoster, ...(mode === 'pro' && gameDraft.opponentTracking === 'player' ? { opponentStarters: opponentRoster.slice(0, 5).map(player => player.id) } : {}), status: 'live', nextSeq: 1, revision: 0, createdAt: now, updatedAt: now };
     validateGame(g, []); await db.createGame(g); await refresh(); gameDraft = null; location.hash = `#live/${g.id}`;
   });
   if (form.id === 'live-member-form') busy(async () => {
@@ -866,13 +885,18 @@ document.addEventListener('submit', event => {
     const opponentTracking = values.get('opponentTracking') === 'player' ? 'player' : 'score';
     const opponentPlayerEvents = activeEvents(gameEvents(g)).filter(event => event.side === 'opponent');
     if ((mode !== 'pro' || opponentTracking !== 'player') && opponentPlayerEvents.length) throw new Error('相手選手の個人記録があるため、標準モード／総得点のみに変更できません。先に履歴から該当記録を削除してください。');
-    const opponentRoster = mode === 'pro' && opponentTracking === 'player' ? parseOpponentRoster(values.get('opponentRosterText')) : [];
+    const rosterText = values.getAll('opponentRosterNumber').filter(Boolean).join('\n');
+    const opponentRoster = mode === 'pro' && opponentTracking === 'player' ? parseOpponentRoster(rosterText, g.opponentRoster || []) : [];
+    const previousOpponentPlayers = new Map((g.opponentRoster || []).map(player => [player.id, player]));
+    const previousInitialIds = Array.isArray(g.opponentStarters) && g.opponentStarters.length ? g.opponentStarters : (g.opponentRoster || []).slice(0, 5).map(player => player.id);
+    const previousInitialNumbers = new Set(previousInitialIds.map(id => previousOpponentPlayers.get(id)?.number).filter(Boolean));
+    const opponentStarters = opponentRoster.filter(player => previousInitialNumbers.has(player.number)).slice(0, 5).map(player => player.id);
     const clockEnabled = mode === 'pro' && values.get('clockEnabled') === 'on';
     const currentSeconds = currentClockSeconds(g);
     const period = g.periods.find(candidate => candidate.id === g.currentPeriodId);
     const clockSeconds = clockEnabled ? Math.max(0, Math.round(currentSeconds ?? Number(period?.minutes || g.minutes) * 60)) : undefined;
     const clockRunning = clockEnabled && g.clockRunning && clockSeconds > 0;
-    await saveGameChange({ ...g, mode, clockEnabled, clockSeconds, clockRunning, clockStartedAt: clockRunning ? g.clockStartedAt : null, opponentTracking: mode === 'pro' ? opponentTracking : 'score', opponentRoster });
+    await saveGameChange({ ...g, mode, clockEnabled, clockSeconds, clockRunning, clockStartedAt: clockRunning ? g.clockStartedAt : null, opponentTracking: mode === 'pro' ? opponentTracking : 'score', opponentRoster, opponentStarters: mode === 'pro' && opponentTracking === 'player' ? (opponentStarters.length ? opponentStarters : opponentRoster.slice(0, 5).map(player => player.id)) : [] });
     closeSheet(); toast('試合設定を保存しました。');
   });
   if (form.id === 'event-form') busy(async () => {

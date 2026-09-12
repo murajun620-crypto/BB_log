@@ -1,9 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, eventLabel, fullCourtPointFromHalf, halfCourtPointFromFull, isBackcourtPoint, normalizeShotZone, oppositeDirection, percent, lineup, validateGame, validateTeam, makePeriods, shotPointsFromPoint, shotZoneForEvent, shotZoneFromPoint, uid } from '../js/domain.js';
+import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, eventLabel, fullCourtPointFromHalf, halfCourtPointFromFull, isBackcourtPoint, normalizeShotZone, opponentLineup, oppositeDirection, percent, lineup, validateGame, validateTeam, makePeriods, shotPointsFromPoint, shotZoneForEvent, shotZoneFromPoint, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
-import { isIPhonePortrait, isIPhoneUserAgent, PRO_HALF_COURT_MARKINGS, proLiveView, shotZonePicker, shotChartMapHTML, strategyBoardHTML } from '../js/views.js';
+import { isIPhonePortrait, isIPhoneUserAgent, PRO_HALF_COURT_MARKINGS, liveSettingsHTML, proLiveView, shotZonePicker, shotChartMapHTML, strategyBoardHTML } from '../js/views.js';
 
 const fixture = () => {
   const players = Array.from({ length: 6 }, (_, i) => ({ id: `player-${i}`, number: `${i + 4}`, name: `選手${i + 1}` }));
@@ -50,11 +50,11 @@ test('Pro games preserve clock, opponent player stats and exact shot positions',
   assert.equal(shotZoneFromPoint('3PM', .3, 60 / 500), 'three-left-wing');
   assert.equal(shotZoneFromPoint(null, .27, 176 / 500), 'two-left-wing');
   assert.equal(shotZoneFromPoint(null, .27, 180 / 500), 'two-left-wing');
-  assert.equal(shotZoneFromPoint(null, 180 / 940, 120 / 500), 'two-left-corner');
-  assert.equal(shotZoneFromPoint(null, 180 / 940, 150 / 500), 'two-left-wing');
+  assert.equal(shotZoneFromPoint(null, 180 / 940, 100 / 500), 'two-left-corner');
+  assert.equal(shotZoneFromPoint(null, 180 / 940, 120 / 500), 'two-left-wing');
   assert.equal(shotZoneFromPoint(null, 240 / 940, 120 / 500), 'two-left-wing');
-  assert.equal(shotZoneFromPoint('3PM', 140 / 940, 50 / 500), 'three-left-corner');
-  assert.equal(shotZoneFromPoint('3PM', 140 / 940, 70 / 500), 'three-left-wing');
+  assert.equal(shotZoneFromPoint('3PM', 140 / 940, 35 / 500), 'three-left-corner');
+  assert.equal(shotZoneFromPoint('3PM', 140 / 940, 50 / 500), 'three-left-wing');
   assert.equal(shotZoneFromPoint(null, 140 / 940, 40 / 500), 'three-left-corner');
   assert.equal(shotZoneFromPoint(null, 300 / 940, 40 / 500), 'three-left-wing');
   assert.equal(shotZoneForEvent({ eventType: '3PM', shotZone: 'three-left-corner', shotX: .3, shotY: .15 }), 'three-left-wing');
@@ -212,7 +212,28 @@ test('opponent players use jersey numbers without requiring or displaying names'
   assert.match(html, /data-action="pro-select-opponent" data-id="opponent-1"/);
   assert.match(html, /<span class="pro-player-name"><strong>8<\/strong><\/span>/);
   assert.match(html, /<b>相手 8 · フィールドゴール成功<\/b>/);
+  assert.match(html, /data-action="pro-opponent-sub"/);
+  assert.match(html, /pro-player on-court/);
   assert.doesNotMatch(html, /相手選手.*相手選手/);
+});
+test('opponent substitutions keep five players on court and use opponent numbers', () => {
+  const { game, events } = fixture();
+  game.mode = 'pro'; game.clockEnabled = false; game.opponentTracking = 'player';
+  game.opponentRoster = Array.from({ length: 6 }, (_, i) => ({ id: `opponent-${i}`, number: `${i + 4}` }));
+  game.opponentStarters = game.opponentRoster.slice(0, 5).map(player => player.id);
+  const substitution = { id: uid(), gameId: game.id, periodId: game.currentPeriodId, eventType: 'SUB', side: 'opponent', playerId: null, outPlayerId: 'opponent-0', inPlayerId: 'opponent-5', points: 0, timestamp: new Date().toISOString(), seq: game.nextSeq++ };
+  events.push(substitution);
+  validateGame(game, events);
+  assert.deepEqual(opponentLineup(game, events), ['opponent-1', 'opponent-2', 'opponent-3', 'opponent-4', 'opponent-5']);
+  assert.equal(eventLabel(game, substitution), '相手 4 → 9');
+});
+test('opponent roster uses roller selectors in live settings', () => {
+  const { game } = fixture();
+  game.mode = 'pro'; game.clockEnabled = false; game.opponentTracking = 'player'; game.opponentRoster = [{ id: 'opponent-1', number: '8' }];
+  const html = liveSettingsHTML(game);
+  assert.equal((html.match(/name="opponentRosterNumber"/g) || []).length, 12);
+  assert.match(html, /option value="8" selected/);
+  assert.doesNotMatch(html, /opponentRosterText/);
 });
 test('strategy board exposes court tools and preserves placed items in its view', () => {
   const board = { tool: 'away', items: [

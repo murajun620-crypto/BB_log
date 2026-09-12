@@ -29,7 +29,7 @@ export const isPointShotEvent = event => isShotEvent(event) || ['FTM', 'FTX'].in
 // Keep the virtual zone boundaries aligned with the visible Pro court. The
 // sideline is widened without moving the 3P line, while the 2P corner/wing
 // split follows the same height used by the shot-map regions.
-const PRO_COURT = { width: 940, height: 500, centerX: 470, centerY: 250, leftBasketX: 74, rightBasketX: 866, threeCornerY: 56, threeCornerDepth: 163, threeRadius: 213, twoCornerY: 138, paintTop: 176, paintBottom: 324, leftFreeThrowX: 210, rightFreeThrowX: 730, rimRadius: 37 };
+const PRO_COURT = { width: 940, height: 500, centerX: 470, centerY: 250, leftBasketX: 74, rightBasketX: 866, threeLineCornerY: 56, threeZoneCornerY: 40, threeCornerDepth: 163, threeRadius: 213, twoCornerY: 110, paintTop: 176, paintBottom: 324, leftFreeThrowX: 210, rightFreeThrowX: 730, rimRadius: 37 };
 export const oppositeDirection = direction => direction === 'left' ? 'right' : 'left';
 export function halfCourtPointFromFull(x, y, direction) {
   if (![x, y].every(value => Number.isFinite(value))) return null;
@@ -58,7 +58,7 @@ function pointIsThree(x, y) {
   const px = x * PRO_COURT.width, py = y * PRO_COURT.height;
   const leftBasket = px <= PRO_COURT.centerX;
   const depth = leftBasket ? px : PRO_COURT.width - px;
-  const corner = depth <= PRO_COURT.threeCornerDepth && (py <= PRO_COURT.threeCornerY || py >= PRO_COURT.height - PRO_COURT.threeCornerY);
+  const corner = depth <= PRO_COURT.threeCornerDepth && (py <= PRO_COURT.threeLineCornerY || py >= PRO_COURT.height - PRO_COURT.threeLineCornerY);
   const basketX = leftBasket ? PRO_COURT.leftBasketX : PRO_COURT.rightBasketX;
   return corner || Math.hypot(px - basketX, py - PRO_COURT.centerY) >= PRO_COURT.threeRadius;
 }
@@ -77,7 +77,7 @@ export function shotZoneFromPoint(type, x, y) {
   if (prefix === 'two' && distanceToBasket <= PRO_COURT.rimRadius) return 'rim';
   if (prefix === 'two' && inPaint && py >= PRO_COURT.paintTop && py <= PRO_COURT.paintBottom) return 'paint';
   const depth = leftBasket ? px : PRO_COURT.width - px;
-  const cornerBoundary = prefix === 'three' ? PRO_COURT.threeCornerY : PRO_COURT.twoCornerY;
+  const cornerBoundary = prefix === 'three' ? PRO_COURT.threeZoneCornerY : PRO_COURT.twoCornerY;
   const cornerDepth = prefix === 'three' ? PRO_COURT.threeCornerDepth : PRO_COURT.leftFreeThrowX;
   if (depth <= cornerDepth && (py <= cornerBoundary || py >= PRO_COURT.height - cornerBoundary)) return `${prefix}-${side < 0 ? 'left' : 'right'}-corner`;
   if (distanceFromCenter > .27) return `${prefix}-${side < 0 ? 'left' : 'right'}-wing`;
@@ -153,8 +153,21 @@ export function aggregateGames(games, events) {
 }
 export function lineup(game, events, strict = false) {
   const on = new Set(game.starters);
-  for (const e of activeEvents(events)) if (e.eventType === 'SUB') {
+  for (const e of activeEvents(events)) if (e.eventType === 'SUB' && e.side !== 'opponent') {
     if (strict && (on.size !== 5 || !on.has(e.outPlayerId) || on.has(e.inPlayerId))) throw new Error('交代履歴が成立しません。後の交代を取り消してから変更してください。');
+    on.delete(e.outPlayerId); on.add(e.inPlayerId);
+  }
+  return [...on];
+}
+export function opponentLineup(game, events, strict = false) {
+  const roster = game?.opponentRoster || [];
+  const ids = new Set(roster.map(player => player.id));
+  const initial = Array.isArray(game?.opponentStarters) && game.opponentStarters.length
+    ? game.opponentStarters
+    : roster.slice(0, 5).map(player => player.id);
+  const on = new Set(initial.filter(id => ids.has(id)));
+  for (const e of activeEvents(events)) if (e.eventType === 'SUB' && e.side === 'opponent') {
+    if (strict && (on.size !== initial.length || !on.has(e.outPlayerId) || on.has(e.inPlayerId))) throw new Error('相手チームの交代履歴が成立しません。後の交代を取り消してから変更してください。');
     on.delete(e.outPlayerId); on.add(e.inPlayerId);
   }
   return [...on];
@@ -162,7 +175,7 @@ export function lineup(game, events, strict = false) {
 export function eventLabel(game, event) {
   const player = (id, side = 'home') => { const p = (side === 'opponent' ? game.opponentRoster || [] : game.roster).find(p => p.id === id); return p ? side === 'opponent' ? p.number : `${p.number} ${p.name}` : '不明'; };
   if (event.eventType === 'OPP') return `相手 +${event.points}`;
-  if (event.eventType === 'SUB') return `${player(event.outPlayerId)} → ${player(event.inPlayerId)}`;
+  if (event.eventType === 'SUB') return `${event.side === 'opponent' ? '相手 ' : ''}${player(event.outPlayerId, event.side)} → ${player(event.inPlayerId, event.side)}`;
   const eventZone = shotZoneForEvent(event);
   const zone = eventZone ? ` · ${shotZoneLabel(eventZone)}` : '';
   return `${event.side === 'opponent' ? '相手 ' : ''}${player(event.playerId, event.side)} · ${STATS[event.eventType]?.label || event.eventType}${zone}`;
@@ -209,13 +222,15 @@ export function validateGame(g, events) {
   const ids = new Set(g.roster.map(p => p.id));
   const opponentIds = new Set((g.opponentRoster || []).map(p => p.id));
   ensure(Array.isArray(g.starters) && (g.starters.length === 0 || g.starters.length === 5) && unique(g.starters) && g.starters.every(id => ids.has(id)), '先発は未設定または5人を選択してください。');
+  if (g.opponentStarters !== undefined) ensure(Array.isArray(g.opponentStarters) && g.opponentStarters.length <= 5 && unique(g.opponentStarters) && g.opponentStarters.every(id => opponentIds.has(id)), '相手チームのコート上選手が不正です。');
   ensure(Array.isArray(g.periods) && g.periods.length >= g.regulationCount && g.periods.length <= 50, 'ピリオド情報が不正です。');
   for (const p of g.periods) ensure(p && isId(p.id) && isText(p.label, 16) && Number.isFinite(p.minutes) && p.minutes >= 1 && p.minutes <= 60 && typeof p.overtime === 'boolean', 'ピリオド情報が不正です。');
   ensure(unique(g.periods.map(p => p.id)) && g.periods.some(p => p.id === g.currentPeriodId), '現在のピリオドが不正です。');
   ensure(Array.isArray(events) && unique(events.map(e => e.id)) && unique(events.map(e => e.seq)), 'イベントが重複しています。');
   for (const e of events) {
     ensure(e && isId(e.id) && e.gameId === g.id && g.periods.some(p => p.id === e.periodId) && validTime(e.timestamp) && Number.isInteger(e.seq) && e.seq > 0 && e.seq < g.nextSeq && (!e.deletedAt || validTime(e.deletedAt)), 'イベント情報が不正です。');
-    if (e.side === 'opponent') ensure(g.mode === 'pro' && g.opponentTracking === 'player' && Object.hasOwn(STATS, e.eventType) && opponentIds.has(e.playerId) && e.points === STATS[e.eventType].points, '相手選手スタッツが不正です。');
+    if (e.side === 'opponent' && e.eventType === 'SUB') ensure(g.mode === 'pro' && g.opponentTracking === 'player' && opponentIds.has(e.outPlayerId) && opponentIds.has(e.inPlayerId) && e.outPlayerId !== e.inPlayerId && e.points === 0, '相手チームの交代選手が不正です。');
+    else if (e.side === 'opponent') ensure(g.mode === 'pro' && g.opponentTracking === 'player' && Object.hasOwn(STATS, e.eventType) && opponentIds.has(e.playerId) && e.points === STATS[e.eventType].points, '相手選手スタッツが不正です。');
     else if (e.eventType === 'OPP') ensure([1, 2, 3].includes(e.points) && e.playerId == null, '相手得点が不正です。');
     else if (e.eventType === 'SUB') ensure(ids.has(e.outPlayerId) && ids.has(e.inPlayerId) && e.outPlayerId !== e.inPlayerId && e.points === 0, '交代選手が不正です。');
     else {
@@ -226,4 +241,5 @@ export function validateGame(g, events) {
     if (e.clockSeconds !== undefined) ensure(Number.isInteger(e.clockSeconds) && e.clockSeconds >= 0 && e.clockSeconds <= 36000, 'ゲームクロックが不正です。');
   }
   lineup(g, events, true);
+  if (g.opponentRoster?.length || g.opponentStarters !== undefined) opponentLineup(g, events, true);
 }

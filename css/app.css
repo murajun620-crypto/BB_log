@@ -170,6 +170,11 @@ input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--accent); c
 .form-footnote { text-align: center; margin: 15px 0; }
 .pro-setup-grid { display: grid; gap: 16px; margin-top: 16px; padding-top: 16px; border-top: 1px solid var(--line); }
 .pro-setup-grid .segmented { margin-top: 8px; }
+.field-label { display: block; }
+.opponent-number-picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 7px; }
+.opponent-number-picker label { display: grid; gap: 3px; min-width: 0; }
+.opponent-number-picker label > span { color: var(--muted); font-size: 9px; }
+.opponent-number-picker select { min-width: 0; margin: 0; }
 .field-help { display: block; margin-top: 7px; color: var(--muted); font-size: 11px; font-weight: 400; }
 .settings-panel { margin-bottom: 18px; }
 .settings-panel h2 { margin-bottom: 14px; }
@@ -384,6 +389,7 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-player.bench strong { color: var(--accent); opacity: .78; }
 .pro-player.selected { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
 .pro-sub-button { min-height: 39px; margin-top: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--muted); font-size: 11px; font-weight: 700; }
+.opponent-sub-button { width: 100%; grid-column: 1 / -1; }
 .pro-opponent-score { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
 .pro-opponent-score .opponent-button { min-height: 44px; }
 .pro-opponent-actions { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 4px; }
