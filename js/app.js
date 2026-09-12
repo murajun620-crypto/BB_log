@@ -144,8 +144,7 @@ function render() {
     html = page === 'live' ? g.mode === 'pro' ? view.proLiveView(state, g, gameEvents(g), currentClockSeconds(g)) : view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
-  if (page === 'live') app.querySelector('.live-footer, .pro-footer')?.insertAdjacentHTML('afterend', view.strategyBoardButtonHTML());
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.4 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.5 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -519,22 +518,6 @@ function openStrategyBoard() {
 const handlers = {
   ...setupCloudShareUI({ showSheet, closeSheet, toast, refreshView: render, getGame: game, getEvents: gameEvents, getAggregate: aggregateShareContext, message: gameShareMessage }),
   'close-sheet': closeSheet,
-  'strategy-board': openStrategyBoard,
-  'strategy-tool': button => {
-    if (!state.strategyBoard) return;
-    state.strategyBoard.tool = strategyBoardTools.has(button.dataset.tool) ? button.dataset.tool : 'home';
-    sheet.querySelectorAll('[data-action="strategy-tool"]').forEach(tool => { const active = tool.dataset.tool === state.strategyBoard.tool; tool.classList.toggle('active', active); tool.setAttribute('aria-pressed', String(active)); });
-    const hint = sheet.querySelector('#strategy-board-hint'); if (hint) hint.textContent = strategyToolHints[state.strategyBoard.tool];
-  },
-  'strategy-undo': () => {
-    const board = state.strategyBoard;
-    if (!board) return;
-    if (board.history?.length) board.items = board.history.pop();
-    else if (board.items.length) board.items.pop();
-    else return;
-    refreshStrategyBoard();
-  },
-  'strategy-clear': () => { if (state.strategyBoard?.items.length) { rememberStrategyBoard(); state.strategyBoard.items = []; refreshStrategyBoard(); toast('作戦ボードを消去しました。'); } },
   'apply-update': applyPWAUpdate,
   'check-update': checkPWAUpdate,
   confirm: () => busy(async () => { const fn = confirmAction; if (fn) await fn(); }),

@@ -191,7 +191,7 @@ input[role=switch]:checked::after { transform: translateX(18px); }
 .shared-game-context { color: var(--muted); font-size: 11px; margin: -4px 0 14px; overflow-wrap: anywhere; }
 /* The recording screen is a fixed-height grid. On short screens only its center scrolls. */
 body.in-game { overscroll-behavior-y: none; }
-.live-screen { width: 100%; max-width: 500px; height: 100vh; height: 100dvh; min-height: 0; margin: auto; padding: env(safe-area-inset-top) 14px max(8px, env(safe-area-inset-bottom)); display: grid; grid-template-rows: 38px 62px 30px 44px 28px minmax(0, 1fr) 78px 50px 42px; gap: 5px; }
+.live-screen { width: 100%; max-width: 500px; height: 100vh; height: 100dvh; min-height: 0; margin: auto; padding: env(safe-area-inset-top) 14px max(8px, env(safe-area-inset-bottom)); display: grid; grid-template-rows: 38px 62px 30px 44px 28px minmax(0, 1fr) 78px 50px; gap: 5px; }
 .live-header { display: flex; align-items: center; gap: 7px; }
 .live-header .icon-button { width: 36px; min-width: 36px; height: 36px; }
 .live-title { display: flex; align-items: center; gap: 6px; font-size: 10px; letter-spacing: 1.1px; font-weight: 750; }
@@ -239,8 +239,6 @@ body.in-game { overscroll-behavior-y: none; }
 .undo-button .icon { width: 17px; }
 .box-button { display: flex; align-items: center; justify-content: center; gap: 5px; background: var(--surface); border: 1px solid var(--line); border-radius: 11px; padding: 8px 12px; font-size: 9px; font-weight: 750; }
 .box-button .icon { width: 17px; }
-.strategy-button { display: flex; align-items: center; justify-content: center; min-width: 104px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); color: var(--accent); font-size: 10px; font-weight: 750; }
-.live-screen > .strategy-button, .pro-live-screen > .strategy-button { flex: 0 0 auto; width: 100%; min-width: 0; min-height: 42px; }
 .strategy-board-sheet { inset: 0; box-sizing: border-box; width: 100vw; max-width: none; height: 100dvh; max-height: none; margin: 0; padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-right)) max(10px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-left)); border-radius: 0; display: flex; flex-direction: column; overflow: hidden; }
 .strategy-board-sheet .sheet-handle { display: none; }
 .strategy-board-sheet .sheet-header { position: relative; z-index: 2; flex: 0 0 auto; min-height: 44px; padding: 0 0 8px; }
@@ -618,7 +616,7 @@ body:has(dialog[open]) #toast { bottom: auto; top: max(15px, env(safe-area-inset
   .player-button strong { font-size: 21px; }
 }
 @media (max-height: 700px) {
-  .live-screen { grid-template-rows: 34px 48px 28px 44px 20px minmax(0, 1fr) 64px 46px 36px; gap: 3px; }
+  .live-screen { grid-template-rows: 34px 48px 28px 44px 20px minmax(0, 1fr) 64px 46px; gap: 3px; }
   .recent-heading { height: 20px; }
   .score-numbers { font-size: 32px; }
 }
