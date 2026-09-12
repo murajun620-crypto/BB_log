@@ -27,9 +27,9 @@ export const SHOT_EVENT_TYPES = new Set(['2PM', '2PX', '3PM', '3PX']);
 export const isShotEvent = event => SHOT_EVENT_TYPES.has(event?.eventType);
 export const isPointShotEvent = event => isShotEvent(event) || ['FTM', 'FTX'].includes(event?.eventType);
 // Keep the virtual zone boundaries aligned with the visible Pro court. The
-// wider sideline gap gives the 3P corner a usable tap area, while the 2P
-// corner/wing split follows the same height used by the shot-map regions.
-const PRO_COURT = { width: 940, height: 500, centerX: 470, centerY: 250, leftBasketX: 74, rightBasketX: 866, threeCornerY: 80, threeCornerDepth: 204, threeRadius: 213, twoCornerY: 138, paintTop: 176, paintBottom: 324, leftFreeThrowX: 210, rightFreeThrowX: 730, rimRadius: 37 };
+// sideline is widened without moving the 3P line, while the 2P corner/wing
+// split follows the same height used by the shot-map regions.
+const PRO_COURT = { width: 940, height: 500, centerX: 470, centerY: 250, leftBasketX: 74, rightBasketX: 866, threeCornerY: 56, threeCornerDepth: 163, threeRadius: 213, twoCornerY: 138, paintTop: 176, paintBottom: 324, leftFreeThrowX: 210, rightFreeThrowX: 730, rimRadius: 37 };
 export const oppositeDirection = direction => direction === 'left' ? 'right' : 'left';
 export function halfCourtPointFromFull(x, y, direction) {
   if (![x, y].every(value => Number.isFinite(value))) return null;
