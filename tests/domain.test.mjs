@@ -256,9 +256,9 @@ test('Pro shot input uses result buttons, auto-selects points and skips the cour
   assert.match(history, /押し続けると選手・シュートエリア・種別を表示/);
   const details = shotMarkerDetailFeedbackHTML({ player: '4 選手1', area: '左ウイング3P', result: '○ 成功', points: '3P', x: 282, y: 50 });
   assert.match(details, /shot-marker-detail-feedback/);
-  assert.match(details, /○ 成功 · 3P/);
   assert.match(details, /4 選手1/);
   assert.match(details, /左ウイング3P/);
+  assert.doesNotMatch(details, /○ 成功 · 3P/);
   const feedback = proLiveView({ ...state, proShotFeedback: { gameId: game.id, eventId: 'feedback-1', eventType: '3PM', shotX: 140 / 940, shotY: 35 / 500, shotZone: 'three-left-corner' } }, game, events);
   assert.match(feedback, /class="pro-shot-area-feedback" data-shot-area="左コーナー3P"/);
   assert.match(feedback, /シュートエリア/);
@@ -270,8 +270,10 @@ test('Pro shot input uses result buttons, auto-selects points and skips the cour
 });
 test('shot marker feedback is readable and court selection is suppressed', () => {
   const details = shotMarkerDetailFeedbackHTML({ player: '4 選手1', area: '左ウイング3P', result: '○ 成功', points: '3P', x: 282, y: 50 });
-  assert.match(details, /tspan x="0" y="-27"/);
-  assert.match(details, /tspan x="0" y="27"/);
+  assert.match(details, /tspan x="0" y="-12">4 選手1<\/tspan>/);
+  assert.match(details, /tspan x="0" y="12">左ウイング3P<\/tspan>/);
+  assert.doesNotMatch(details, /○ 成功 · 3P/);
+  assert.match(details, /width="144" height="54"/);
   assert.match(shotChartCss, /\.shot-court-map, \.shot-chart-map, \.pro-court \{[^}]*user-select: none/);
   assert.match(shotChartCss, /\.shot-marker-detail-feedback-text \{[^}]*font-size: 16px/);
   for (const source of [appSource, readerSource]) {
