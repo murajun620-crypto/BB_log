@@ -41,6 +41,8 @@
 .pro-shot-chart-marker text { pointer-events: none; }
 .pro-shot-chart-marker text { fill: var(--accent); font-size: 28px; font-weight: 850; paint-order: stroke; stroke: rgba(255,255,255,.9); stroke-width: 4px; stroke-linejoin: round; }
 .pro-shot-chart-marker.miss text { fill: #c7483f; }
+.pro-shot-draft-preview { fill: rgba(240, 178, 74, .24); stroke: #f0b24a; stroke-width: 4; pointer-events: none; }
+.pro-shot-editing, .pro-shot-chart-map[data-shot-editable-surface="true"] { cursor: crosshair; touch-action: none; }
 .shot-marker-detail-feedback { pointer-events: none; }
 .shot-marker-detail-feedback-point { fill: rgba(240, 178, 74, .18); stroke: #f0b24a; stroke-width: 3; }
 .shot-marker-detail-feedback-connector { stroke: #f0b24a; stroke-width: 2; stroke-dasharray: 4 4; }

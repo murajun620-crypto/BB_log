@@ -362,6 +362,8 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-shot-marker .shot-marker-hit-area { fill: transparent; pointer-events: all; }
 .pro-shot-marker text { fill: var(--accent); font-size: 28px; font-weight: 850; paint-order: stroke; stroke: rgba(255,255,255,.9); stroke-width: 4px; stroke-linejoin: round; pointer-events: none; }
 .pro-shot-marker.miss text { fill: #c7483f; }
+.pro-shot-draft-preview { fill: rgba(240, 178, 74, .24); stroke: #f0b24a; stroke-width: 4; pointer-events: none; }
+.pro-live-screen .pro-court.pro-shot-editing { pointer-events: auto !important; opacity: 1; filter: none; cursor: crosshair; }
 .pro-shot-area-feedback { pointer-events: none; animation: pro-shot-area-feedback-fade 3.2s ease-out forwards; }
 .pro-shot-area-feedback-point { fill: rgba(240, 178, 74, .18); stroke: #f0b24a; stroke-width: 3; }
 .pro-shot-area-feedback-connector { stroke: #f0b24a; stroke-width: 2; stroke-dasharray: 4 4; }

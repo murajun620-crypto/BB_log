@@ -1,5 +1,5 @@
 import * as db from './db.js';
-import { uid, localDate, STATS, activeEvents, attackDirectionForPeriod, fullCourtPointFromHalf, isBackcourtPoint, makePeriods, opponentLineup, oppositeDirection, shotPointsFromPoint, shotZoneFromPoint, validateTeam, validateGame, lineup, eventLabel, aggregate, aggregateGames } from './domain.js';
+import { uid, localDate, STATS, activeEvents, attackDirectionForPeriod, fullCourtPointFromHalf, halfCourtPointFromFull, isBackcourtPoint, makePeriods, opponentLineup, oppositeDirection, shotPointsFromPoint, shotZoneFromPoint, shotZoneForEvent, shotZoneLabel, validateTeam, validateGame, lineup, eventLabel, aggregate, aggregateGames } from './domain.js';
 import { backupObject, parseBackup, gameCSV, download, copyText, shareFile, shareUrl } from './transfer.js';
 import { boxScoreImage, playerStatsImage, safeFilename, shareImage } from './share-image.js';
 import { createSharedReport, createAggregateSharedReport, createCompressedSharePayload, parseSharePayload, parseSharedReport, sharedReportFile } from './shared-report.js';
@@ -10,27 +10,51 @@ import { cloudSettingsHTML, setupCloudShareUI } from './cloud-share-ui.js';
 const app = document.querySelector('#app');
 const sheet = document.querySelector('#sheet');
 const toastNode = document.querySelector('#toast');
-const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, advancedMode: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, historySelection: new Set(), aggregateMode: 'total', aggregateGameId: null, aggregatePlayerGameId: 'total', shotDisplayMode: 'points', strategyBoard: null, proSelection: null, proSub: null, proOpponentSelection: null, proOpponentSub: null, proShotFeedback: null, page: 'home', gameId: null, busy: false, lastError: '' };
-let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, proClockTimer = null, proClockSaving = false, proShotFeedbackTimer = null, activeShotMarkerFeedback = null, resolvedShareHash = '', sharePayloadPromise = null, pwaRegistration = null;
+const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, advancedMode: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, historySelection: new Set(), aggregateMode: 'total', aggregateGameId: null, aggregatePlayerGameId: 'total', shotDisplayMode: 'points', strategyBoard: null, proSelection: null, proSub: null, proOpponentSelection: null, proOpponentSub: null, proShotFeedback: null, proShotEdit: null, page: 'home', gameId: null, busy: false, lastError: '' };
+let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, proClockTimer = null, proClockSaving = false, proShotFeedbackTimer = null, activeShotMarkerFeedback = null, shotMarkerGesture = null, activeProShotGesture = null, suppressNextShotMarkerClick = false, suppressNextProShotClick = false, shotMarkerClickTimer = null, proShotClickTimer = null, activeShotEditSource = null, resolvedShareHash = '', sharePayloadPromise = null, pwaRegistration = null;
 const PRO_FIELD_SHOT_TYPES = new Set(['FGM', 'FGX']);
 const PRO_DIRECT_FIELD_SHOT_TYPES = new Set(['2PM', '2PX', '3PM', '3PX']);
 const PRO_SHOT_FEEDBACK_DURATION = 3200;
-function proShotPointFromEvent(button, event, direction) {
+function proShotPointFromClient(button, clientX, clientY, direction) {
   const rect = button.getBoundingClientRect();
-  const clientX = event?.clientX || rect.left + rect.width / 2;
-  const clientY = event?.clientY || rect.top + rect.height / 2;
+  const pointX = Number.isFinite(clientX) ? clientX : rect.left + rect.width / 2;
+  const pointY = Number.isFinite(clientY) ? clientY : rect.top + rect.height / 2;
   if (!button.classList.contains('pro-court-half')) {
     return {
-      x: Math.max(0, Math.min(1, (clientX - rect.left) / rect.width)),
-      y: Math.max(0, Math.min(1, (clientY - rect.top) / rect.height)),
+      x: Math.max(0, Math.min(1, (pointX - rect.left) / rect.width)),
+      y: Math.max(0, Math.min(1, (pointY - rect.top) / rect.height)),
     };
   }
   const scale = Math.min(rect.width / 500, rect.height / 500) || 1;
   const offsetX = (rect.width - 500 * scale) / 2;
   const offsetY = (rect.height - 500 * scale) / 2;
-  const localX = Math.max(0, Math.min(500, (clientX - rect.left - offsetX) / scale));
-  const localY = Math.max(0, Math.min(500, (clientY - rect.top - offsetY) / scale));
+  const localX = Math.max(0, Math.min(500, (pointX - rect.left - offsetX) / scale));
+  const localY = Math.max(0, Math.min(500, (pointY - rect.top - offsetY) / scale));
   return fullCourtPointFromHalf(localX, localY, direction);
+}
+function proShotPointFromEvent(button, event, direction) {
+  return proShotPointFromClient(button, event?.clientX, event?.clientY, direction);
+}
+function proShotViewPoint(button, point, direction) {
+  if (button.classList.contains('pro-court-half')) return halfCourtPointFromFull(point.x, point.y, direction);
+  return { x: point.x * 940, y: point.y * 500 };
+}
+function updateProShotPreview(gesture) {
+  if (!gesture?.button || !gesture.point) return;
+  const point = proShotViewPoint(gesture.button, gesture.point, gesture.direction);
+  if (!point) return;
+  let preview = gesture.button.querySelector('[data-pro-shot-draft]');
+  if (!preview) {
+    preview = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    preview.classList.add('pro-shot-draft-preview');
+    preview.dataset.proShotDraft = 'true';
+    gesture.button.append(preview);
+  }
+  preview.setAttribute('cx', point.x.toFixed(1));
+  preview.setAttribute('cy', point.y.toFixed(1));
+}
+function clearProShotPreview(gesture) {
+  gesture?.button?.querySelector('[data-pro-shot-draft]')?.remove();
 }
 const getSetting = key => state.data.settings.find(s => s.key === key)?.value;
 const game = () => state.data.games.find(g => g.id === state.gameId);
@@ -67,6 +91,245 @@ function shotMarkerFromTarget(target) {
 }
 function shotCourtFromTarget(target) {
   return target?.closest?.('.pro-court, .shot-court-map, .shot-chart-map');
+}
+function shotEventContext(markerOrButton) {
+  const eventId = markerOrButton?.dataset?.eventId || markerOrButton?.dataset?.shotEditEventId;
+  if (!eventId) return null;
+  const gameId = markerOrButton?.dataset?.shotGameId || markerOrButton?.dataset?.shotEditGameId || state.proShotEdit?.gameId || state.gameId;
+  const g = state.data.games.find(candidate => candidate.id === gameId) || game();
+  const event = state.data.events.find(candidate => candidate.id === eventId && (!g || candidate.gameId === g.id) && !candidate.deletedAt);
+  if (!g || !event || !PRO_DIRECT_FIELD_SHOT_TYPES.has(event.eventType)) return null;
+  return { g, event };
+}
+function shotRoster(g, event) {
+  return event?.side === 'opponent' ? (g?.opponentRoster || []) : (g?.roster || []);
+}
+function shotPlayerName(g, event) {
+  const player = shotRoster(g, event).find(candidate => candidate.id === event?.playerId);
+  return player ? [player.number, player.name].filter(Boolean).join(' ') : '選手不明';
+}
+function shotMarkerEditHTML(context) {
+  const { g, event } = context;
+  const area = view.esc(shotZoneLabel(shotZoneForEvent(event)) || '位置不明');
+  const player = view.esc(shotPlayerName(g, event));
+  const attributes = `data-event-id="${view.esc(event.id)}" data-shot-game-id="${view.esc(g.id)}"`;
+  return `<p class="help">選手：${player}<br>シュートエリア：${area}</p><div class="card-list"><button type="button" class="button secondary full" data-action="change-shot-position" ${attributes}>位置を変更</button><button type="button" class="button secondary full" data-action="open-shot-player-picker" ${attributes}>選手を変更</button><button type="button" class="button danger full" data-action="delete-shot-marker" ${attributes}>シュートを削除</button></div>`;
+}
+function showShotMarkerEdit(marker) {
+  const context = shotEventContext(marker);
+  if (!context || marker.dataset.shotEditable !== 'true') return false;
+  clearShotMarkerFeedback();
+  const sourceDialog = marker.closest?.('dialog');
+  activeShotEditSource = {
+    marker,
+    surface: marker.closest?.('.pro-court, .pro-shot-chart-map'),
+    sheetHTML: sourceDialog === sheet ? sheet.querySelector('.sheet-content')?.innerHTML || '' : '',
+    sheetTitle: sourceDialog === sheet ? sheet.querySelector('.sheet-header h2')?.textContent || '選手スタッツ' : '',
+    sheetClass: sourceDialog === sheet ? sheet.className : '',
+  };
+  showSheet('シュートを編集', shotMarkerEditHTML(context), 'player-sheet');
+  return true;
+}
+function shotMarkerByEventId(eventId, root = document) {
+  return [...root.querySelectorAll('[data-shot-marker][data-event-id]')].find(marker => marker.dataset.eventId === eventId) || null;
+}
+function activateShotPositionSurface(marker, context) {
+  const surface = marker?.closest?.('.pro-court, .pro-shot-chart-map');
+  if (!surface) return false;
+  if (!surface.dataset.shotEditOriginalCaptured) {
+    surface.dataset.shotEditOriginalCaptured = 'true';
+    surface.dataset.shotEditOriginalAction = surface.getAttribute('data-action') || '';
+    surface.dataset.shotEditOriginalRole = surface.getAttribute('role') || '';
+    surface.dataset.shotEditOriginalAriaLabel = surface.getAttribute('aria-label') || '';
+  }
+  surface.dataset.action = 'pro-edit-shot-point';
+  surface.dataset.shotEditEventId = context.event.id;
+  surface.dataset.shotEditGameId = context.g.id;
+  surface.dataset.shotEditSide = context.event.side || 'home';
+  surface.classList.add('pro-shot-editing');
+  surface.setAttribute('role', 'button');
+  surface.setAttribute('aria-label', 'シュート位置を変更。コートをタップまたはドラッグ');
+  return true;
+}
+function beginShotPositionEdit(button) {
+  const context = shotEventContext(button);
+  const source = activeShotEditSource;
+  if (!context || !source) return;
+  closeSheet();
+  state.proShotEdit = { gameId: context.g.id, eventId: context.event.id, side: context.event.side || 'home' };
+  if (source.sheetHTML) {
+    showSheet(source.sheetTitle, source.sheetHTML, source.sheetClass);
+    source.marker = shotMarkerByEventId(context.event.id, sheet) || shotMarkerByEventId(context.event.id);
+    source.surface = source.marker?.closest?.('.pro-court, .pro-shot-chart-map') || null;
+  } else if (!source.marker?.isConnected) {
+    source.marker = shotMarkerByEventId(context.event.id);
+    source.surface = source.marker?.closest?.('.pro-court, .pro-shot-chart-map') || null;
+  }
+  if (!activateShotPositionSurface(source.marker, context)) {
+    state.proShotEdit = null;
+    return toast('シュート位置を変更できるコートが見つかりません。', true);
+  }
+  toast('コートをタップ、またはそのままドラッグして位置を変更してください。');
+}
+function removeShotPositionSurface(surface) {
+  if (!surface) return;
+  if (surface.dataset.shotEditOriginalCaptured) {
+    if (surface.dataset.shotEditOriginalAction) surface.setAttribute('data-action', surface.dataset.shotEditOriginalAction); else surface.removeAttribute('data-action');
+    if (surface.dataset.shotEditOriginalRole) surface.setAttribute('role', surface.dataset.shotEditOriginalRole); else surface.removeAttribute('role');
+    if (surface.dataset.shotEditOriginalAriaLabel) surface.setAttribute('aria-label', surface.dataset.shotEditOriginalAriaLabel); else surface.removeAttribute('aria-label');
+  } else if (surface.dataset.action === 'pro-edit-shot-point') surface.removeAttribute('data-action');
+  delete surface.dataset.shotEditEventId;
+  delete surface.dataset.shotEditGameId;
+  delete surface.dataset.shotEditSide;
+  delete surface.dataset.shotEditOriginalCaptured;
+  delete surface.dataset.shotEditOriginalAction;
+  delete surface.dataset.shotEditOriginalRole;
+  delete surface.dataset.shotEditOriginalAriaLabel;
+  surface.classList.remove('pro-shot-editing');
+}
+function cancelShotPositionEdit() {
+  if (activeProShotGesture?.kind === 'edit') cancelProShotGesture();
+  else clearProShotPreview(activeProShotGesture);
+  removeShotPositionSurface(activeShotEditSource?.surface);
+  document.querySelectorAll('[data-action="pro-edit-shot-point"]').forEach(removeShotPositionSurface);
+  activeShotEditSource = null;
+  state.proShotEdit = null;
+}
+function isForcePress(event) {
+  const pressure = Number(event?.pressure);
+  const webkitForce = Number(event?.webkitForce);
+  return webkitForce >= 2 || (event?.pointerType && event.pointerType !== 'mouse' && pressure >= .75);
+}
+function suppressShotMarkerClickOnce() {
+  suppressNextShotMarkerClick = true;
+  clearTimeout(shotMarkerClickTimer);
+  shotMarkerClickTimer = setTimeout(() => { suppressNextShotMarkerClick = false; shotMarkerClickTimer = null; }, 900);
+}
+function suppressProShotClickOnce() {
+  suppressNextProShotClick = true;
+  clearTimeout(proShotClickTimer);
+  proShotClickTimer = setTimeout(() => { suppressNextProShotClick = false; proShotClickTimer = null; }, 900);
+}
+function clearShotMarkerGesture() {
+  if (shotMarkerGesture?.timer) clearTimeout(shotMarkerGesture.timer);
+  shotMarkerGesture = null;
+}
+function triggerShotMarkerEdit(marker) {
+  const context = shotEventContext(marker);
+  if (!context || marker.dataset.shotEditable !== 'true') return false;
+  if (shotMarkerGesture) {
+    if (shotMarkerGesture.marker !== marker || shotMarkerGesture.longPressed) return false;
+    shotMarkerGesture.longPressed = true;
+    clearTimeout(shotMarkerGesture.timer);
+  }
+  suppressShotMarkerClickOnce();
+  return showShotMarkerEdit(marker);
+}
+function startShotMarkerGesture(marker, event) {
+  if (event.button > 0 || marker.dataset.shotEditable !== 'true' || !shotEventContext(marker)) return false;
+  clearShotMarkerGesture();
+  const gesture = { marker, pointerId: event.pointerId, startX: event.clientX, startY: event.clientY, longPressed: false, timer: null };
+  gesture.timer = setTimeout(() => triggerShotMarkerEdit(marker), 560);
+  shotMarkerGesture = gesture;
+  marker.setPointerCapture?.(event.pointerId);
+  if (isForcePress(event)) triggerShotMarkerEdit(marker);
+  return true;
+}
+function moveShotMarkerGesture(event) {
+  const gesture = shotMarkerGesture;
+  if (!gesture || gesture.pointerId !== event.pointerId) return false;
+  if (!gesture.longPressed && Number.isFinite(gesture.startX) && Number.isFinite(gesture.startY) && Math.hypot(event.clientX - gesture.startX, event.clientY - gesture.startY) > 10) {
+    clearShotMarkerGesture();
+    return false;
+  }
+  if (!gesture.longPressed && isForcePress(event)) triggerShotMarkerEdit(gesture.marker);
+  return true;
+}
+function finishShotMarkerGesture(event) {
+  const gesture = shotMarkerGesture;
+  if (!gesture || gesture.pointerId !== event.pointerId) return false;
+  const longPressed = gesture.longPressed;
+  clearShotMarkerGesture();
+  if (longPressed) {
+    suppressShotMarkerClickOnce();
+    event.preventDefault();
+    return true;
+  }
+  return false;
+}
+function shotEditDirection(context) {
+  const direction = attackDirectionForPeriod(context.g);
+  return context.event.side === 'opponent' ? oppositeDirection(direction) : direction;
+}
+function startProShotGesture(surface, event, kind) {
+  if (event.button > 0) return false;
+  const context = kind === 'edit' ? shotEventContext(surface) : proShotSelectionContext();
+  if (!context) return false;
+  const direction = kind === 'edit' ? shotEditDirection(context) : context.shotDirection;
+  const point = proShotPointFromEvent(surface, event, direction);
+  if (!point) return false;
+  activeProShotGesture = { kind, button: surface, context, direction, pointerId: event.pointerId, point };
+  surface.setPointerCapture?.(event.pointerId);
+  updateProShotPreview(activeProShotGesture);
+  event.preventDefault();
+  return true;
+}
+function moveProShotGesture(event) {
+  const gesture = activeProShotGesture;
+  if (!gesture || gesture.pointerId !== event.pointerId) return false;
+  const point = proShotPointFromEvent(gesture.button, event, gesture.direction);
+  if (point) {
+    gesture.point = point;
+    updateProShotPreview(gesture);
+  }
+  event.preventDefault();
+  return true;
+}
+function releaseProShotPointer(gesture, pointerId) {
+  if (gesture?.button?.hasPointerCapture?.(pointerId)) gesture.button.releasePointerCapture(pointerId);
+}
+function finishProShotGesture(event) {
+  const gesture = activeProShotGesture;
+  if (!gesture || gesture.pointerId !== event.pointerId) return false;
+  const point = proShotPointFromEvent(gesture.button, event, gesture.direction) || gesture.point;
+  clearProShotPreview(gesture);
+  releaseProShotPointer(gesture, event.pointerId);
+  activeProShotGesture = null;
+  suppressProShotClickOnce();
+  if (gesture.kind === 'edit') saveShotPosition(gesture.context, point);
+  else recordProShotAt(gesture.button, event, point, gesture.context);
+  return true;
+}
+function cancelProShotGesture() {
+  clearProShotPreview(activeProShotGesture);
+  releaseProShotPointer(activeProShotGesture, activeProShotGesture?.pointerId);
+  activeProShotGesture = null;
+}
+function openShotPlayerPicker(button) {
+  const context = shotEventContext(button);
+  if (!context) return toast('シュート記録が見つかりません。', true);
+  const players = shotRoster(context.g, context.event);
+  const choices = players.map(player => `<button type="button" class="player-button" data-action="select-shot-player" data-event-id="${view.esc(context.event.id)}" data-shot-game-id="${view.esc(context.g.id)}" data-player-id="${view.esc(player.id)}"><strong>${view.esc(player.number)}</strong><span>${view.esc(player.name || '名前なし')}</span></button>`).join('');
+  showSheet('選手を変更', `<p class="help">${view.esc(eventLabel(context.g, context.event))}</p><div class="player-grid">${choices || '<p class="empty-message">変更できる選手がいません。</p>'}</div>`, 'player-sheet');
+}
+function changeShotPlayer(button) {
+  const context = shotEventContext(button);
+  const player = shotRoster(context?.g, context?.event).find(candidate => candidate.id === button.dataset.playerId);
+  if (!context || !player) return toast('選手を変更できません。', true);
+  return busy(async () => {
+    await saveGameChange(context.g, { ...context.event, playerId: player.id, updatedAt: new Date().toISOString() });
+    closeSheet();
+    toast('シュートの選手を変更しました。');
+  });
+}
+function deleteShotMarker(button) {
+  const context = shotEventContext(button);
+  if (!context) return toast('シュート記録が見つかりません。', true);
+  confirm('シュートを削除', `${shotPlayerName(context.g, context.event)}のシュートを削除しますか？`, '削除する', async () => {
+    await saveGameChange(context.g, { ...context.event, deletedAt: new Date().toISOString() });
+    closeSheet();
+    toast('シュートを削除しました。');
+  }, true);
 }
 function toast(message, error = false) {
   clearTimeout(toastTimer); toastNode.textContent = message; toastNode.className = `show${error ? ' error' : ''}`;
@@ -120,12 +383,14 @@ function syncProClockTimer() {
 function render() {
   const currentHash = location.hash;
   const [requestedPage = 'home', id, ...rest] = currentHash.replace(/^#/, '').split('/');
+  const page = requestedPage === 'share' ? 'shared' : requestedPage;
+  if (state.proShotEdit && (state.page !== page || (['live', 'box'].includes(page) && state.proShotEdit.gameId !== id))) cancelShotPositionEdit();
+  if (state.page !== page) clearShotMarkerFeedback();
   if (state.proShotFeedback && (requestedPage !== 'live' || state.proShotFeedback.gameId !== id)) {
     clearTimeout(proShotFeedbackTimer);
     proShotFeedbackTimer = null;
     state.proShotFeedback = null;
   }
-  const page = requestedPage === 'share' ? 'shared' : requestedPage;
   if (requestedPage === 'share' && resolvedShareHash !== currentHash) {
     resolvedShareHash = currentHash;
     sharedReport = null;
@@ -185,13 +450,13 @@ function render() {
   } else { state.page = 'home'; html = view.homeView(state); }
   clearShotMarkerFeedback();
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.28 · BUILT FOR THE SIDELINES`);
-  if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode, game()?.roster));
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.29 · BUILT FOR THE SIDELINES`);
+  if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode, game()?.roster, true));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
     const chartEvents = state.aggregateGameId ? gameEvents(state.data.games.find(candidate => candidate.id === state.aggregateGameId)) : state.data.events.filter(event => selectedForChart.some(candidate => candidate.id === event.gameId));
     const chartPlayers = state.aggregateGameId ? state.data.games.find(candidate => candidate.id === state.aggregateGameId)?.roster || [] : selectedForChart.flatMap(candidate => candidate.roster);
-    [...app.querySelectorAll('.section-heading')].find(element => element.querySelector('h2')?.textContent === 'チーム・シューティング')?.insertAdjacentHTML('beforebegin', view.shotChartHTML(chartEvents, null, state.shotDisplayMode, chartPlayers));
+    [...app.querySelectorAll('.section-heading')].find(element => element.querySelector('h2')?.textContent === 'チーム・シューティング')?.insertAdjacentHTML('beforebegin', view.shotChartHTML(chartEvents, null, state.shotDisplayMode, chartPlayers, true));
   }
   if (page === 'shared') [...app.querySelectorAll('.section-heading')].find(element => element.querySelector('h2')?.textContent === 'チーム・シューティング')?.insertAdjacentHTML('beforebegin', view.sharedShotChartHTML(sharedReport.shots || [], null, state.shotDisplayMode, sharedReport.players));
   if (page === 'settings') app.querySelector('.settings-panel')?.insertAdjacentHTML('afterend', cloudSettingsHTML());
@@ -214,7 +479,7 @@ function render() {
   }
   syncProClockTimer();
 }
-function closeSheet() { if (sheet.open) sheet.close(); pending = null; confirmAction = null; }
+function closeSheet() { if (state.proShotEdit) cancelShotPositionEdit(); if (sheet.open) sheet.close(); pending = null; confirmAction = null; }
 function showSheet(title, html, cls = '') {
   sheet.className = cls;
   sheet.innerHTML = `<div class="sheet-handle"></div><header class="sheet-header"><h2 id="sheet-title">${view.esc(title)}</h2><button type="button" class="icon-button" data-action="close-sheet" aria-label="閉じる">${view.icon('close')}</button></header><div class="sheet-content">${html}</div>`;
@@ -338,6 +603,48 @@ async function record(eventType, playerId = null, extra = {}) {
   const event = { id: uid(), gameId: g.id, periodId: g.currentPeriodId, eventType, playerId, points: STATS[eventType]?.points || 0, timestamp: new Date().toISOString(), seq: g.nextSeq, ...extra, ...(clockSeconds === null ? {} : { clockSeconds }) };
   await saveGameChange({ ...g, nextSeq: g.nextSeq + 1 }, event);
   toast(eventLabel(g, event)); return event;
+}
+function proShotSelectionContext() {
+  const g = game();
+  const ownSelection = state.proSelection;
+  const opponentSelection = state.proOpponentSelection;
+  const isOpponent = Boolean(g?.opponentTracking === 'player' && !ownSelection?.playerId && opponentSelection?.playerId);
+  const selection = isOpponent ? opponentSelection : ownSelection;
+  if (g?.mode !== 'pro' || !selection?.type || !selection.playerId || !PRO_FIELD_SHOT_TYPES.has(selection.type)) return null;
+  const attackDirection = attackDirectionForPeriod(g);
+  return { g, selection, isOpponent, attackDirection, shotDirection: isOpponent ? oppositeDirection(attackDirection) : attackDirection };
+}
+function recordProShotAt(button, event, pointOverride = null, contextOverride = null) {
+  const context = contextOverride || proShotSelectionContext();
+  if (!context) return toast('FGの○／×と選手を先に選んでください。FTは選手をタップすると記録されます。', true);
+  const { g, selection, isOpponent, attackDirection, shotDirection } = context;
+  if (isOpponent && button.classList.contains('pro-court-half')) return toast('スマホでは相手のシュート位置を記録できません。', true);
+  const point = pointOverride || proShotPointFromEvent(button, event, shotDirection);
+  if (!point) return toast('シュート位置を取得できません。', true);
+  const x = point.x, y = point.y;
+  if (isBackcourtPoint(attackDirection, x, isOpponent)) return toast('バックコートは選択できません。', true);
+  const points = shotPointsFromPoint(x, y);
+  const eventType = `${points}${selection.type.endsWith('M') ? 'PM' : 'PX'}`;
+  const zone = shotZoneFromPoint(null, x, y);
+  const shotExtra = { ...(zone ? { shotZone: zone } : {}), shotX: x, shotY: y, ...(isOpponent ? { side: 'opponent' } : {}) };
+  return busy(async () => { const saved = await record(eventType, selection.playerId, shotExtra); if (isOpponent) state.proOpponentSelection = null; else state.proSelection = null; showProShotFeedback(saved); if (!isOpponent) offerFollowup(saved); });
+}
+function saveShotPosition(context, point) {
+  const { g, event } = context;
+  if (!point || ![point.x, point.y].every(value => Number.isFinite(value) && value >= 0 && value <= 1)) return toast('シュート位置を取得できません。', true);
+  const attackDirection = attackDirectionForPeriod(g);
+  if (isBackcourtPoint(attackDirection, point.x, event.side === 'opponent')) return toast('バックコートには移動できません。', true);
+  const points = shotPointsFromPoint(point.x, point.y);
+  const zone = shotZoneFromPoint(null, point.x, point.y);
+  if (!points || !zone) return toast('シュートエリアを判定できません。', true);
+  const eventType = `${points}${event.eventType.endsWith('M') ? 'PM' : 'PX'}`;
+  return busy(async () => {
+    await saveGameChange(g, { ...event, eventType, points: STATS[eventType]?.points || 0, shotX: point.x, shotY: point.y, shotZone: zone, updatedAt: new Date().toISOString() });
+    cancelShotPositionEdit();
+    closeSheet();
+    render();
+    toast('シュート位置を変更しました。');
+  });
 }
 function pickStat(type, options = {}) {
   pending = { kind: 'stat', type, followup: !!options.followup };
@@ -671,23 +978,12 @@ const handlers = {
     if (PRO_FIELD_SHOT_TYPES.has(selection.type)) { state.proSelection = { ...selection, playerId: id }; render(); return; }
     return busy(async () => { await record(selection.type, id); state.proSelection = null; render(); });
   },
-  'pro-shot-point': (button, event) => {
-    const g = game(), ownSelection = state.proSelection, opponentSelection = state.proOpponentSelection;
-    const isOpponent = g?.opponentTracking === 'player' && !ownSelection?.playerId && opponentSelection?.playerId;
-    const selection = isOpponent ? opponentSelection : ownSelection;
-    if (isOpponent && button.classList.contains('pro-court-half')) return toast('スマホでは相手のシュート位置を記録できません。', true);
-    if (g?.mode !== 'pro' || !selection?.type || !selection.playerId || !PRO_FIELD_SHOT_TYPES.has(selection.type)) return toast('FGの○／×と選手を先に選んでください。FTは選手をタップすると記録されます。', true);
-    const attackDirection = attackDirectionForPeriod(g);
-    const shotDirection = isOpponent ? oppositeDirection(attackDirection) : attackDirection;
-    const point = proShotPointFromEvent(button, event, shotDirection);
-    const x = point.x, y = point.y;
-    if (isBackcourtPoint(attackDirection, x, isOpponent)) return toast('バックコートは選択できません。', true);
-    const points = shotPointsFromPoint(x, y);
-    const eventType = `${points}${selection.type.endsWith('M') ? 'PM' : 'PX'}`;
-    const zone = shotZoneFromPoint(null, x, y);
-    const shotExtra = { ...(zone ? { shotZone: zone } : {}), shotX: x, shotY: y, ...(isOpponent ? { side: 'opponent' } : {}) };
-    return busy(async () => { const saved = await record(eventType, selection.playerId, shotExtra); if (isOpponent) state.proOpponentSelection = null; else state.proSelection = null; showProShotFeedback(saved); if (!isOpponent) offerFollowup(saved); });
-  },
+  'pro-shot-point': (button, event) => recordProShotAt(button, event),
+  'pro-edit-shot-point': () => {},
+  'change-shot-position': button => beginShotPositionEdit(button),
+  'open-shot-player-picker': button => openShotPlayerPicker(button),
+  'select-shot-player': button => changeShotPlayer(button),
+  'delete-shot-marker': button => deleteShotMarker(button),
   'pro-backcourt': () => toast('バックコートは選択できません。', true),
   'pro-sub': () => { if (game()?.mode !== 'pro') return; state.proSelection = null; state.proSub = { outPlayerId: null }; state.proOpponentSelection = null; state.proOpponentSub = null; render(); },
   'toggle-pro-attack': () => busy(async () => {
@@ -833,7 +1129,7 @@ const handlers = {
   },
   finish: () => confirm('試合を終了しますか？', 'BOX SCOREに結果をまとめます。終了後も履歴の編集や記録の再開ができます。', '試合を終了', async () => { const g = await saveGameChange({ ...game(), status: 'finished' }); closeSheet(); location.hash = `#box/${g.id}`; }),
   reopen: () => confirm('記録を再開しますか？', 'この試合を記録中に戻します。', '再開する', async () => { const g = await saveGameChange({ ...game(), status: 'live' }); closeSheet(); location.hash = `#live/${g.id}`; }),
-  'player-detail': button => showSheet('選手スタッツ', `${view.playerDetail(game(), gameEvents(), button.dataset.id)}${view.shotChartHTML(gameEvents(), button.dataset.id, state.shotDisplayMode, game()?.roster)}`),
+  'player-detail': button => showSheet('選手スタッツ', `${view.playerDetail(game(), gameEvents(), button.dataset.id)}${view.shotChartHTML(gameEvents(), button.dataset.id, state.shotDisplayMode, game()?.roster, true)}`),
   'shared-player-detail': button => showSheet('選手スタッツ', `${view.sharedPlayerDetail(sharedReport, button.dataset.id)}${view.sharedShotChartHTML(sharedReport.shots || [], button.dataset.id, state.shotDisplayMode, sharedReport.players)}`),
   'share-options': () => {
     const g = game();
@@ -863,18 +1159,70 @@ document.addEventListener('dragstart', event => {
   if (shotCourtFromTarget(event.target)) event.preventDefault();
 });
 document.addEventListener('pointerdown', event => {
+  if (event.button > 0) return;
+  const target = event.target;
+  const backcourt = target.closest?.('[data-action="pro-backcourt"]');
+  const editSurface = target.closest?.('[data-action="pro-edit-shot-point"]');
+  if (editSurface && state.proShotEdit && !backcourt && startProShotGesture(editSurface, event, 'edit')) return;
   const marker = shotMarkerFromTarget(event.target);
-  if (!marker || event.button > 0) return;
-  event.preventDefault();
-  showShotMarkerFeedback(marker);
-  marker.setPointerCapture?.(event.pointerId);
+  if (marker && startShotMarkerGesture(marker, event)) return;
+  const shotSurface = target.closest?.('[data-action="pro-shot-point"]');
+  if (shotSurface && !backcourt) startProShotGesture(shotSurface, event, 'new');
 });
-document.addEventListener('pointerup', clearShotMarkerFeedback);
-document.addEventListener('pointercancel', clearShotMarkerFeedback);
-window.addEventListener('blur', clearShotMarkerFeedback);
+document.addEventListener('pointermove', event => {
+  if (activeProShotGesture && moveProShotGesture(event)) return;
+  moveShotMarkerGesture(event);
+});
+document.addEventListener('pointerup', event => {
+  if (activeProShotGesture && finishProShotGesture(event)) return;
+  finishShotMarkerGesture(event);
+});
+document.addEventListener('pointercancel', event => {
+  if (activeProShotGesture?.pointerId === event.pointerId) cancelProShotGesture();
+  if (shotMarkerGesture?.pointerId === event.pointerId) clearShotMarkerGesture();
+});
+window.addEventListener('blur', () => {
+  cancelProShotGesture();
+  clearShotMarkerGesture();
+  clearShotMarkerFeedback();
+});
+document.addEventListener('contextmenu', event => {
+  const marker = shotMarkerFromTarget(event.target);
+  if (marker?.dataset.shotEditable === 'true' && triggerShotMarkerEdit(marker)) event.preventDefault();
+});
+document.addEventListener('webkitmouseforcechanged', event => {
+  const marker = shotMarkerFromTarget(event.target);
+  if (marker && isForcePress(event) && triggerShotMarkerEdit(marker)) event.preventDefault?.();
+});
+document.addEventListener('touchforcechange', event => {
+  const touch = event.changedTouches?.[0] || event.touches?.[0];
+  const pointTarget = touch && document.elementFromPoint(touch.clientX, touch.clientY);
+  const marker = shotMarkerFromTarget(pointTarget || event.target);
+  if (marker && Number(touch?.force) >= .75 && triggerShotMarkerEdit(marker)) event.preventDefault();
+});
 document.addEventListener('click', event => {
+  if (suppressNextProShotClick) {
+    suppressNextProShotClick = false;
+    clearTimeout(proShotClickTimer);
+    proShotClickTimer = null;
+    return;
+  }
+  const marker = shotMarkerFromTarget(event.target);
+  if (marker) {
+    if (suppressNextShotMarkerClick) {
+      suppressNextShotMarkerClick = false;
+      clearTimeout(shotMarkerClickTimer);
+      shotMarkerClickTimer = null;
+      return;
+    }
+    if (activeShotMarkerFeedback?.marker === marker) clearShotMarkerFeedback();
+    else showShotMarkerFeedback(marker);
+    return;
+  }
+  if (activeShotMarkerFeedback && !event.target.closest?.('[data-shot-marker-feedback]')) clearShotMarkerFeedback();
   const button = event.target.closest('[data-action]');
   if (!button || button.disabled || state.busy) return;
+  if (button.dataset.action === 'pro-edit-shot-point') return;
   if (button.dataset.action === 'toggle-shot-display') {
     const root = button.closest('[data-shot-display-root]');
     if (!root) return;
@@ -892,20 +1240,24 @@ document.addEventListener('click', event => {
   if (fn) Promise.resolve().then(() => fn(button, event)).catch(reportError);
 });
 document.addEventListener('keydown', event => {
+  if (event.key === 'Escape') {
+    if (activeProShotGesture) cancelProShotGesture();
+    if (state.proShotEdit) { cancelShotPositionEdit(); if (sheet.open) closeSheet(); }
+    clearShotMarkerFeedback();
+    return;
+  }
   if (!['Enter', ' '].includes(event.key)) return;
   const marker = shotMarkerFromTarget(event.target);
   if (marker) {
     event.preventDefault();
-    showShotMarkerFeedback(marker);
+    if (activeShotMarkerFeedback?.marker === marker) clearShotMarkerFeedback();
+    else showShotMarkerFeedback(marker);
     return;
   }
   const zone = event.target.closest?.('[data-action="shot-zone"]');
   if (!zone) return;
   event.preventDefault();
   zone.dispatchEvent(new MouseEvent('click', { bubbles: true }));
-});
-document.addEventListener('keyup', event => {
-  if (['Enter', ' '].includes(event.key) && shotMarkerFromTarget(event.target)) clearShotMarkerFeedback();
 });
 document.addEventListener('input', event => {
   if (event.target.matches?.('[data-jersey-number]')) {

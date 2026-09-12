@@ -176,17 +176,14 @@ document.addEventListener('selectstart', event => {
 document.addEventListener('dragstart', event => {
   if (shotCourtFromTarget(event.target)) event.preventDefault();
 });
-document.addEventListener('pointerdown', event => {
-  const marker = shotMarkerFromTarget(event.target);
-  if (!marker || event.button > 0) return;
-  event.preventDefault();
-  showShotMarkerFeedback(marker);
-  marker.setPointerCapture?.(event.pointerId);
-});
-document.addEventListener('pointerup', clearShotMarkerFeedback);
-document.addEventListener('pointercancel', clearShotMarkerFeedback);
-window.addEventListener('blur', clearShotMarkerFeedback);
 document.addEventListener('click', event => {
+  const marker = shotMarkerFromTarget(event.target);
+  if (marker) {
+    if (activeShotMarkerFeedback?.marker === marker) clearShotMarkerFeedback();
+    else showShotMarkerFeedback(marker);
+    return;
+  }
+  if (activeShotMarkerFeedback && !event.target.closest?.('[data-shot-marker-feedback]')) clearShotMarkerFeedback();
   const toggle = event.target.closest('[data-action]');
   if (toggle?.dataset.action === 'select-player-game') return;
   if (toggle?.dataset.action === 'toggle-shot-display') {
@@ -218,11 +215,9 @@ document.addEventListener('keydown', event => {
   const marker = shotMarkerFromTarget(event.target);
   if (marker) {
     event.preventDefault();
-    showShotMarkerFeedback(marker);
+    if (activeShotMarkerFeedback?.marker === marker) clearShotMarkerFeedback();
+    else showShotMarkerFeedback(marker);
   }
-});
-document.addEventListener('keyup', event => {
-  if (['Enter', ' '].includes(event.key) && shotMarkerFromTarget(event.target)) clearShotMarkerFeedback();
 });
 document.addEventListener('change', event => {
   const select = event.target.closest('[data-action="select-player-game"]');
