@@ -35,6 +35,7 @@
 .pro-chart-court-markings circle { fill: none; }
 .pro-shot-chart-markers { pointer-events: auto; }
 .pro-shot-chart-marker { pointer-events: auto; cursor: pointer; }
+.pro-shot-chart-marker .shot-marker-hit-area { fill: transparent; pointer-events: all; }
 .pro-shot-chart-marker text { pointer-events: none; }
 .pro-shot-chart-marker text { fill: var(--accent); font-size: 28px; font-weight: 850; paint-order: stroke; stroke: rgba(255,255,255,.9); stroke-width: 4px; stroke-linejoin: round; }
 .pro-shot-chart-marker.miss text { fill: #c7483f; }
