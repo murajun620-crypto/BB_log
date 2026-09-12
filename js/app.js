@@ -121,7 +121,7 @@ function render() {
     if (!gameDraft) {
       const draft = getSetting('gameDraft');
       const t = state.data.teams.find(t => t.id === draft?.teamId) || state.data.teams[0];
-      gameDraft = { date: localDate(), teamId: t?.id, opponentName: '', format: 'quarters', count: 4, minutes: 8, participants: t?.players.map(p => p.id) || [], starters: t?.players.length >= 5 ? t.players.slice(0, 5).map(p => p.id) : [], mode: 'standard', clockEnabled: false, opponentTracking: 'score', opponentRosterText: '', ...(draft ? structuredClone(draft) : {}) };
+      gameDraft = { date: localDate(), teamId: t?.id, opponentName: '', format: 'quarters', count: 4, minutes: 8, participants: t?.players.map(p => p.id) || [], starters: t?.players.length >= 5 ? t.players.slice(0, 5).map(p => p.id) : [], mode: 'standard', clockEnabled: false, opponentTracking: 'score', opponentRosterNumbersText: '', opponentRosterNamesText: '', ...(draft ? structuredClone(draft) : {}) };
       if (t && gameDraft.teamId !== t.id) selectTeam(t.id);
     }
     html = view.gameFormView(state, gameDraft);
@@ -144,7 +144,7 @@ function render() {
     html = page === 'live' ? g.mode === 'pro' ? view.proLiveView(state, g, gameEvents(g), currentClockSeconds(g)) : view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.18 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.19 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -227,7 +227,8 @@ function readTeamForm() {
 function readGameForm() {
   const form = document.querySelector('#game-form'); if (!form) return;
   const d = new FormData(form);
-  gameDraft = { ...gameDraft, date: d.get('date'), teamId: d.get('teamId'), opponentName: d.get('opponentName'), format: d.get('format'), count: d.get('count') || 4, minutes: d.get('minutes'), mode: d.get('mode') || 'standard', clockEnabled: d.get('clockEnabled') === 'on', opponentTracking: d.get('opponentTracking') || 'score', opponentRosterText: d.get('opponentRosterText') || '', participants: d.getAll('participants'), starters: d.getAll('starters') };
+  gameDraft = { ...gameDraft, date: d.get('date'), teamId: d.get('teamId'), opponentName: d.get('opponentName'), format: d.get('format'), count: d.get('count') || 4, minutes: d.get('minutes'), mode: d.get('mode') || 'standard', clockEnabled: d.get('clockEnabled') === 'on', opponentTracking: d.get('opponentTracking') || 'score', opponentRosterNumbersText: d.get('opponentRosterNumbersText') || '', opponentRosterNamesText: d.get('opponentRosterNamesText') || '', participants: d.getAll('participants'), starters: d.getAll('starters') };
+  delete gameDraft.opponentRosterText;
 }
 function selectTeam(id) {
   const t = state.data.teams.find(t => t.id === id);
@@ -236,10 +237,16 @@ function selectTeam(id) {
 function parseOpponentRoster(value, previousRoster = []) {
   const rows = Array.isArray(value)
     ? value.map(row => ({ number: String(row?.number ?? '').trim(), name: String(row?.name ?? '').trim() }))
-    : String(value || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean).map(line => {
-      const match = line.match(/^([0-9]{1,3})(?:[ \t]+(.+?))?$/);
-      return { number: match?.[1] || '', name: match?.[2]?.trim() || '' };
-    });
+    : value && typeof value === 'object' && !Array.isArray(value) && ('numbers' in value || 'names' in value)
+      ? (() => {
+        const numberLines = String(value.numbers ?? '').replace(/\r/g, '').split('\n');
+        const nameLines = String(value.names ?? '').replace(/\r/g, '').split('\n');
+        return Array.from({ length: Math.max(numberLines.length, nameLines.length) }, (_, index) => ({ number: numberLines[index]?.trim() || '', name: nameLines[index]?.trim() || '' })).filter(row => row.number || row.name);
+      })()
+      : String(value ?? '').split(/\r?\n/).map(line => line.trim()).filter(Boolean).map(line => {
+        const match = line.match(/^([0-9]{1,3})(?:[ \t]+(.+?))?$/);
+        return { number: match?.[1] || '', name: match?.[2]?.trim() || '' };
+      });
   const existing = new Map(previousRoster.map(player => [String(player.number), player.id]));
   const numbers = new Set();
   return rows.map((row, index) => {
@@ -787,6 +794,10 @@ document.addEventListener('input', event => {
     const sanitized = event.target.value.replace(/[^0-9]/g, '').slice(0, 3);
     if (event.target.value !== sanitized) event.target.value = sanitized;
   }
+  if (event.target.matches?.('[data-opponent-numbers]')) {
+    const sanitized = event.target.value.replace(/\r/g, '').split('\n').map(line => line.replace(/[^0-9]/g, '').slice(0, 3)).join('\n');
+    if (event.target.value !== sanitized) event.target.value = sanitized;
+  }
   if (event.target.closest('#team-form')) { readTeamForm(); persistDraft('teamDraft', teamDraft); }
   if (event.target.closest('#game-form')) { readGameForm(); persistDraft('gameDraft', gameDraft); }
 });
@@ -865,7 +876,7 @@ document.addEventListener('submit', event => {
     const periods = makePeriods(gameDraft.format, gameDraft.count, gameDraft.minutes);
     const now = new Date().toISOString();
     const mode = gameDraft.mode === 'pro' ? 'pro' : 'standard';
-    const opponentRoster = mode === 'pro' && gameDraft.opponentTracking === 'player' ? parseOpponentRoster(gameDraft.opponentRosterText) : [];
+    const opponentRoster = mode === 'pro' && gameDraft.opponentTracking === 'player' ? parseOpponentRoster({ numbers: gameDraft.opponentRosterNumbersText, names: gameDraft.opponentRosterNamesText }) : [];
     if (mode === 'pro' && gameDraft.opponentTracking === 'player' && !opponentRoster.length) throw new Error('相手選手を1人以上入力してください。');
     const g = { id: uid(), teamId: t.id, teamName: t.name, opponentName: gameDraft.opponentName.trim(), date: gameDraft.date, format: gameDraft.format, regulationCount: periods.length, minutes: Number(gameDraft.minutes), periods, currentPeriodId: periods[0]?.id, roster: structuredClone(t.players.filter(p => gameDraft.participants.includes(p.id))), starters: gameDraft.starters, mode, ...(mode === 'pro' ? { attackDirection: 'right' } : {}), clockEnabled: mode === 'pro' && !!gameDraft.clockEnabled, clockSeconds: mode === 'pro' && gameDraft.clockEnabled ? Math.round(Number(gameDraft.minutes) * 60) : undefined, clockRunning: false, clockStartedAt: null, opponentTracking: mode === 'pro' ? gameDraft.opponentTracking : 'score', opponentRoster, ...(mode === 'pro' && gameDraft.opponentTracking === 'player' ? { opponentStarters: opponentRoster.slice(0, 5).map(player => player.id) } : {}), status: 'live', nextSeq: 1, revision: 0, createdAt: now, updatedAt: now };
     validateGame(g, []); await db.createGame(g); await refresh(); gameDraft = null; location.hash = `#live/${g.id}`;
@@ -914,8 +925,7 @@ document.addEventListener('submit', event => {
     const opponentTracking = values.get('opponentTracking') === 'player' ? 'player' : 'score';
     const opponentPlayerEvents = activeEvents(gameEvents(g)).filter(event => event.side === 'opponent');
     if ((mode !== 'pro' || opponentTracking !== 'player') && opponentPlayerEvents.length) throw new Error('相手選手の個人記録があるため、標準モード／総得点のみに変更できません。先に履歴から該当記録を削除してください。');
-    const rosterText = values.get('opponentRosterText') || '';
-    const opponentRoster = mode === 'pro' && opponentTracking === 'player' ? parseOpponentRoster(rosterText, g.opponentRoster || []) : [];
+    const opponentRoster = mode === 'pro' && opponentTracking === 'player' ? parseOpponentRoster({ numbers: values.get('opponentRosterNumbersText'), names: values.get('opponentRosterNamesText') }, g.opponentRoster || []) : [];
     const previousOpponentPlayers = new Map((g.opponentRoster || []).map(player => [player.id, player]));
     const previousInitialIds = Array.isArray(g.opponentStarters) && g.opponentStarters.length ? g.opponentStarters : (g.opponentRoster || []).slice(0, 5).map(player => player.id);
     const previousInitialNumbers = new Set(previousInitialIds.map(id => previousOpponentPlayers.get(id)?.number).filter(Boolean));

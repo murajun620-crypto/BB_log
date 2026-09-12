@@ -246,14 +246,17 @@ test('opponent substitutions keep five players on court and use opponent numbers
   assert.deepEqual(opponentLineup(game, events), ['opponent-1', 'opponent-2', 'opponent-3', 'opponent-4', 'opponent-5']);
   assert.equal(eventLabel(game, substitution), '相手 4 → 9');
 });
-test('opponent roster uses text input with optional names in live settings', () => {
+test('opponent roster uses separate number and name boxes in live settings', () => {
   const { game } = fixture();
   game.mode = 'pro'; game.clockEnabled = false; game.opponentTracking = 'player'; game.opponentRoster = [{ id: 'opponent-1', number: '8', name: '相手選手' }];
   const html = liveSettingsHTML(game);
-  assert.match(html, /name="opponentRosterText"/);
-  assert.match(html, /8 相手選手/);
+  assert.match(html, /name="opponentRosterNumbersText"[^>]*data-opponent-numbers/);
+  assert.match(html, /name="opponentRosterNamesText"/);
+  assert.match(html, /<textarea name="opponentRosterNumbersText"[^>]*>8<\/textarea>/);
+  assert.match(html, /<textarea name="opponentRosterNamesText"[^>]*>相手選手<\/textarea>/);
   assert.match(html, /半角数字1〜3桁/);
-  assert.doesNotMatch(html, /opponentRosterNumber|ローラー/);
+  assert.doesNotMatch(html, /name="opponentRosterText"/);
+  assert.doesNotMatch(html, /ローラー/);
 });
 test('team and opponent rosters have no registration count cap and still reject full-width numbers', () => {
   const manyPlayers = Array.from({ length: 61 }, (_, i) => ({ id: `large-player-${i}`, number: String(i % 1000), name: `選手${i}` }));
