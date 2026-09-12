@@ -396,11 +396,12 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-sub-button { min-height: 39px; margin-top: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--muted); font-size: 11px; font-weight: 700; }
 .pro-live-screen.pro-step-ready .pro-court { opacity: .35; filter: grayscale(.8); pointer-events: none; }
 .pro-live-screen.pro-step-ready .pro-player,
-.pro-live-screen.pro-step-ready .pro-roster-key,
-.pro-live-screen.pro-step-ready .pro-sub-button { opacity: .35; filter: grayscale(.8); pointer-events: none; }
-.pro-live-screen.pro-await-own-player .pro-center,
+.pro-live-screen.pro-step-ready .pro-roster-key { opacity: .35; filter: grayscale(.8); pointer-events: none; }
+.pro-live-screen.pro-await-own-player .pro-court,
+.pro-live-screen.pro-await-own-player .pro-direction-button,
 .pro-live-screen.pro-await-own-player .pro-away-side,
-.pro-live-screen.pro-await-opponent-player .pro-center,
+.pro-live-screen.pro-await-opponent-player .pro-court,
+.pro-live-screen.pro-await-opponent-player .pro-direction-button,
 .pro-live-screen.pro-await-opponent-player .pro-home-side,
 .pro-live-screen.pro-await-own-sub .pro-center,
 .pro-live-screen.pro-await-own-sub .pro-away-side,
@@ -408,12 +409,10 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-live-screen.pro-await-opponent-sub .pro-home-side { opacity: .28; filter: grayscale(.85); pointer-events: none; }
 .pro-live-screen.pro-await-own-court .pro-home-side,
 .pro-live-screen.pro-await-own-court .pro-away-side,
-.pro-live-screen.pro-await-own-court .pro-action-panel,
 .pro-live-screen.pro-await-own-court .pro-court-status,
 .pro-live-screen.pro-await-own-court .pro-direction-button,
 .pro-live-screen.pro-await-opponent-court .pro-home-side,
 .pro-live-screen.pro-await-opponent-court .pro-away-side,
-.pro-live-screen.pro-await-opponent-court .pro-action-panel,
 .pro-live-screen.pro-await-opponent-court .pro-court-status,
 .pro-live-screen.pro-await-opponent-court .pro-direction-button { opacity: .28; filter: grayscale(.85); pointer-events: none; }
 .pro-live-screen.pro-await-own-court .pro-court,

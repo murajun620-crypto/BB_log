@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, eventLabel, fullCourtPointFromHalf, halfCourtPointFromFull, isBackcourtPoint, normalizeShotZone, opponentLineup, oppositeDirection, percent, lineup, validateGame, validateTeam, makePeriods, shotPointsFromPoint, shotZoneForEvent, shotZoneFromPoint, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
@@ -14,6 +15,7 @@ const fixture = () => {
   const add = (type, extra = {}) => { const e = { id: uid(), gameId: game.id, periodId: game.currentPeriodId, eventType: type, playerId: ['OPP', 'SUB'].includes(type) ? null : players[0].id, points: STATS[type]?.points || 0, timestamp: new Date().toISOString(), seq: game.nextSeq++, ...extra }; events.push(e); return e; };
   return { team, game, events, add };
 };
+const proLiveCss = readFileSync(new URL('../css/app.css', import.meta.url), 'utf8');
 
 test('all 14 stat types aggregate accurately, independently of event input order', () => {
   const { game, events, add } = fixture();
@@ -209,6 +211,13 @@ test('Pro shot input uses result buttons, auto-selects points and skips the cour
   assert.doesNotMatch(freeThrow, /data-action="pro-shot-point"/);
   const awaitingPlayer = proLiveView({ proSelection: { type: 'FGM', playerId: null }, proOpponentSelection: null }, game, events);
   assert.match(awaitingPlayer, /pro-await-own-player/); assert.match(awaitingPlayer, /data-action="add-member"/);
+});
+test('Pro LIVE keeps substitution and play changes available while guiding the next tap', () => {
+  assert.equal(proLiveCss.includes('.pro-live-screen.pro-step-ready .pro-sub-button'), false);
+  assert.equal(proLiveCss.includes('.pro-live-screen.pro-await-own-player .pro-center'), false);
+  assert.equal(proLiveCss.includes('.pro-live-screen.pro-await-opponent-player .pro-center'), false);
+  assert.equal(proLiveCss.includes('.pro-live-screen.pro-await-own-court .pro-action-panel'), false);
+  assert.equal(proLiveCss.includes('.pro-live-screen.pro-await-opponent-court .pro-action-panel'), false);
 });
 test('opponent players require a jersey number but can optionally include a name', () => {
   const { game } = fixture();
