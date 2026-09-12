@@ -289,12 +289,12 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-live-screen { width: 100%; max-width: 1500px; min-height: 100vh; min-height: 100dvh; margin: auto; padding: max(8px, env(safe-area-inset-top)) max(10px, env(safe-area-inset-left)) max(8px, env(safe-area-inset-bottom)) max(10px, env(safe-area-inset-right)); display: flex; flex-direction: column; gap: 7px; }
 .pro-header { display: flex; align-items: center; gap: 7px; min-height: 38px; }
 .pro-header .icon-button { width: 36px; min-width: 36px; height: 36px; }
-.pro-scoreboard { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; width: min(100%, 680px); margin: 0 auto; padding: 9px 15px 4px; border: 1px solid #453912; border-radius: 12px 12px 0 0; background: #080a08; color: #ffdc52; box-shadow: inset 0 0 0 1px #000; }
+.pro-scoreboard { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 12px; width: min(100%, 680px); margin: 0 auto; padding: 9px 15px 4px; border: 1px solid #453912; border-radius: 12px 12px 0 0; background: #080a08; color: #fff; box-shadow: inset 0 0 0 1px #000; }
 .pro-scoreboard > div { min-width: 0; }
 .pro-scoreboard > div:last-child { text-align: right; }
-.pro-scoreboard span { display: block; color: #bba54d; font-size: 9px; font-weight: 750; letter-spacing: 1px; }
-.pro-scoreboard strong { display: block; overflow: hidden; color: #ffe57a; text-overflow: ellipsis; white-space: nowrap; font-size: clamp(13px, 2vw, 20px); }
-.pro-scoreboard > b { display: flex; align-items: center; gap: 10px; color: #ffdc52; font-size: clamp(32px, 5vw, 54px); line-height: 1; letter-spacing: -2px; font-variant-numeric: tabular-nums; }
+.pro-scoreboard > div > span { display: block; color: #fff; font-size: 9px; font-weight: 750; letter-spacing: 1px; }
+.pro-scoreboard strong { display: block; overflow: hidden; color: #fff; text-overflow: ellipsis; white-space: nowrap; font-size: clamp(13px, 2vw, 20px); }
+.pro-scoreboard > b { display: flex; align-items: center; gap: 10px; color: #ff4f5f; font-size: clamp(32px, 5vw, 54px); line-height: 1; letter-spacing: -2px; font-variant-numeric: tabular-nums; }
 .pro-score-digits, .pro-clock-digits { font-family: "Roboto Mono", "Share Tech Mono", "Arial Narrow", "Courier New", monospace; font-weight: 900; font-variant-numeric: tabular-nums; letter-spacing: .03em; text-shadow: 0 1px 0 currentColor; }
 .digital-display { display: inline-flex; align-items: center; gap: .08em; height: 1em; }
 .digital-digit { position: relative; display: inline-block; width: .58em; height: 1em; flex: 0 0 .58em; }
@@ -316,18 +316,18 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-score-digits .digital-display { display: inline-flex; color: inherit; font-size: 1em; font-weight: inherit; letter-spacing: normal; }
 .pro-score-digits .digital-display > span { display: inline-block; color: inherit; font-size: 1em; }
 .pro-score-digits .digital-display i { color: inherit; font-size: 1em; font-style: normal; font-weight: inherit; }
-.pro-scoreboard > b i { color: #9a8127; font-size: .6em; font-style: normal; font-weight: 450; }
-.pro-meta { display: flex; align-items: center; justify-content: center; gap: 10px; width: min(100%, 680px); min-height: 36px; margin: -7px auto 0; padding: 5px 12px 8px; border: 1px solid #453912; border-top: 0; border-radius: 0 0 12px 12px; background: #080a08; color: #c6ae51; font-size: 11px; box-shadow: inset 0 -1px 0 #000; }
-.pro-meta .period-button { min-height: 32px; border-color: #5b4c18; background: #151507; color: #ffe272; }
-.pro-clock { display: inline-flex; align-items: baseline; justify-content: center; gap: 7px; min-width: 118px; min-height: 42px; padding: 7px 11px; border: 1px solid #5b4c18; border-radius: 7px; background: #121207; color: #ffdc52; box-shadow: inset 0 0 0 1px #000; }
+.pro-scoreboard > b i { color: #fff; font-size: .6em; font-style: normal; font-weight: 450; }
+.pro-meta { display: flex; align-items: center; justify-content: center; gap: 10px; width: min(100%, 680px); min-height: 36px; margin: -7px auto 0; padding: 5px 12px 8px; border: 1px solid #453912; border-top: 0; border-radius: 0 0 12px 12px; background: #080a08; color: #fff; font-size: 11px; box-shadow: inset 0 -1px 0 #000; }
+.pro-meta .period-button { min-height: 32px; border-color: #5b4c18; background: #151507; color: #fff; }
+.pro-clock { display: inline-flex; align-items: baseline; justify-content: center; gap: 7px; min-width: 118px; min-height: 42px; padding: 7px 11px; border: 1px solid #7d4b2c; border-radius: 7px; background: #121207; color: #ff9d45; box-shadow: inset 0 0 0 1px #000; }
 .pro-clock span { font-size: 25px; line-height: 1; }
-.pro-clock small { color: #b9a34c; font-size: 8px; font-weight: 750; letter-spacing: .7px; }
-.pro-clock.running { border-color: #c9a92f; color: #ffed83; }
-.pro-clock-toggle { min-width: 50px; min-height: 34px; padding: 5px 7px; border: 1px solid #5b4c18; border-radius: 8px; background: #151507; color: #ffe272; }
+.pro-clock small { color: #fff; font-size: 8px; font-weight: 750; letter-spacing: .7px; }
+.pro-clock.running { border-color: #ff9d45; color: #ffb66f; }
+.pro-clock-toggle { min-width: 50px; min-height: 34px; padding: 5px 7px; border: 1px solid #5b4c18; border-radius: 8px; background: #151507; color: #fff; }
 .pro-clock-toggle small { font-size: 8px; font-weight: 750; letter-spacing: .7px; }
-.pro-clock-toggle.running { border-color: #ffe272; background: #ffdc52; color: #151507; }
-.pro-clock-reset { min-width: 34px; min-height: 34px; border: 1px solid #5b4c18; background: #151507; color: #ffe272; font-size: 20px; }
-.pro-clock-off { color: #c6ae51; font-size: 9px; letter-spacing: 1px; }
+.pro-clock-toggle.running { border-color: #ff9d45; background: #ff9d45; color: #fff; }
+.pro-clock-reset { min-width: 34px; min-height: 34px; border: 1px solid #5b4c18; background: #151507; color: #fff; font-size: 20px; }
+.pro-clock-off { color: #fff; font-size: 9px; letter-spacing: 1px; }
 .clock-edit-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .clock-drum-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
 .clock-drum-grid label { color: var(--muted); font-size: 11px; }
@@ -370,13 +370,18 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-roster { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; max-height: 28vh; overflow-y: auto; }
 .pro-player { display: flex; align-items: center; justify-content: space-between; gap: 6px; min-width: 0; min-height: 40px; padding: 5px 7px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); text-align: left; }
 .pro-player-name { display: flex; align-items: center; gap: 5px; min-width: 0; }
-.pro-player-name strong { flex: 0 0 auto; color: var(--accent); font-size: 15px; font-variant-numeric: tabular-nums; }
+.pro-player-name strong { flex: 0 0 auto; color: #fff; font-size: 15px; font-variant-numeric: tabular-nums; }
 .pro-player-name span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 10px; }
-.pro-player-stats { flex: 0 0 auto; color: var(--muted); font-size: 9px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pro-player-stats { display: flex; flex: 0 0 auto; align-items: center; gap: 5px; color: #fff; font-family: "Roboto Mono", "Share Tech Mono", "Arial Narrow", "Courier New", monospace; font-size: 9px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pro-player-stat { display: inline-flex; align-items: center; gap: 2px; height: 15px; line-height: 1; }
+.pro-player-stat em { font-family: inherit; font-size: 7px; font-style: normal; font-weight: 800; letter-spacing: .04em; }
+.pro-player-stat-score { color: #53d17a; }
+.pro-player-stat-foul { color: #ff4f5f; }
+.pro-player-stat .digital-display { height: .86em; color: inherit; font-size: 13px; }
+.pro-player-stat .digital-digit { width: .48em; flex-basis: .48em; }
 .pro-player.on-court { border-color: var(--accent); background: var(--accent-soft); }
 .pro-player.bench { background: var(--surface-2); color: var(--muted); opacity: .82; }
 .pro-player.bench strong { color: var(--muted); }
-.pro-player.bench .pro-player-stats { color: var(--muted); }
 .pro-player.selected { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
 .pro-sub-button { min-height: 39px; margin-top: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--muted); font-size: 11px; font-weight: 700; }
 .pro-opponent-score { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
