@@ -51,7 +51,10 @@ test('Pro games preserve clock, opponent player stats and exact shot positions',
   assert.equal(shotZoneFromPoint(null, .27, 176 / 500), 'two-left-wing');
   assert.equal(shotZoneFromPoint(null, .27, 180 / 500), 'two-left-wing');
   assert.equal(shotZoneFromPoint(null, 180 / 940, 120 / 500), 'two-left-corner');
+  assert.equal(shotZoneFromPoint(null, 180 / 940, 150 / 500), 'two-left-wing');
   assert.equal(shotZoneFromPoint(null, 240 / 940, 120 / 500), 'two-left-wing');
+  assert.equal(shotZoneFromPoint('3PM', 180 / 940, 70 / 500), 'three-left-corner');
+  assert.equal(shotZoneFromPoint('3PM', 180 / 940, 90 / 500), 'three-left-wing');
   assert.equal(shotZoneFromPoint(null, 140 / 940, 40 / 500), 'three-left-corner');
   assert.equal(shotZoneFromPoint(null, 300 / 940, 40 / 500), 'three-left-wing');
   assert.equal(shotZoneForEvent({ eventType: '3PM', shotZone: 'three-left-corner', shotX: .3, shotY: .15 }), 'three-left-wing');
@@ -89,7 +92,7 @@ test('only portrait iPhones use the Pro half court and its markings face the upp
   assert.equal(isIPhonePortrait('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', true), true);
   assert.equal(isIPhonePortrait('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', false), false);
   assert.equal(isIPhonePortrait('Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)', true), false);
-  assert.match(PRO_HALF_COURT_MARKINGS, /M444 163A214 214 0 0 1 56 163/);
+  assert.match(PRO_HALF_COURT_MARKINGS, /M420 204A214 214 0 0 1 80 204/);
   assert.match(PRO_HALF_COURT_MARKINGS, /M304 210A54 54 0 0 1 196 210/);
   assert.match(PRO_HALF_COURT_MARKINGS, /M287 74A37 37 0 0 1 213 74/);
 });

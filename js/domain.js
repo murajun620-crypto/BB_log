@@ -26,7 +26,10 @@ export const SHOT_ZONE_IDS = new Set([...SHOT_ZONES.map(zone => zone.id), ...Obj
 export const SHOT_EVENT_TYPES = new Set(['2PM', '2PX', '3PM', '3PX']);
 export const isShotEvent = event => SHOT_EVENT_TYPES.has(event?.eventType);
 export const isPointShotEvent = event => isShotEvent(event) || ['FTM', 'FTX'].includes(event?.eventType);
-const PRO_COURT = { width: 940, height: 500, centerX: 470, centerY: 250, leftBasketX: 74, rightBasketX: 866, threeCornerY: 56, threeRadius: 213, twoCornerY: 176, paintTop: 176, paintBottom: 324, leftFreeThrowX: 210, rightFreeThrowX: 730, rimRadius: 37 };
+// Keep the virtual zone boundaries aligned with the visible Pro court. The
+// wider sideline gap gives the 3P corner a usable tap area, while the 2P
+// corner/wing split follows the same height used by the shot-map regions.
+const PRO_COURT = { width: 940, height: 500, centerX: 470, centerY: 250, leftBasketX: 74, rightBasketX: 866, threeCornerY: 80, threeCornerDepth: 204, threeRadius: 213, twoCornerY: 138, paintTop: 176, paintBottom: 324, leftFreeThrowX: 210, rightFreeThrowX: 730, rimRadius: 37 };
 export const oppositeDirection = direction => direction === 'left' ? 'right' : 'left';
 export function halfCourtPointFromFull(x, y, direction) {
   if (![x, y].every(value => Number.isFinite(value))) return null;
@@ -55,7 +58,7 @@ function pointIsThree(x, y) {
   const px = x * PRO_COURT.width, py = y * PRO_COURT.height;
   const leftBasket = px <= PRO_COURT.centerX;
   const depth = leftBasket ? px : PRO_COURT.width - px;
-  const corner = depth <= 163 && (py <= PRO_COURT.threeCornerY || py >= PRO_COURT.height - PRO_COURT.threeCornerY);
+  const corner = depth <= PRO_COURT.threeCornerDepth && (py <= PRO_COURT.threeCornerY || py >= PRO_COURT.height - PRO_COURT.threeCornerY);
   const basketX = leftBasket ? PRO_COURT.leftBasketX : PRO_COURT.rightBasketX;
   return corner || Math.hypot(px - basketX, py - PRO_COURT.centerY) >= PRO_COURT.threeRadius;
 }
@@ -75,7 +78,7 @@ export function shotZoneFromPoint(type, x, y) {
   if (prefix === 'two' && inPaint && py >= PRO_COURT.paintTop && py <= PRO_COURT.paintBottom) return 'paint';
   const depth = leftBasket ? px : PRO_COURT.width - px;
   const cornerBoundary = prefix === 'three' ? PRO_COURT.threeCornerY : PRO_COURT.twoCornerY;
-  const cornerDepth = prefix === 'three' ? 163 : PRO_COURT.leftFreeThrowX;
+  const cornerDepth = prefix === 'three' ? PRO_COURT.threeCornerDepth : PRO_COURT.leftFreeThrowX;
   if (depth <= cornerDepth && (py <= cornerBoundary || py >= PRO_COURT.height - cornerBoundary)) return `${prefix}-${side < 0 ? 'left' : 'right'}-corner`;
   if (distanceFromCenter > .27) return `${prefix}-${side < 0 ? 'left' : 'right'}-wing`;
   return `${prefix}-top`;
