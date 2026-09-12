@@ -398,7 +398,7 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-roster-add { display: inline-flex; grid-column: 1 / -1; align-items: center; justify-content: center; gap: 5px; min-height: 42px; padding: 6px 8px; border: 1px dashed var(--line); border-radius: 8px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 700; }
 .pro-roster-add .icon { width: 15px; height: 15px; }
 .pro-sub-button { min-height: 39px; margin-top: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--muted); font-size: 11px; font-weight: 700; }
-.pro-live-screen.pro-step-ready .pro-court { opacity: .35; filter: grayscale(.8); pointer-events: none; }
+.pro-live-screen.pro-step-ready .pro-court { pointer-events: none; }
 .pro-live-screen.pro-step-ready .pro-player,
 .pro-live-screen.pro-step-ready .pro-roster-key { opacity: .35; filter: grayscale(.8); pointer-events: none; }
 .pro-live-screen.pro-await-own-player .pro-court,
