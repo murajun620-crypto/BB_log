@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, fullCourtPointFromHalf, halfCourtPointFromFull, isBackcourtPoint, normalizeShotZone, oppositeDirection, percent, lineup, validateGame, validateTeam, makePeriods, shotPointsFromPoint, shotZoneForEvent, shotZoneFromPoint, uid } from '../js/domain.js';
+import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, eventLabel, fullCourtPointFromHalf, halfCourtPointFromFull, isBackcourtPoint, normalizeShotZone, oppositeDirection, percent, lineup, validateGame, validateTeam, makePeriods, shotPointsFromPoint, shotZoneForEvent, shotZoneFromPoint, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
 import { isIPhonePortrait, isIPhoneUserAgent, PRO_HALF_COURT_MARKINGS, proLiveView, shotZonePicker, shotChartMapHTML, strategyBoardHTML } from '../js/views.js';
@@ -202,6 +202,17 @@ test('Pro shot input uses result buttons, auto-selects points and skips the cour
   assert.match(proLiveView(state, { ...game, currentPeriodId: game.periods[2].id }, events), /← 左ゴール/);
   const freeThrow = proLiveView({ ...state, proSelection: { type: 'FTM', playerId: 'player-0' } }, game, events);
   assert.doesNotMatch(freeThrow, /data-action="pro-shot-point"/);
+});
+test('opponent players use jersey numbers without requiring or displaying names', () => {
+  const { game } = fixture();
+  game.mode = 'pro'; game.clockEnabled = false; game.opponentTracking = 'player'; game.opponentRoster = [{ id: 'opponent-1', number: '8' }];
+  validateGame(game, []);
+  assert.equal(eventLabel(game, { eventType: 'PF', playerId: 'opponent-1', side: 'opponent' }), '相手 8 · F');
+  const html = proLiveView({ proSelection: null, proOpponentSelection: { type: 'FGM', playerId: 'opponent-1' } }, game, []);
+  assert.match(html, /data-action="pro-select-opponent" data-id="opponent-1"/);
+  assert.match(html, /<span class="pro-player-name"><strong>8<\/strong><\/span>/);
+  assert.match(html, /<b>相手 8 · フィールドゴール成功<\/b>/);
+  assert.doesNotMatch(html, /相手選手.*相手選手/);
 });
 test('strategy board exposes court tools and preserves placed items in its view', () => {
   const board = { tool: 'away', items: [

@@ -160,7 +160,7 @@ export function lineup(game, events, strict = false) {
   return [...on];
 }
 export function eventLabel(game, event) {
-  const player = (id, side = 'home') => { const p = (side === 'opponent' ? game.opponentRoster || [] : game.roster).find(p => p.id === id); return p ? `${p.number} ${p.name}` : '不明'; };
+  const player = (id, side = 'home') => { const p = (side === 'opponent' ? game.opponentRoster || [] : game.roster).find(p => p.id === id); return p ? side === 'opponent' ? p.number : `${p.number} ${p.name}` : '不明'; };
   if (event.eventType === 'OPP') return `相手 +${event.points}`;
   if (event.eventType === 'SUB') return `${player(event.outPlayerId)} → ${player(event.inPlayerId)}`;
   const eventZone = shotZoneForEvent(event);
@@ -177,6 +177,11 @@ export function validatePlayers(players) {
   for (const p of players) ensure(p && isId(p.id) && typeof p.number === 'string' && /^\d{1,3}$/.test(p.number) && isText(p.name, 40), '選手の背番号（0〜999）と名前を確認してください。');
   ensure(unique(players.map(p => p.id)) && unique(players.map(p => p.number)), '選手IDまたは背番号が重複しています。');
 }
+function validateOpponentPlayers(players) {
+  ensure(Array.isArray(players) && players.length >= 1 && players.length <= 60, '相手選手は1〜60人で入力してください。');
+  for (const p of players) ensure(p && isId(p.id) && typeof p.number === 'string' && /^\d{1,3}$/.test(p.number) && (p.name === undefined || typeof p.name === 'string' && p.name.length <= 40), '相手選手の背番号を確認してください。');
+  ensure(unique(players.map(p => p.id)) && unique(players.map(p => p.number)), '相手選手IDまたは背番号が重複しています。');
+}
 export function validateTeam(t) {
   ensure(t && isId(t.id) && isText(t.name, 40) && Number.isInteger(t.revision) && t.revision >= 0, 'チーム情報が不正です。');
   validatePlayers(t.players);
@@ -191,7 +196,7 @@ export function validateGame(g, events) {
   validatePlayers(g.roster);
   if (g.opponentRoster !== undefined) {
     ensure(Array.isArray(g.opponentRoster) && g.opponentRoster.length <= 60, '相手選手情報が不正です。');
-    if (g.opponentRoster.length) validatePlayers(g.opponentRoster);
+    if (g.opponentRoster.length) validateOpponentPlayers(g.opponentRoster);
   }
   if (g.mode !== undefined) ensure(['standard', 'pro'].includes(g.mode), '記録モードが不正です。');
   if (g.attackDirection !== undefined) ensure(['left', 'right'].includes(g.attackDirection), '攻撃方向が不正です。');

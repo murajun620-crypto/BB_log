@@ -144,7 +144,7 @@ function render() {
     html = page === 'live' ? g.mode === 'pro' ? view.proLiveView(state, g, gameEvents(g), currentClockSeconds(g)) : view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.12 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.13 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -237,11 +237,10 @@ function parseOpponentRoster(text) {
   const lines = String(text || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
   const numbers = new Set();
   return lines.map((line, index) => {
-    const match = line.match(/^(\d{1,3})\s*(?:,|\s+)\s*(.+)$/);
-    if (!match) throw new Error(`相手選手${index + 1}は「背番号 名前」の形式で入力してください。`);
-    if (numbers.has(match[1])) throw new Error('相手選手の背番号が重複しています。');
-    numbers.add(match[1]);
-    return { id: uid(), number: match[1], name: match[2].slice(0, 40) };
+    if (!/^\d{1,3}$/.test(line)) throw new Error(`相手選手${index + 1}は背番号（1〜3桁）だけで入力してください。`);
+    if (numbers.has(line)) throw new Error('相手選手の背番号が重複しています。');
+    numbers.add(line);
+    return { id: uid(), number: line };
   });
 }
 async function saveGameChange(next, event = null) {
