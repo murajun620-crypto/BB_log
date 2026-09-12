@@ -1,4 +1,4 @@
-const VERSION = 'v2.2.15';
+const VERSION = 'v2.2.16';
 const CACHE_NAME = `courtside-reader-${VERSION}`;
 const ASSETS = [
   '../js/cloud-config.js', '../js/cloud-share.js',
@@ -6,9 +6,10 @@ const ASSETS = [
   '../js/domain.js', '../js/views.js', '../js/shared-report.js', '../icons/icon.svg', '../icons/icon-192.png',
   '../icons/icon-512.png', '../icons/maskable-512.png', '../icons/apple-touch-icon.png',
 ];
+const assetRequests = ASSETS.map(asset => new Request(new URL(asset, self.registration.scope), { cache: 'reload' }));
 
 self.addEventListener('install', event => {
-  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
+  event.waitUntil(caches.open(CACHE_NAME).then(cache => cache.addAll(assetRequests)).then(() => self.skipWaiting()));
 });
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
