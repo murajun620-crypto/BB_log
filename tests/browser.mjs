@@ -147,9 +147,15 @@ try {
   await page.evaluate(() => {
     window.sharedShare = null;
     window.sharedFile = null;
+    window.copiedShareLink = '';
+    Object.defineProperty(navigator, 'clipboard', { configurable: true, value: { writeText: async value => { window.copiedShareLink = value; } } });
     Object.defineProperty(navigator, 'canShare', { configurable: true, value: data => ['image/png', 'application/json'].includes(data.files?.[0]?.type) });
     Object.defineProperty(navigator, 'share', { configurable: true, value: async data => { const file = data.files?.[0]; window.sharedShare = { url: data.url || '', message: data.text || '' }; if (file) window.sharedFile = { name: file.name, size: file.size, type: file.type, text: file.type === 'application/json' ? await file.text() : null, message: data.text || '' }; } });
   });
+  await page.getByRole('button', { name: '共有', exact: true }).click();
+  await page.getByRole('button', { name: 'リンクをコピー', exact: true }).click();
+  await page.waitForFunction(() => window.copiedShareLink.includes('#share/v'));
+  assert.match(await page.evaluate(() => window.copiedShareLink), /\/reader\/#share\/v/);
   await page.getByRole('button', { name: '共有', exact: true }).click();
   step('LINE sharing uses the standard system share sheet');
   await page.getByRole('button', { name: 'LINEへ共有', exact: true }).click();

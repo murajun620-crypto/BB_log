@@ -72,7 +72,7 @@ export async function shareFile(file, title, message = '') {
   downloadFile(file);
   return 'downloaded';
 }
-async function copyText(value) {
+export async function copyText(value) {
   try {
     if (navigator.clipboard?.writeText) { await navigator.clipboard.writeText(value); return true; }
   } catch {}

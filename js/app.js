@@ -1,6 +1,6 @@
 import * as db from './db.js';
 import { uid, localDate, STATS, activeEvents, attackDirectionForPeriod, fullCourtPointFromHalf, isBackcourtPoint, makePeriods, oppositeDirection, shotPointsFromPoint, shotZoneFromPoint, validateTeam, validateGame, lineup, eventLabel, aggregate, aggregateGames } from './domain.js';
-import { backupObject, parseBackup, gameCSV, download, shareFile, shareUrl } from './transfer.js';
+import { backupObject, parseBackup, gameCSV, download, copyText, shareFile, shareUrl } from './transfer.js';
 import { boxScoreImage, playerStatsImage, safeFilename, shareImage } from './share-image.js';
 import { createSharedReport, createAggregateSharedReport, createCompressedSharePayload, parseSharePayload, parseSharedReport, sharedReportFile } from './shared-report.js';
 import * as view from './views.js';
@@ -144,7 +144,7 @@ function render() {
     html = page === 'live' ? g.mode === 'pro' ? view.proLiveView(state, g, gameEvents(g), currentClockSeconds(g)) : view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.9 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.10 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -369,6 +369,24 @@ async function shareGameLink() {
   const result = await shareUrl(link, `${g.teamName} vs ${g.opponentName}`, gameShareMessage(g));
   if (result === 'copied') toast('共有リンクをコピーしました。LINEに貼り付けてください。');
   if (result === 'copy-failed') toast('リンクをコピーできませんでした。共有メニューから送ってください。', true);
+  if (sheet.open) closeSheet();
+}
+async function copyGameLink() {
+  const g = game();
+  if (!g) throw new Error('試合が見つかりません。');
+  const prepared = sharePayloadPromise?.gameId === g.id ? sharePayloadPromise.promise : null;
+  const payload = await (prepared || createCompressedSharePayload(g, gameEvents(g)));
+  sharePayloadPromise = null;
+  const link = reportLink(payload);
+  if (link.length > 14000) {
+    toast('リンクが長すぎるためコピーできません。ファイルで共有してください。', true);
+    return;
+  }
+  if (!(await copyText(link))) {
+    toast('リンクをコピーできませんでした。', true);
+    return;
+  }
+  toast('共有リンクをコピーしました。LINEに貼り付けてください。');
   if (sheet.open) closeSheet();
 }
 const strategyToolHints = { home: '味方を選び、コートをタップして配置（最大5人）。配置済みはドラッグで移動', away: '相手を選び、コートをタップして配置（最大5人）。配置済みはドラッグで移動', ball: '空いている場所をタップしてボールを配置・移動。配置済みはドラッグで移動', line: '始点から終点までドラッグしてラインを描く', arrow: '始点から終点までドラッグして矢印を描く', erase: '消したいユニフォーム・ボール・線をタップ' };
@@ -693,7 +711,7 @@ const handlers = {
     const g = game();
     const events = gameEvents(g);
     sharePayloadPromise = g ? { gameId: g.id, promise: createCompressedSharePayload(g, events) } : null;
-    showSheet('スタッツを共有', `<button class="button primary full" data-action="share-link">${view.icon('share')}LINEへ共有</button><p class="help">日付・対戦チーム・スコアを本文に添えて、リンクをLINEなどの共有メニューから送ります。受信者はリンクをタップしてBOX SCOREを開き、選手をタップして詳細も確認できます。</p><button class="button secondary full spaced" data-action="share-report">${view.icon('download')}ファイルで共有</button><p class="help">リンクを使わず、閲覧用ファイルを送る方法です。受信者は「設定」から開きます。</p><button class="button secondary full spaced" data-action="share-box-image">${view.icon('download')}画像で共有</button>`);
+    showSheet('スタッツを共有', `<button class="button primary full" data-action="share-link">${view.icon('share')}LINEへ共有</button><p class="help">日付・対戦チーム・スコアを本文に添えて、リンクをLINEなどの共有メニューから送ります。受信者はリンクをタップしてBOX SCOREを開き、選手をタップして詳細も確認できます。</p><button class="button secondary full spaced" data-action="copy-share-link">${view.icon('share')}リンクをコピー</button><p class="help">Readerの共有リンクだけをクリップボードにコピーします。サーバーには保存しません。</p><button class="button secondary full spaced" data-action="share-report">${view.icon('download')}ファイルで共有</button><p class="help">リンクを使わず、閲覧用ファイルを送る方法です。受信者は「設定」から開きます。</p><button class="button secondary full spaced" data-action="share-box-image">${view.icon('download')}画像で共有</button>`);
     if (cloudShareEnabled()) {
       const button = sheet.querySelector('[data-action="share-link"]');
       button.dataset.action = 'cloud-create';
@@ -702,6 +720,7 @@ const handlers = {
     }
   },
   'share-link': () => shareGameLink(),
+  'copy-share-link': () => copyGameLink(),
   'share-report': () => shareGameReport(),
   'share-box-image': async () => { await shareStatsImage(); if (sheet.open) closeSheet(); },
   'share-player-image': button => shareStatsImage(button.dataset.id),
