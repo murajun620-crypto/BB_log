@@ -1,8 +1,8 @@
-const VERSION = 'v2.2.8';
+const VERSION = 'v2.2.9';
 const CACHE_NAME = `courtside-reader-${VERSION}`;
 const ASSETS = [
   '../js/cloud-config.js', '../js/cloud-share.js',
-  './', './index.html', './css/reader.css', './js/reader.js', './manifest.webmanifest',
+  './', './index.html', './css/reader.css', '../css/shot-chart.css', './js/reader.js', './manifest.webmanifest',
   '../js/domain.js', '../js/views.js', '../js/shared-report.js', '../icons/icon.svg', '../icons/icon-192.png',
   '../icons/icon-512.png', '../icons/maskable-512.png', '../icons/apple-touch-icon.png',
 ];

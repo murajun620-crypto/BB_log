@@ -1,12 +1,12 @@
 // Bump this version whenever any app-shell asset changes.
-const VERSION = 'v2.2.8';
+const VERSION = 'v2.2.9';
 const CACHE_PREFIX = 'courtside-shell-';
 // Include scope in the name so multiple GitHub Pages projects cannot clear each other's caches.
 const CACHE_BASE = `${CACHE_PREFIX}${encodeURIComponent(self.registration.scope)}-`;
 const CACHE_NAME = `${CACHE_BASE}${VERSION}`;
 const ASSETS = [
   './js/cloud-config.js', './js/cloud-share.js', './js/cloud-share-ui.js',
-  './', './index.html', './css/app.css', './js/app.js', './js/domain.js', './js/db.js',
+  './', './index.html', './css/app.css', './css/shot-chart.css', './js/app.js', './js/domain.js', './js/db.js',
   './js/views.js', './js/transfer.js', './js/share-image.js', './js/shared-report.js', './manifest.webmanifest', './icons/icon.svg',
   './icons/icon-192.png', './icons/icon-512.png', './icons/maskable-512.png', './icons/apple-touch-icon.png',
 ];

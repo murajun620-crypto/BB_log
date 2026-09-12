@@ -34,22 +34,26 @@ test('edits and soft deletions change score, player totals and periods without d
   assert.equal(a.team.PTS, 2); assert.equal(a.team.FGA, 2); assert.equal(a.team.FGM, 1);
   assert.equal(a.opponent, 0); assert.equal(events.length, 3);
 });
-test('Pro games preserve clock, opponent player stats and exact shot positions', () => {
+test('Pro games preserve clock, opponent player stats and exact shot positions', async () => {
   const { game, events, add } = fixture();
   game.mode = 'pro'; game.clockEnabled = true; game.clockSeconds = 480; game.clockRunning = false; game.clockStartedAt = null;
   game.attackDirection = 'right';
   game.opponentTracking = 'player'; game.opponentRoster = [{ id: 'opponent-1', number: '8', name: '相手選手' }];
-  add('3PM', { shotX: .72, shotY: .5, shotZone: shotZoneFromPoint('3PM', .72, .5), clockSeconds: 431 });
+  add('3PM', { shotX: .68, shotY: .5, shotZone: shotZoneFromPoint('3PM', .68, .5), clockSeconds: 431 });
   events.push({ id: uid(), gameId: game.id, periodId: game.currentPeriodId, eventType: '2PM', playerId: 'opponent-1', side: 'opponent', points: 2, timestamp: new Date().toISOString(), seq: game.nextSeq++, shotX: .1, shotY: .5, shotZone: shotZoneFromPoint('2PM', .1, .5), clockSeconds: 420 });
   validateGame(game, events);
   const a = aggregate(game, events);
   assert.equal(a.team.PTS, 3); assert.equal(a.opponent, 2); assert.equal(a.opponentPlayers['opponent-1'].PTS, 2);
-  assert.equal(events[0].shotZone, 'three-top'); assert.equal(events[0].shotX, .72); assert.equal(events[1].shotZone, 'rim');
+  assert.equal(events[0].shotZone, 'three-top'); assert.equal(events[0].shotX, .68); assert.equal(events[1].shotZone, 'rim');
   assert.equal(shotZoneFromPoint('3PM', .5, .25), 'three-left-wing');
-  assert.equal(shotZoneFromPoint('3PM', .3, 56 / 500), 'three-left-corner');
+  assert.equal(shotZoneFromPoint('3PM', .3, 56 / 500), 'three-left-wing');
   assert.equal(shotZoneFromPoint('3PM', .3, 60 / 500), 'three-left-wing');
-  assert.equal(shotZoneFromPoint(null, .27, 176 / 500), 'two-left-corner');
+  assert.equal(shotZoneFromPoint(null, .27, 176 / 500), 'two-left-wing');
   assert.equal(shotZoneFromPoint(null, .27, 180 / 500), 'two-left-wing');
+  assert.equal(shotZoneFromPoint(null, 180 / 940, 120 / 500), 'two-left-corner');
+  assert.equal(shotZoneFromPoint(null, 240 / 940, 120 / 500), 'two-left-wing');
+  assert.equal(shotZoneFromPoint(null, 140 / 940, 40 / 500), 'three-left-corner');
+  assert.equal(shotZoneFromPoint(null, 300 / 940, 40 / 500), 'three-left-wing');
   assert.equal(shotZoneForEvent({ eventType: '3PM', shotZone: 'three-left-corner', shotX: .3, shotY: .15 }), 'three-left-wing');
   const correctedShared = createSharedReport(game, [{ ...events[0], shotX: .3, shotY: .15, shotZone: 'three-left-corner' }]);
   assert.equal(correctedShared.report.shots[0].zone, 'three-left-wing');
@@ -57,6 +61,12 @@ test('Pro games preserve clock, opponent player stats and exact shot positions',
   assert.equal(shotPointsFromPoint(.12, .1), 3); assert.equal(shotPointsFromPoint(.3, .5), 2);
   assert.equal(shotPointsFromPoint(.31, .5), 3); assert.equal(shotPointsFromPoint(.7, .5), 2);
   assert.equal(shotZoneFromPoint(null, 74 / 940, .5), 'rim'); assert.equal(shotZoneFromPoint(null, 180 / 940, .5), 'paint');
+  const pointShared = createSharedReport(game, [events[0]]);
+  assert.deepEqual(pointShared.report.shots[0], { playerId: 'p1', zone: 'three-top', result: 'made', x: .68, y: .5 });
+  const pointPayload = await createCompressedSharePayload(game, [events[0]]);
+  const parsedPointPayload = await parseSharePayload(pointPayload);
+  assert.deepEqual(parsedPointPayload.shots, pointShared.report.shots);
+  assert.equal((shotChartMapHTML(parsedPointPayload.shots).match(/data-action="toggle-shot-display"/g) || []).length, 2);
   assert.equal(attackDirectionForPeriod(game), 'right'); assert.equal(attackDirectionForPeriod(game, game.periods[2].id), 'left');
   game.attackDirection = 'left'; assert.equal(attackDirectionForPeriod(game, game.periods[2].id), 'right');
 });

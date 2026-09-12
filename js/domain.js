@@ -53,9 +53,11 @@ export function isBackcourtPoint(direction, x, opponent = false) {
 }
 function pointIsThree(x, y) {
   const px = x * PRO_COURT.width, py = y * PRO_COURT.height;
-  if (py <= PRO_COURT.threeCornerY || py >= PRO_COURT.height - PRO_COURT.threeCornerY) return true;
-  const basketX = px <= PRO_COURT.centerX ? PRO_COURT.leftBasketX : PRO_COURT.rightBasketX;
-  return Math.hypot(px - basketX, py - PRO_COURT.centerY) >= PRO_COURT.threeRadius;
+  const leftBasket = px <= PRO_COURT.centerX;
+  const depth = leftBasket ? px : PRO_COURT.width - px;
+  const corner = depth <= 163 && (py <= PRO_COURT.threeCornerY || py >= PRO_COURT.height - PRO_COURT.threeCornerY);
+  const basketX = leftBasket ? PRO_COURT.leftBasketX : PRO_COURT.rightBasketX;
+  return corner || Math.hypot(px - basketX, py - PRO_COURT.centerY) >= PRO_COURT.threeRadius;
 }
 export function shotPointsFromPoint(x, y) {
   if (![x, y].every(value => Number.isFinite(value) && value >= 0 && value <= 1)) return null;
@@ -71,8 +73,10 @@ export function shotZoneFromPoint(type, x, y) {
   const inPaint = leftBasket ? px <= PRO_COURT.leftFreeThrowX : px >= PRO_COURT.rightFreeThrowX;
   if (prefix === 'two' && distanceToBasket <= PRO_COURT.rimRadius) return 'rim';
   if (prefix === 'two' && inPaint && py >= PRO_COURT.paintTop && py <= PRO_COURT.paintBottom) return 'paint';
+  const depth = leftBasket ? px : PRO_COURT.width - px;
   const cornerBoundary = prefix === 'three' ? PRO_COURT.threeCornerY : PRO_COURT.twoCornerY;
-  if (py <= cornerBoundary || py >= PRO_COURT.height - cornerBoundary) return `${prefix}-${side < 0 ? 'left' : 'right'}-corner`;
+  const cornerDepth = prefix === 'three' ? 163 : PRO_COURT.leftFreeThrowX;
+  if (depth <= cornerDepth && (py <= cornerBoundary || py >= PRO_COURT.height - cornerBoundary)) return `${prefix}-${side < 0 ? 'left' : 'right'}-corner`;
   if (distanceFromCenter > .27) return `${prefix}-${side < 0 ? 'left' : 'right'}-wing`;
   return `${prefix}-top`;
 }

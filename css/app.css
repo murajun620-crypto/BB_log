@@ -449,7 +449,6 @@ dialog::backdrop { background: #07170f70; backdrop-filter: blur(3px); }
 .picker-instruction { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
 .shot-zone-legend { display: flex; gap: 16px; margin: 0 0 10px; color: var(--muted); font-size: 11px; }
 .shot-zone-legend .target-zone { color: var(--accent); font-weight: 750; }
-.shot-court-map { display: block; width: 100%; max-width: 620px; height: auto; margin: 0 auto; overflow: hidden; border: 1px solid #d6c08d; border-radius: 12px; background: #f1dfb0; touch-action: manipulation; }
 .court-surface { fill: url(#court-wood); }
 .court-markings { fill: none; stroke: rgba(255, 255, 255, .94); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
 .court-markings circle { fill: none; }
@@ -471,32 +470,6 @@ dialog::backdrop { background: #07170f70; backdrop-filter: blur(3px); }
 .shot-map-zone.active:active { filter: brightness(.8) saturate(1.2); }
 .shot-map-zone.active:focus-visible { outline: none; stroke: #154f42; stroke-width: 5; }
 .shot-map-zone.disabled { opacity: .58; filter: saturate(.86) brightness(1.03); pointer-events: none; }
-.shot-chart { margin-top: 24px; }
-.shot-chart .section-heading { margin-top: 0; }
-.shot-display-toggle { display: flex; justify-content: flex-end; gap: 4px; margin-top: 8px; }
-.shot-display-toggle .mode-toggle { min-height: 36px; }
-.shot-display-toggle .mode-toggle.active { color: var(--surface); background: var(--accent); border-color: var(--accent); }
-.shot-display-view { display: none; }
-[data-shot-display-mode="points"] .shot-display-view-points, [data-shot-display-mode="zones"] .shot-display-view-zones { display: block; }
-.shot-chart-map { margin-top: 8px; }
-.shot-chart-map .shot-map-zone { fill-opacity: .86; stroke: rgba(255, 255, 255, .9); stroke-width: 1.8; }
-.shot-chart-map .shot-chart-zone-label { pointer-events: none; }
-.shot-chart-map .shot-chart-zone-rate, .shot-chart-map .shot-chart-zone-count { fill: #173c32; font-family: inherit; paint-order: stroke; stroke: rgba(255, 255, 255, .68); stroke-linejoin: round; }
-.shot-chart-map .shot-chart-zone-rate { font-size: 16px; font-weight: 800; stroke-width: 3px; }
-.shot-chart-map .shot-chart-zone-count { font-size: 16px; font-weight: 650; stroke-width: 2px; }
-.pro-shot-chart-map { border-color: var(--line); background: #f1dfb0; }
-.pro-chart-court-surface { fill: #f1dfb0; }
-.pro-chart-court-markings { fill: none; stroke: rgba(255, 255, 255, .96); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; pointer-events: none; }
-.pro-chart-court-markings circle { fill: none; }
-.pro-shot-chart-markers { pointer-events: none; }
-.pro-shot-chart-marker { pointer-events: none; }
-.pro-shot-chart-marker text { fill: var(--accent); font-size: 28px; font-weight: 850; paint-order: stroke; stroke: rgba(255,255,255,.9); stroke-width: 4px; stroke-linejoin: round; }
-.pro-shot-chart-marker.miss text { fill: #c7483f; }
-.pro-shot-zone-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-top: 7px; }
-.pro-shot-zone-summary-item { display: grid; gap: 2px; min-width: 0; padding: 7px 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); text-align: center; }
-.pro-shot-zone-summary-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 8px; }
-.pro-shot-zone-summary-item strong { font-size: 13px; line-height: 1.1; }
-.pro-shot-zone-summary-item b { color: var(--accent); font-size: 10px; }
 .cloud-share-preview { display: grid; gap: 10px; margin: 12px 0 16px; }
 .cloud-share-preview dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 5px 12px; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); font-size: 12px; }
 .cloud-share-preview dt { color: var(--muted); }
