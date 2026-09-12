@@ -50,22 +50,25 @@ test('Pro games preserve clock, opponent player stats and exact shot positions',
   assert.equal(shotZoneFromPoint('3PM', .3, 60 / 500), 'three-left-wing');
   assert.equal(shotZoneFromPoint(null, .27, 176 / 500), 'two-left-wing');
   assert.equal(shotZoneFromPoint(null, .27, 180 / 500), 'two-left-wing');
-  assert.equal(shotZoneFromPoint(null, 180 / 940, 100 / 500), 'two-left-corner');
-  assert.equal(shotZoneFromPoint(null, 180 / 940, 120 / 500), 'two-left-wing');
+  assert.equal(shotZoneFromPoint(null, 170 / 940, 90 / 500), 'two-left-corner');
+  assert.equal(shotZoneFromPoint(null, 180 / 940, 90 / 500), 'two-left-wing');
+  assert.equal(shotZoneFromPoint(null, 170 / 940, 100 / 500), 'two-left-wing');
   assert.equal(shotZoneFromPoint(null, 240 / 940, 120 / 500), 'two-left-wing');
   assert.equal(shotZoneFromPoint('3PM', 140 / 940, 35 / 500), 'three-left-corner');
   assert.equal(shotZoneFromPoint('3PM', 140 / 940, 50 / 500), 'three-left-wing');
+  assert.equal(shotZoneFromPoint('3PM', 145 / 940, 48 / 500), 'three-left-corner');
+  assert.equal(shotZoneFromPoint('3PM', 146 / 940, 48 / 500), 'three-left-wing');
   assert.equal(shotZoneFromPoint(null, 140 / 940, 40 / 500), 'three-left-corner');
   assert.equal(shotZoneFromPoint(null, 300 / 940, 40 / 500), 'three-left-wing');
   assert.equal(shotZoneForEvent({ eventType: '3PM', shotZone: 'three-left-corner', shotX: .3, shotY: .15 }), 'three-left-wing');
   const correctedShared = createSharedReport(game, [{ ...events[0], shotX: .3, shotY: .15, shotZone: 'three-left-corner' }]);
   assert.equal(correctedShared.report.shots[0].zone, 'three-left-wing');
   assert.equal(shotPointsFromPoint(.5, .5), 3); assert.equal(shotPointsFromPoint(.2, .5), 2);
-  assert.equal(shotPointsFromPoint(.12, .1), 3); assert.equal(shotPointsFromPoint(.3, .5), 2);
-  assert.equal(shotPointsFromPoint(.31, .5), 3); assert.equal(shotPointsFromPoint(.7, .5), 2);
+  assert.equal(shotPointsFromPoint(.12, .08), 3); assert.equal(shotPointsFromPoint(.3, .5), 2);
+  assert.equal(shotPointsFromPoint(.31, .5), 2); assert.equal(shotPointsFromPoint(.33, .5), 3); assert.equal(shotPointsFromPoint(.7, .5), 2);
   assert.equal(shotZoneFromPoint(null, 74 / 940, .5), 'rim'); assert.equal(shotZoneFromPoint(null, 180 / 940, .5), 'paint');
   const pointShared = createSharedReport(game, [events[0]]);
-  assert.deepEqual(pointShared.report.shots[0], { playerId: 'p1', zone: 'three-top', result: 'made', x: .68, y: .5 });
+  assert.deepEqual(pointShared.report.shots[0], { playerId: 'p1', zone: 'two-top', result: 'made', x: .68, y: .5 });
   const pointPayload = await createCompressedSharePayload(game, [events[0]]);
   const parsedPointPayload = await parseSharePayload(pointPayload);
   assert.deepEqual(parsedPointPayload.shots, pointShared.report.shots);
@@ -92,10 +95,10 @@ test('only portrait iPhones use the Pro half court and its markings face the upp
   assert.equal(isIPhonePortrait('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', true), true);
   assert.equal(isIPhonePortrait('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', false), false);
   assert.equal(isIPhonePortrait('Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)', true), false);
-  assert.match(PRO_HALF_COURT_MARKINGS, /M10 24H490V476H10ZM56 24V163M444 24V163M444 163A214 214 0 0 1 56 163/);
+  assert.match(PRO_HALF_COURT_MARKINGS, /M0 24H500V476H0ZM48 24V145M452 24V145M452 145A230 230 0 0 1 48 145/);
   const fullCourt = proLiveView({}, fixture().game, []);
-  assert.match(fullCourt, /pro-court-surface" x="24" y="10" width="892" height="480"/);
-  assert.match(fullCourt, /M24 10H916V490H24ZM470 10V490M24 56H163/);
+  assert.match(fullCourt, /pro-court-surface" x="24" y="0" width="892" height="500"/);
+  assert.match(fullCourt, /M24 0H916V500H24ZM470 0V500M24 48H145/);
   assert.match(PRO_HALF_COURT_MARKINGS, /M304 210A54 54 0 0 1 196 210/);
   assert.match(PRO_HALF_COURT_MARKINGS, /M287 74A37 37 0 0 1 213 74/);
 });
@@ -197,13 +200,17 @@ test('Pro shot input uses result buttons, auto-selects points and skips the cour
   assert.match(field, /pro-history-button/); assert.match(field, /pro-player on-court/); assert.doesNotMatch(field, /<strong>#/);
   assert.match(field, /pro-player-stat-score/); assert.match(field, /pro-player-stat-foul/); assert.match(field, /<em>PTS<\/em><span class="pro-player-stat-value">0<\/span>/); assert.match(field, /<em>F<\/em><span class="pro-player-stat-value">0<\/span>/); assert.doesNotMatch(field, /class="pro-player-stat pro-player-stat-score"[^>]*>.*digital-display/); assert.match(field, /aria-label="0点、ファウル0"/);
   assert.match(field, /data-action="toggle-pro-attack"/); assert.match(field, /→ 右ゴール/);
+  assert.match(field, /pro-await-own-court/); assert.match(field, /pro-court-wrap/);
+  assert.doesNotMatch(field, /選手をタップ|プレーを選択|相手選手をタップ/);
   assert.match(field, /pro-backcourt-overlay/); assert.match(field, /BACK COURT/);
   assert.doesNotMatch(field, /pro-court-zone-boundaries/);
   assert.match(proLiveView(state, { ...game, currentPeriodId: game.periods[2].id }, events), /← 左ゴール/);
   const freeThrow = proLiveView({ ...state, proSelection: { type: 'FTM', playerId: 'player-0' } }, game, events);
   assert.doesNotMatch(freeThrow, /data-action="pro-shot-point"/);
+  const awaitingPlayer = proLiveView({ proSelection: { type: 'FGM', playerId: null }, proOpponentSelection: null }, game, events);
+  assert.match(awaitingPlayer, /pro-await-own-player/); assert.match(awaitingPlayer, /data-action="add-member"/);
 });
-test('opponent players use jersey numbers without requiring or displaying names', () => {
+test('opponent players require a jersey number but can optionally include a name', () => {
   const { game } = fixture();
   game.mode = 'pro'; game.clockEnabled = false; game.opponentTracking = 'player'; game.opponentRoster = [{ id: 'opponent-1', number: '8' }];
   validateGame(game, []);
@@ -211,10 +218,13 @@ test('opponent players use jersey numbers without requiring or displaying names'
   const html = proLiveView({ proSelection: null, proOpponentSelection: { type: 'FGM', playerId: 'opponent-1' } }, game, []);
   assert.match(html, /data-action="pro-select-opponent" data-id="opponent-1"/);
   assert.match(html, /<span class="pro-player-name"><strong>8<\/strong><\/span>/);
-  assert.match(html, /<b>相手 8 · フィールドゴール成功<\/b>/);
+  assert.match(html, /<b>OPPONENT · 8 · フィールドゴール成功<\/b>/);
   assert.match(html, /data-action="pro-opponent-sub"/);
+  assert.match(html, /data-action="add-opponent-player"/);
   assert.match(html, /pro-player on-court/);
-  assert.doesNotMatch(html, /相手選手.*相手選手/);
+  game.opponentRoster[0].name = '相手選手';
+  assert.equal(eventLabel(game, { eventType: 'PF', playerId: 'opponent-1', side: 'opponent' }), '相手 8 相手選手 · F');
+  assert.match(proLiveView({ proSelection: null, proOpponentSelection: { type: 'FGM', playerId: 'opponent-1' } }, game, []), /<strong>8<\/strong><span>相手選手<\/span>/);
 });
 test('opponent substitutions keep five players on court and use opponent numbers', () => {
   const { game, events } = fixture();
@@ -227,13 +237,25 @@ test('opponent substitutions keep five players on court and use opponent numbers
   assert.deepEqual(opponentLineup(game, events), ['opponent-1', 'opponent-2', 'opponent-3', 'opponent-4', 'opponent-5']);
   assert.equal(eventLabel(game, substitution), '相手 4 → 9');
 });
-test('opponent roster uses roller selectors in live settings', () => {
+test('opponent roster uses text input with optional names in live settings', () => {
   const { game } = fixture();
-  game.mode = 'pro'; game.clockEnabled = false; game.opponentTracking = 'player'; game.opponentRoster = [{ id: 'opponent-1', number: '8' }];
+  game.mode = 'pro'; game.clockEnabled = false; game.opponentTracking = 'player'; game.opponentRoster = [{ id: 'opponent-1', number: '8', name: '相手選手' }];
   const html = liveSettingsHTML(game);
-  assert.equal((html.match(/name="opponentRosterNumber"/g) || []).length, 12);
-  assert.match(html, /option value="8" selected/);
-  assert.doesNotMatch(html, /opponentRosterText/);
+  assert.match(html, /name="opponentRosterText"/);
+  assert.match(html, /8 相手選手/);
+  assert.match(html, /半角数字1〜3桁/);
+  assert.doesNotMatch(html, /opponentRosterNumber|ローラー/);
+});
+test('team and opponent rosters have no registration count cap and still reject full-width numbers', () => {
+  const manyPlayers = Array.from({ length: 61 }, (_, i) => ({ id: `large-player-${i}`, number: String(i % 1000), name: `選手${i}` }));
+  validateTeam({ id: 'large-team', name: 'LARGE', revision: 0, players: manyPlayers });
+  const { game } = fixture();
+  game.mode = 'pro'; game.clockEnabled = false; game.opponentTracking = 'player'; game.roster = structuredClone(manyPlayers); game.starters = manyPlayers.slice(0, 5).map(player => player.id);
+  game.opponentRoster = manyPlayers.map((player, i) => ({ id: `large-opponent-${i}`, number: player.number }));
+  game.opponentStarters = game.opponentRoster.slice(0, 5).map(player => player.id);
+  assert.doesNotThrow(() => validateGame(game, []));
+  game.opponentRoster = [{ id: 'opponent-full-width', number: '８' }]; game.opponentStarters = [];
+  assert.throws(() => validateGame(game, []), /相手選手の背番号/);
 });
 test('strategy board exposes court tools and preserves placed items in its view', () => {
   const board = { tool: 'away', items: [

@@ -27,9 +27,9 @@ export const SHOT_EVENT_TYPES = new Set(['2PM', '2PX', '3PM', '3PX']);
 export const isShotEvent = event => SHOT_EVENT_TYPES.has(event?.eventType);
 export const isPointShotEvent = event => isShotEvent(event) || ['FTM', 'FTX'].includes(event?.eventType);
 // Keep the virtual zone boundaries aligned with the visible Pro court. The
-// sideline is widened without moving the 3P line, while the 2P corner/wing
-// split follows the same height used by the shot-map regions.
-const PRO_COURT = { width: 940, height: 500, centerX: 470, centerY: 250, leftBasketX: 74, rightBasketX: 866, threeLineCornerY: 56, threeZoneCornerY: 40, threeCornerDepth: 163, threeRadius: 213, twoCornerY: 110, paintTop: 176, paintBottom: 324, leftFreeThrowX: 210, rightFreeThrowX: 730, rimRadius: 37 };
+// sidelines now use the full court height, the 3P arc is larger, and its
+// shortened straight section is the only part treated as a 3P corner.
+const PRO_COURT = { width: 940, height: 500, centerX: 470, centerY: 250, leftBasketX: 74, rightBasketX: 866, threeLineCornerY: 48, threeZoneCornerY: 48, threeCornerDepth: 145, threeRadius: 230, twoCornerY: 90, twoCornerDepth: 175, paintTop: 176, paintBottom: 324, leftFreeThrowX: 210, rightFreeThrowX: 730, rimRadius: 37 };
 export const oppositeDirection = direction => direction === 'left' ? 'right' : 'left';
 export function halfCourtPointFromFull(x, y, direction) {
   if (![x, y].every(value => Number.isFinite(value))) return null;
@@ -78,7 +78,7 @@ export function shotZoneFromPoint(type, x, y) {
   if (prefix === 'two' && inPaint && py >= PRO_COURT.paintTop && py <= PRO_COURT.paintBottom) return 'paint';
   const depth = leftBasket ? px : PRO_COURT.width - px;
   const cornerBoundary = prefix === 'three' ? PRO_COURT.threeZoneCornerY : PRO_COURT.twoCornerY;
-  const cornerDepth = prefix === 'three' ? PRO_COURT.threeCornerDepth : PRO_COURT.leftFreeThrowX;
+  const cornerDepth = prefix === 'three' ? PRO_COURT.threeCornerDepth : PRO_COURT.twoCornerDepth;
   if (depth <= cornerDepth && (py <= cornerBoundary || py >= PRO_COURT.height - cornerBoundary)) return `${prefix}-${side < 0 ? 'left' : 'right'}-corner`;
   if (distanceFromCenter > .27) return `${prefix}-${side < 0 ? 'left' : 'right'}-wing`;
   return `${prefix}-top`;
@@ -173,7 +173,7 @@ export function opponentLineup(game, events, strict = false) {
   return [...on];
 }
 export function eventLabel(game, event) {
-  const player = (id, side = 'home') => { const p = (side === 'opponent' ? game.opponentRoster || [] : game.roster).find(p => p.id === id); return p ? side === 'opponent' ? p.number : `${p.number} ${p.name}` : '不明'; };
+  const player = (id, side = 'home') => { const p = (side === 'opponent' ? game.opponentRoster || [] : game.roster).find(p => p.id === id); return p ? side === 'opponent' ? [p.number, p.name].filter(Boolean).join(' ') : `${p.number} ${p.name}` : '不明'; };
   if (event.eventType === 'OPP') return `相手 +${event.points}`;
   if (event.eventType === 'SUB') return `${event.side === 'opponent' ? '相手 ' : ''}${player(event.outPlayerId, event.side)} → ${player(event.inPlayerId, event.side)}`;
   const eventZone = shotZoneForEvent(event);
@@ -186,13 +186,13 @@ const isId = s => isText(s, 100) && /^[\w-]+$/.test(s) && !['__proto__', 'constr
 const validTime = s => typeof s === 'string' && Number.isFinite(Date.parse(s));
 const unique = list => new Set(list).size === list.length;
 export function validatePlayers(players) {
-  ensure(Array.isArray(players) && players.length >= 1 && players.length <= 60, '選手は1〜60人登録してください。');
-  for (const p of players) ensure(p && isId(p.id) && typeof p.number === 'string' && /^\d{1,3}$/.test(p.number) && isText(p.name, 40), '選手の背番号（0〜999）と名前を確認してください。');
+  ensure(Array.isArray(players) && players.length >= 1, '選手を1人以上登録してください。');
+  for (const p of players) ensure(p && isId(p.id) && typeof p.number === 'string' && /^[0-9]{1,3}$/.test(p.number) && isText(p.name, 40), '選手の背番号（0〜999）と名前を確認してください。');
   ensure(unique(players.map(p => p.id)) && unique(players.map(p => p.number)), '選手IDまたは背番号が重複しています。');
 }
 function validateOpponentPlayers(players) {
-  ensure(Array.isArray(players) && players.length >= 1 && players.length <= 60, '相手選手は1〜60人で入力してください。');
-  for (const p of players) ensure(p && isId(p.id) && typeof p.number === 'string' && /^\d{1,3}$/.test(p.number) && (p.name === undefined || typeof p.name === 'string' && p.name.length <= 40), '相手選手の背番号を確認してください。');
+  ensure(Array.isArray(players) && players.length >= 1, '相手選手を1人以上入力してください。');
+  for (const p of players) ensure(p && isId(p.id) && typeof p.number === 'string' && /^[0-9]{1,3}$/.test(p.number) && (p.name === undefined || typeof p.name === 'string' && p.name.length <= 40), '相手選手の背番号を確認してください。');
   ensure(unique(players.map(p => p.id)) && unique(players.map(p => p.number)), '相手選手IDまたは背番号が重複しています。');
 }
 export function validateTeam(t) {
@@ -208,7 +208,7 @@ export function validateGame(g, events) {
   ensure(Number.isInteger(g.revision) && g.revision >= 0 && Number.isInteger(g.nextSeq) && g.nextSeq >= 1 && validTime(g.createdAt) && validTime(g.updatedAt), '試合メタデータが不正です。');
   validatePlayers(g.roster);
   if (g.opponentRoster !== undefined) {
-    ensure(Array.isArray(g.opponentRoster) && g.opponentRoster.length <= 60, '相手選手情報が不正です。');
+    ensure(Array.isArray(g.opponentRoster), '相手選手情報が不正です。');
     if (g.opponentRoster.length) validateOpponentPlayers(g.opponentRoster);
   }
   if (g.mode !== undefined) ensure(['standard', 'pro'].includes(g.mode), '記録モードが不正です。');

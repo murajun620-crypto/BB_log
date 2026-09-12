@@ -144,7 +144,7 @@ function render() {
     html = page === 'live' ? g.mode === 'pro' ? view.proLiveView(state, g, gameEvents(g), currentClockSeconds(g)) : view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.16 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.17 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -227,22 +227,27 @@ function readTeamForm() {
 function readGameForm() {
   const form = document.querySelector('#game-form'); if (!form) return;
   const d = new FormData(form);
-  const opponentNumbers = d.getAll('opponentRosterNumber');
-  gameDraft = { ...gameDraft, date: d.get('date'), teamId: d.get('teamId'), opponentName: d.get('opponentName'), format: d.get('format'), count: d.get('count') || 4, minutes: d.get('minutes'), mode: d.get('mode') || 'standard', clockEnabled: d.get('clockEnabled') === 'on', opponentTracking: d.get('opponentTracking') || 'score', opponentRosterText: opponentNumbers.length ? opponentNumbers.filter(Boolean).join('\n') : gameDraft.opponentRosterText || '', participants: d.getAll('participants'), starters: d.getAll('starters') };
+  gameDraft = { ...gameDraft, date: d.get('date'), teamId: d.get('teamId'), opponentName: d.get('opponentName'), format: d.get('format'), count: d.get('count') || 4, minutes: d.get('minutes'), mode: d.get('mode') || 'standard', clockEnabled: d.get('clockEnabled') === 'on', opponentTracking: d.get('opponentTracking') || 'score', opponentRosterText: d.get('opponentRosterText') || '', participants: d.getAll('participants'), starters: d.getAll('starters') };
 }
 function selectTeam(id) {
   const t = state.data.teams.find(t => t.id === id);
   gameDraft.teamId = id; gameDraft.participants = t.players.map(p => p.id); gameDraft.starters = t.players.length >= 5 ? t.players.slice(0, 5).map(p => p.id) : [];
 }
-function parseOpponentRoster(text, previousRoster = []) {
-  const lines = String(text || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean);
+function parseOpponentRoster(value, previousRoster = []) {
+  const rows = Array.isArray(value)
+    ? value.map(row => ({ number: String(row?.number ?? '').trim(), name: String(row?.name ?? '').trim() }))
+    : String(value || '').split(/\r?\n/).map(line => line.trim()).filter(Boolean).map(line => {
+      const match = line.match(/^([0-9]{1,3})(?:[ \t]+(.+?))?$/);
+      return { number: match?.[1] || '', name: match?.[2]?.trim() || '' };
+    });
   const existing = new Map(previousRoster.map(player => [String(player.number), player.id]));
   const numbers = new Set();
-  return lines.map((line, index) => {
-    if (!/^\d{1,3}$/.test(line)) throw new Error(`相手選手${index + 1}は背番号（1〜3桁）だけで入力してください。`);
-    if (numbers.has(line)) throw new Error('相手選手の背番号が重複しています。');
-    numbers.add(line);
-    return { id: existing.get(line) || uid(), number: line };
+  return rows.map((row, index) => {
+    if (!/^[0-9]{1,3}$/.test(row.number)) throw new Error(`相手選手${index + 1}の背番号は半角数字1〜3桁で入力してください。名前は任意です。`);
+    if (row.name.length > 40) throw new Error(`相手選手${index + 1}の名前は40文字以内で入力してください。`);
+    if (numbers.has(row.number)) throw new Error('相手選手の背番号が重複しています。');
+    numbers.add(row.number);
+    return { id: existing.get(row.number) || uid(), number: row.number, ...(row.name ? { name: row.name } : {}) };
   });
 }
 async function saveGameChange(next, event = null) {
@@ -277,7 +282,11 @@ function offerFollowup(event) {
 }
 function memberForm(player = null) {
   pending = { kind: 'member-form', playerId: player?.id || null };
-  showSheet(player ? '登録済み選手を追加' : '新しい選手を追加', `<form id="live-member-form" data-player-id="${view.esc(player?.id || '')}"><p class="help">${player ? '背番号や名前を変更すると、チームの現在の登録にも反映します。' : 'この選手をチームへ登録し、進行中の試合にも追加します。'}過去試合の表示は変更されません。</p><label>背番号<input name="number" inputmode="numeric" pattern="[0-9]{1,3}" maxlength="3" required value="${view.esc(player?.number || '')}" placeholder="例：12"></label><label class="spaced">名前<input name="name" maxlength="40" required value="${view.esc(player?.name || '')}" placeholder="選手名"></label><button class="button primary full spaced" type="submit">チームと試合に追加</button></form>`);
+  showSheet(player ? '登録済み選手を追加' : '新しい選手を追加', `<form id="live-member-form" data-player-id="${view.esc(player?.id || '')}"><p class="help">${player ? '背番号や名前を変更すると、チームの現在の登録にも反映します。' : 'この選手をチームへ登録し、進行中の試合にも追加します。'}過去試合の表示は変更されません。</p><label>背番号<input name="number" data-jersey-number inputmode="numeric" pattern="[0-9]{1,3}" maxlength="3" required value="${view.esc(player?.number || '')}" placeholder="例：12"></label><label class="spaced">名前<input name="name" maxlength="40" required value="${view.esc(player?.name || '')}" placeholder="選手名"></label><button class="button primary full spaced" type="submit">チームと試合に追加</button></form>`);
+}
+function opponentMemberForm() {
+  pending = { kind: 'opponent-member-form' };
+  showSheet('相手選手を追加', '<form id="live-opponent-member-form"><p class="help">試合中の相手選手一覧に追加します。背番号は半角数字1〜3桁、名前は任意です。</p><label>背番号<input name="number" data-jersey-number inputmode="numeric" pattern="[0-9]{1,3}" maxlength="3" required placeholder="例：12"></label><label class="spaced">名前（任意）<input name="name" maxlength="40" placeholder="相手選手名"></label><button class="button primary full spaced" type="submit">相手選手を追加</button></form>', 'player-sheet');
 }
 function addMemberMenu() {
   const g = game(); const team = state.data.teams.find(t => t.id === g?.teamId);
@@ -540,7 +549,7 @@ const handlers = {
   'apply-update': applyPWAUpdate,
   'check-update': checkPWAUpdate,
   confirm: () => busy(async () => { const fn = confirmAction; if (fn) await fn(); }),
-  'add-player': () => { readTeamForm(); if (teamDraft.players.length >= 60) return toast('選手は60人まで登録できます。'); teamDraft.players.push({ id: uid(), number: '', name: '' }); persistDraft('teamDraft', teamDraft); render(); document.querySelector('.roster-edit-row:last-child input').focus(); },
+  'add-player': () => { readTeamForm(); teamDraft.players.push({ id: uid(), number: '', name: '' }); persistDraft('teamDraft', teamDraft); render(); document.querySelector('.roster-edit-row:last-child input').focus(); },
   'remove-player': button => { readTeamForm(); if (teamDraft.players.length <= 1) return toast('1人以上の選手を登録してください。'); teamDraft.players = teamDraft.players.filter(p => p.id !== button.dataset.id); persistDraft('teamDraft', teamDraft); render(); },
   'preset-minutes': button => { document.querySelector('[name=minutes]').value = button.dataset.value; readGameForm(); persistDraft('gameDraft', gameDraft); document.querySelectorAll('.preset').forEach(b => b.classList.toggle('active', b === button)); },
   stat: button => pickStat(button.dataset.type),
@@ -662,7 +671,6 @@ const handlers = {
   'prepare-member': button => {
     const g = game(); const team = state.data.teams.find(t => t.id === g?.teamId);
     const player = team?.players.find(p => p.id === button.dataset.id) || null;
-    if (team && !button.dataset.id && team.players.length >= 60) return toast('チームには60人まで登録できます。');
     memberForm(player);
   },
   opponent: button => busy(() => record('OPP', null, { points: Number(button.dataset.points) })),
@@ -699,6 +707,7 @@ const handlers = {
     showSheet(`${label}を追加`, `<form id="ot-form"><p class="help">新しい延長ピリオドを追加し、入力先を切り替えます。</p><label>延長時間（分）<input type="number" name="minutes" value="5" min="1" max="60" step="0.5" required></label><button class="button primary full spaced" type="submit">${label}を追加して移動</button></form>`);
   },
   'add-member': addMemberMenu,
+  'add-opponent-player': opponentMemberForm,
   'game-menu': () => showSheet('試合メニュー', `<div class="card-list"><a class="button secondary full" href="#box/${game().id}">BOX SCOREを表示</a><button class="button secondary full" data-action="game-settings">試合設定</button><button class="button secondary full" data-action="add-member">メンバーを追加</button><button class="button secondary full" data-action="period-menu">ピリオド操作</button><button class="button secondary full" data-action="events">イベント履歴・編集</button><button class="button primary full" data-action="finish">試合を終了する</button><a class="button secondary full" href="#home">保存してホームへ</a></div><p class="help">試合中の設定変更も、その場で保存されます。</p>`),
   'game-settings': () => { const g = game(); if (g) showSheet('試合設定', view.liveSettingsHTML(g)); },
   'aggregate-selected': () => {
@@ -774,6 +783,10 @@ document.addEventListener('keydown', event => {
   zone.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 });
 document.addEventListener('input', event => {
+  if (event.target.matches?.('[data-jersey-number]')) {
+    const sanitized = event.target.value.replace(/[^0-9]/g, '').slice(0, 3);
+    if (event.target.value !== sanitized) event.target.value = sanitized;
+  }
   if (event.target.closest('#team-form')) { readTeamForm(); persistDraft('teamDraft', teamDraft); }
   if (event.target.closest('#game-form')) { readGameForm(); persistDraft('gameDraft', gameDraft); }
 });
@@ -873,6 +886,21 @@ document.addEventListener('submit', event => {
     state.data.games = state.data.games.map(candidate => candidate.id === saved.game.id ? saved.game : candidate);
     closeSheet(); render(); toast(`${player.number} ${player.name}をチームと試合に追加しました。`);
   });
+  if (form.id === 'live-opponent-member-form') busy(async () => {
+    const g = game();
+    if (!g || g.status !== 'live' || g.mode !== 'pro' || g.opponentTracking !== 'player') throw new Error('Proの相手選手記録中に追加してください。');
+    const values = new FormData(form);
+    const player = parseOpponentRoster([{ number: values.get('number'), name: values.get('name') }], g.opponentRoster || [])[0];
+    if ((g.opponentRoster || []).some(candidate => candidate.number === player.number)) throw new Error('相手選手の背番号が重複しています。');
+    const opponentRoster = [...(g.opponentRoster || []), player];
+    const initialStarters = Array.isArray(g.opponentStarters) && g.opponentStarters.length
+      ? [...g.opponentStarters]
+      : (g.opponentRoster || []).slice(0, 5).map(candidate => candidate.id);
+    const hasOpponentSubstitutions = activeEvents(gameEvents(g)).some(event => event.side === 'opponent' && event.eventType === 'SUB');
+    const opponentStarters = hasOpponentSubstitutions ? initialStarters : [...initialStarters, player.id].slice(0, 5);
+    await saveGameChange({ ...g, opponentRoster, opponentStarters });
+    closeSheet(); toast(`相手 ${player.number}${player.name ? ` ${player.name}` : ''}を追加しました。`);
+  });
   if (form.id === 'live-lineup-form') busy(async () => {
     const selected = new FormData(form).getAll('lineup');
     if (selected.length !== 5) throw new Error('コート上の選手を5人選択してください。');
@@ -886,7 +914,7 @@ document.addEventListener('submit', event => {
     const opponentTracking = values.get('opponentTracking') === 'player' ? 'player' : 'score';
     const opponentPlayerEvents = activeEvents(gameEvents(g)).filter(event => event.side === 'opponent');
     if ((mode !== 'pro' || opponentTracking !== 'player') && opponentPlayerEvents.length) throw new Error('相手選手の個人記録があるため、標準モード／総得点のみに変更できません。先に履歴から該当記録を削除してください。');
-    const rosterText = values.getAll('opponentRosterNumber').filter(Boolean).join('\n');
+    const rosterText = values.get('opponentRosterText') || '';
     const opponentRoster = mode === 'pro' && opponentTracking === 'player' ? parseOpponentRoster(rosterText, g.opponentRoster || []) : [];
     const previousOpponentPlayers = new Map((g.opponentRoster || []).map(player => [player.id, player]));
     const previousInitialIds = Array.isArray(g.opponentStarters) && g.opponentStarters.length ? g.opponentStarters : (g.opponentRoster || []).slice(0, 5).map(player => player.id);

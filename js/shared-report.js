@@ -103,7 +103,7 @@ function validDate(value) {
   return /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(parsedDate.valueOf()) && parsedDate.toISOString().slice(0, 10) === value;
 }
 function validatePlayers(players) {
-  ensure(Array.isArray(players) && players.length >= 1 && players.length <= 60);
+  ensure(Array.isArray(players) && players.length >= 1);
   ensure(new Set(players.map(player => player?.id)).size === players.length);
   for (const player of players) {
     ensure(player && /^p\d{1,2}$/.test(player.id) && /^\d{1,3}$/.test(player.number) && validText(player.name, 40));
@@ -135,7 +135,7 @@ export function parseSharedReport(text) {
   ensure(Number.isSafeInteger(report.opponentScore) && report.opponentScore >= 0 && report.opponentScore <= 999999);
   ensure(Array.isArray(report.periods) && report.periods.length >= 1 && report.periods.length <= 50);
   for (const period of report.periods) ensure(period && validText(period.label, 12) && Number.isSafeInteger(period.home) && period.home >= 0 && period.home <= 999999 && Number.isSafeInteger(period.away) && period.away >= 0 && period.away <= 999999);
-  ensure(Array.isArray(report.players) && report.players.length >= 1 && report.players.length <= 60);
+  ensure(Array.isArray(report.players) && report.players.length >= 1);
   ensure(new Set(report.players.map(player => player?.id)).size === report.players.length);
   for (const player of report.players) {
     ensure(player && /^p\d{1,2}$/.test(player.id) && /^\d{1,3}$/.test(player.number) && validText(player.name, 40));
