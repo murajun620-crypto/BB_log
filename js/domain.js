@@ -26,10 +26,25 @@ export const SHOT_ZONE_IDS = new Set([...SHOT_ZONES.map(zone => zone.id), ...Obj
 export const SHOT_EVENT_TYPES = new Set(['2PM', '2PX', '3PM', '3PX']);
 export const isShotEvent = event => SHOT_EVENT_TYPES.has(event?.eventType);
 export const isPointShotEvent = event => isShotEvent(event) || ['FTM', 'FTX'].includes(event?.eventType);
-// Keep the virtual zone boundaries aligned with the visible Pro court. The
-// corner depth runs from the endline to the vertical reference through the
-// no-charge/lane area, while the 3P side boundary remains the short straight.
-const PRO_COURT = { width: 940, height: 500, centerX: 470, centerY: 250, leftBasketX: 74, rightBasketX: 866, threeLineCornerY: 48, threeZoneCornerY: 48, cornerDepth: 210, threeRadius: 230, twoCornerY: 90, paintTop: 176, paintBottom: 324, leftFreeThrowX: 210, rightFreeThrowX: 730, rimRadius: 37 };
+// This is the canonical Pro-court geometry. Rendering, automatic 2P/3P
+// detection, and the coloured shot-area chart all use these values so that
+// a white reference line cannot diverge from the saved area.
+export const PRO_COURT = {
+  width: 940, height: 500, centerX: 470, centerY: 250,
+  courtLeftX: 24, courtRightX: 916,
+  leftBasketX: 74, rightBasketX: 866,
+  threeLineCornerY: 48, threeZoneCornerY: 48,
+  // 3P corner/wing: left x=210, right x=730.
+  threeCornerDepth: 210,
+  // 2P corner/wing: left x=120, right x=820.
+  twoCornerDepth: 120,
+  threeRadius: 230, leftThreeArcEndpointX: 145, rightThreeArcEndpointX: 795,
+  paintTop: 176, paintBottom: 324,
+  leftFreeThrowX: 210, rightFreeThrowX: 730, rimRadius: 37,
+};
+const THREE_ARC_OFFSET = Math.sqrt(PRO_COURT.threeRadius ** 2 - (PRO_COURT.centerY - PRO_COURT.threeLineCornerY) ** 2);
+const LEFT_THREE_ARC_CENTER_X = PRO_COURT.leftThreeArcEndpointX - THREE_ARC_OFFSET;
+const RIGHT_THREE_ARC_CENTER_X = PRO_COURT.rightThreeArcEndpointX + THREE_ARC_OFFSET;
 export const oppositeDirection = direction => direction === 'left' ? 'right' : 'left';
 export function halfCourtPointFromFull(x, y, direction) {
   if (![x, y].every(value => Number.isFinite(value))) return null;
@@ -57,10 +72,13 @@ export function isBackcourtPoint(direction, x, opponent = false) {
 function pointIsThree(x, y) {
   const px = x * PRO_COURT.width, py = y * PRO_COURT.height;
   const leftBasket = px <= PRO_COURT.centerX;
-  const depth = leftBasket ? px : PRO_COURT.width - px;
-  const corner = depth <= PRO_COURT.cornerDepth && (py <= PRO_COURT.threeLineCornerY || py >= PRO_COURT.height - PRO_COURT.threeLineCornerY);
-  const basketX = leftBasket ? PRO_COURT.leftBasketX : PRO_COURT.rightBasketX;
-  return corner || Math.hypot(px - basketX, py - PRO_COURT.centerY) >= PRO_COURT.threeRadius;
+  const onSideline = py <= PRO_COURT.threeLineCornerY || py >= PRO_COURT.height - PRO_COURT.threeLineCornerY;
+  const insideStraight = leftBasket ? px <= PRO_COURT.leftThreeArcEndpointX : px >= PRO_COURT.rightThreeArcEndpointX;
+  // The SVG 3P arc is deliberately wider than a basket-centred circle. Use
+  // its mathematical centre here, rather than the basket position, so a tap
+  // directly beside the white arc receives the same 2P/3P result.
+  const arcCenterX = leftBasket ? LEFT_THREE_ARC_CENTER_X : RIGHT_THREE_ARC_CENTER_X;
+  return (onSideline && insideStraight) || Math.hypot(px - arcCenterX, py - PRO_COURT.centerY) >= PRO_COURT.threeRadius;
 }
 export function shotPointsFromPoint(x, y) {
   if (![x, y].every(value => Number.isFinite(value) && value >= 0 && value <= 1)) return null;
@@ -77,16 +95,22 @@ export function shotZoneFromPoint(type, x, y) {
   if (prefix === 'two' && distanceToBasket <= PRO_COURT.rimRadius) return 'rim';
   if (prefix === 'two' && inPaint && py >= PRO_COURT.paintTop && py <= PRO_COURT.paintBottom) return 'paint';
   const depth = leftBasket ? px : PRO_COURT.width - px;
-  const cornerBoundary = prefix === 'three' ? PRO_COURT.threeZoneCornerY : PRO_COURT.twoCornerY;
-  const cornerDepth = PRO_COURT.cornerDepth;
-  if (depth <= cornerDepth && (py <= cornerBoundary || py >= PRO_COURT.height - cornerBoundary)) return `${prefix}-${side < 0 ? 'left' : 'right'}-corner`;
+  const inCorner = prefix === 'three'
+    ? depth <= PRO_COURT.threeCornerDepth && (py <= PRO_COURT.threeZoneCornerY || py >= PRO_COURT.height - PRO_COURT.threeZoneCornerY)
+    : depth <= PRO_COURT.twoCornerDepth;
+  if (inCorner) return `${prefix}-${side < 0 ? 'left' : 'right'}-corner`;
   if (distanceFromCenter > .27) return `${prefix}-${side < 0 ? 'left' : 'right'}-wing`;
   return `${prefix}-top`;
 }
 export function shotZoneForEvent(event) {
   const x = Number.isFinite(event?.shotX) ? event.shotX : event?.x;
   const y = Number.isFinite(event?.shotY) ? event.shotY : event?.y;
-  return shotZoneFromPoint(null, x, y) || normalizeShotZone(event?.shotZone ?? event?.zone);
+  // A saved event already has its 2P/3P type. Keep that type when rendering
+  // history and Reader charts so an older marker cannot appear in a different
+  // point family from the score that was recorded. New Pro taps still use the
+  // coordinate classifier before the event is saved.
+  const type = SHOT_EVENT_TYPES.has(event?.eventType) ? event.eventType : null;
+  return shotZoneFromPoint(type, x, y) || normalizeShotZone(event?.shotZone ?? event?.zone);
 }
 export const shotZoneLabel = zoneId => SHOT_ZONES.find(zone => zone.id === normalizeShotZone(zoneId))?.label || '';
 export const uid = () => crypto.randomUUID();

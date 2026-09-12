@@ -1,4 +1,4 @@
-import { STATS, STAT_DEFS, SHOT_ZONES, aggregate, aggregateGames, activeEvents, attackDirectionForPeriod, eventLabel, formatGame, halfCourtPointFromFull, isShotEvent, lineup, localDate, opponentLineup, oppositeDirection, percent, shotZoneForEvent, shotZoneLabel } from './domain.js';
+import { STATS, STAT_DEFS, SHOT_ZONES, PRO_COURT, aggregate, aggregateGames, activeEvents, attackDirectionForPeriod, eventLabel, formatGame, fullCourtPointFromHalf, halfCourtPointFromFull, isShotEvent, lineup, localDate, opponentLineup, oppositeDirection, percent, shotZoneForEvent, shotZoneFromPoint, shotZoneLabel } from './domain.js';
 
 export const esc = value => String(value ?? '').replace(/[&<>"']/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[ch]));
 const paths = {
@@ -116,9 +116,9 @@ const PRO_OTHER_ACTIONS = ['OREB', 'DREB', 'AST', 'STL', 'BLK', 'TO', 'PF', 'FD'
 const PRO_FIELD_SHOT_TYPES = new Set(['FGM', 'FGX']);
 // A purpose-built full court prevents the non-uniform half-court transform from
 // stretching the 3P arc and produces matching lanes on both ends.
-const PRO_COURT_MAIN_LINES = '<path d="M24 0H916V500H24ZM470 0V500M24 48H145M24 452H145M145 48A230 230 0 0 1 145 452M916 48H795M916 452H795M795 48A230 230 0 0 0 795 452M24 176H210V324H24M916 176H730V324H916M54 218V282M886 218V282M162 176V184M186 176V184M162 324V316M186 324V316M778 176V184M754 176V184M778 324V316M754 324V316M210 196A54 54 0 0 1 210 304M730 196A54 54 0 0 0 730 304M74 213A37 37 0 0 1 74 287M866 213A37 37 0 0 0 866 287"></path><circle cx="470" cy="250" r="50"></circle><circle cx="74" cy="250" r="10"></circle><circle cx="866" cy="250" r="10"></circle>';
+const PRO_COURT_MAIN_LINES = `<path d="M${PRO_COURT.courtLeftX} 0H${PRO_COURT.courtRightX}V${PRO_COURT.height}H${PRO_COURT.courtLeftX}ZM${PRO_COURT.centerX} 0V${PRO_COURT.height}M${PRO_COURT.courtLeftX} ${PRO_COURT.threeLineCornerY}H${PRO_COURT.leftThreeArcEndpointX}M${PRO_COURT.courtLeftX} ${PRO_COURT.height - PRO_COURT.threeLineCornerY}H${PRO_COURT.leftThreeArcEndpointX}M${PRO_COURT.leftThreeArcEndpointX} ${PRO_COURT.threeLineCornerY}A${PRO_COURT.threeRadius} ${PRO_COURT.threeRadius} 0 0 1 ${PRO_COURT.leftThreeArcEndpointX} ${PRO_COURT.height - PRO_COURT.threeLineCornerY}M${PRO_COURT.courtRightX} ${PRO_COURT.threeLineCornerY}H${PRO_COURT.rightThreeArcEndpointX}M${PRO_COURT.courtRightX} ${PRO_COURT.height - PRO_COURT.threeLineCornerY}H${PRO_COURT.rightThreeArcEndpointX}M${PRO_COURT.rightThreeArcEndpointX} ${PRO_COURT.threeLineCornerY}A${PRO_COURT.threeRadius} ${PRO_COURT.threeRadius} 0 0 0 ${PRO_COURT.rightThreeArcEndpointX} ${PRO_COURT.height - PRO_COURT.threeLineCornerY}M${PRO_COURT.leftFreeThrowX} 0V${PRO_COURT.threeLineCornerY}M${PRO_COURT.leftFreeThrowX} ${PRO_COURT.height - PRO_COURT.threeLineCornerY}V${PRO_COURT.height}M${PRO_COURT.rightFreeThrowX} 0V${PRO_COURT.threeLineCornerY}M${PRO_COURT.rightFreeThrowX} ${PRO_COURT.height - PRO_COURT.threeLineCornerY}V${PRO_COURT.height}M${PRO_COURT.twoCornerDepth} ${PRO_COURT.threeLineCornerY}V${PRO_COURT.paintTop}M${PRO_COURT.twoCornerDepth} ${PRO_COURT.paintBottom}V${PRO_COURT.height - PRO_COURT.threeLineCornerY}M${PRO_COURT.width - PRO_COURT.twoCornerDepth} ${PRO_COURT.threeLineCornerY}V${PRO_COURT.paintTop}M${PRO_COURT.width - PRO_COURT.twoCornerDepth} ${PRO_COURT.paintBottom}V${PRO_COURT.height - PRO_COURT.threeLineCornerY}M${PRO_COURT.courtLeftX} ${PRO_COURT.paintTop}H${PRO_COURT.leftFreeThrowX}V${PRO_COURT.paintBottom}H${PRO_COURT.courtLeftX}M${PRO_COURT.courtRightX} ${PRO_COURT.paintTop}H${PRO_COURT.rightFreeThrowX}V${PRO_COURT.paintBottom}H${PRO_COURT.courtRightX}M54 218V282M886 218V282M162 176V184M186 176V184M162 324V316M186 324V316M778 176V184M754 176V184M778 324V316M754 324V316M210 196A54 54 0 0 1 210 304M730 196A54 54 0 0 0 730 304M74 213A37 37 0 0 1 74 287M866 213A37 37 0 0 0 866 287"></path><circle cx="470" cy="250" r="50"></circle><circle cx="74" cy="250" r="10"></circle><circle cx="866" cy="250" r="10"></circle>`;
 const PRO_COURT_MARKINGS = PRO_COURT_MAIN_LINES;
-export const PRO_HALF_COURT_MARKINGS = '<path d="M0 24H500V476H0ZM48 24V145M452 24V145M452 145A230 230 0 0 1 48 145M176 24H324V210H176ZM218 54H282M304 210A54 54 0 0 1 196 210M287 74A37 37 0 0 1 213 74"></path><circle cx="250" cy="74" r="10"></circle>';
+export const PRO_HALF_COURT_MARKINGS = '<path d="M0 24H500V476H0ZM48 24V145M452 24V145M452 145A230 230 0 0 1 48 145M452 210H500M0 210H48M324 120H452M48 120H176M176 24H324V210H176ZM218 54H282M304 210A54 54 0 0 1 196 210M287 74A37 37 0 0 1 213 74"></path><circle cx="250" cy="74" r="10"></circle>';
 export const isIPhoneUserAgent = userAgent => /iPhone|iPod/i.test(String(userAgent || ''));
 export const isIPhonePortrait = (userAgent, portrait) => isIPhoneUserAgent(userAgent) && !!portrait;
 const isPortraitViewport = () => {
@@ -408,7 +408,7 @@ export function aggregatePlayerDetailWithGames(report, id, mode = 'total', games
   return `${options}<p class="shared-game-context">${esc(context)}</p><div class="player-detail-name"><span class="jersey">${esc(basePlayer.number)}</span><h3>${esc(basePlayer.name)}</h3><div class="detail-points"><b>${value(playerStats.PTS)}</b> PTS</div></div>${shooting(playerStats, averageMode ? games.length : selectedDetail ? 1 : games.length)}<div class="detail-stats">${DETAIL_STAT_KEYS.map(key => `<div><span>${({ OREB: 'OR', DREB: 'DR', PF: 'F' }[key] || key)}</span><strong>${value(playerStats[key])}</strong></div>`).join('')}</div>`;
 }
 export function settingsView(s) {
-  return shell(s, `${heading('PREFERENCES', '設定とデータ')}<section class="panel settings-panel"><h2>入力・表示</h2><label class="setting-row"><span><strong>連続入力</strong><small>標準・Proでシュート後にAST / OR・DRを提案</small></span><input type="checkbox" role="switch" id="continuous" ${s.preferences.continuous ? 'checked' : ''}></label><label class="setting-row"><span><strong>外観</strong><small>見やすい明るさを選択</small></span><select id="theme" aria-label="外観">${[['system', '端末に合わせる'], ['light', 'ライト'], ['dark', 'ダーク']].map(([v, label]) => `<option value="${v}" ${s.preferences.theme === v ? 'selected' : ''}>${label}</option>`).join('')}</select></label></section><section class="panel settings-panel"><h2>受け取った共有レポート</h2><p class="help">共有された1試合のファイルを、データへ取り込まず読み取り専用で開きます。</p><label class="button primary full" for="shared-report-file">${icon('share')}共有レポートを開く</label><input type="file" id="shared-report-file" accept=".json,application/json" class="sr-only"></section><section class="panel settings-panel"><h2>バックアップ</h2><p class="help">試合・チーム・設定を1つのJSONに保存します。定期的に「ファイル」などへ書き出してください。</p>${action('export-json', `${icon('download')}全データを書き出す`, 'button primary full')}<label class="button secondary full spaced" for="restore-file">JSONから復元</label><input type="file" id="restore-file" accept=".json,application/json" class="sr-only"><p class="help">復元前に内容を検証し、件数を表示します。復元すると現在の全データが置き換わります。</p></section><section class="panel settings-panel"><h2>この端末の保存状態</h2><div class="storage-status">${statusChip(s)}<span>${s.data.teams.length}チーム / ${s.data.games.length}試合 / ${activeEvents(s.data.events).length}記録</span></div><p class="help">${s.pwa.error ? esc(s.pwa.error) : s.pwa.ready ? 'アプリ本体のキャッシュが完了しました。通信がなくても利用できます。' : '初回のキャッシュ完了までオンラインでお待ちください。'}</p>${s.pwa.update ? '<p class="notice">更新があります。下のボタンから適用できます。</p>' + action('apply-update', '最新版に更新', 'button primary full') : action('check-update', '最新版を確認', 'button secondary full')}${action('persist', '保存領域の保持をリクエスト', 'button secondary full')}<p class="help" id="persist-status">ブラウザのデータ削除や端末の故障に備え、JSONバックアップもご利用ください。</p></section><section class="panel settings-panel"><h2>iPhoneのホーム画面に追加</h2><ol class="install-steps"><li>Safariでこのアプリを開く</li><li>共有メニューから「ホーム画面に追加」</li><li>表示される場合は「Webアプリとして開く」をONにし、追加</li><li>追加したアプリを起動し、「オフライン利用OK」を確認</li></ol></section><p class="version-note">COURTSIDE 2.2.29 · BUILT FOR THE SIDELINES</p>`);
+  return shell(s, `${heading('PREFERENCES', '設定とデータ')}<section class="panel settings-panel"><h2>入力・表示</h2><label class="setting-row"><span><strong>連続入力</strong><small>標準・Proでシュート後にAST / OR・DRを提案</small></span><input type="checkbox" role="switch" id="continuous" ${s.preferences.continuous ? 'checked' : ''}></label><label class="setting-row"><span><strong>外観</strong><small>見やすい明るさを選択</small></span><select id="theme" aria-label="外観">${[['system', '端末に合わせる'], ['light', 'ライト'], ['dark', 'ダーク']].map(([v, label]) => `<option value="${v}" ${s.preferences.theme === v ? 'selected' : ''}>${label}</option>`).join('')}</select></label></section><section class="panel settings-panel"><h2>受け取った共有レポート</h2><p class="help">共有された1試合のファイルを、データへ取り込まず読み取り専用で開きます。</p><label class="button primary full" for="shared-report-file">${icon('share')}共有レポートを開く</label><input type="file" id="shared-report-file" accept=".json,application/json" class="sr-only"></section><section class="panel settings-panel"><h2>バックアップ</h2><p class="help">試合・チーム・設定を1つのJSONに保存します。定期的に「ファイル」などへ書き出してください。</p>${action('export-json', `${icon('download')}全データを書き出す`, 'button primary full')}<label class="button secondary full spaced" for="restore-file">JSONから復元</label><input type="file" id="restore-file" accept=".json,application/json" class="sr-only"><p class="help">復元前に内容を検証し、件数を表示します。復元すると現在の全データが置き換わります。</p></section><section class="panel settings-panel"><h2>この端末の保存状態</h2><div class="storage-status">${statusChip(s)}<span>${s.data.teams.length}チーム / ${s.data.games.length}試合 / ${activeEvents(s.data.events).length}記録</span></div><p class="help">${s.pwa.error ? esc(s.pwa.error) : s.pwa.ready ? 'アプリ本体のキャッシュが完了しました。通信がなくても利用できます。' : '初回のキャッシュ完了までオンラインでお待ちください。'}</p>${s.pwa.update ? '<p class="notice">更新があります。下のボタンから適用できます。</p>' + action('apply-update', '最新版に更新', 'button primary full') : action('check-update', '最新版を確認', 'button secondary full')}${action('persist', '保存領域の保持をリクエスト', 'button secondary full')}<p class="help" id="persist-status">ブラウザのデータ削除や端末の故障に備え、JSONバックアップもご利用ください。</p></section><section class="panel settings-panel"><h2>iPhoneのホーム画面に追加</h2><ol class="install-steps"><li>Safariでこのアプリを開く</li><li>共有メニューから「ホーム画面に追加」</li><li>表示される場合は「Webアプリとして開く」をONにし、追加</li><li>追加したアプリを起動し、「オフライン利用OK」を確認</li></ol></section><p class="version-note">COURTSIDE 2.2.31 · BUILT FOR THE SIDELINES</p>`);
 }
 export function pickerHTML(g, events, type, options = {}) {
   const on = lineup(g, events); const tracked = g.starters.length === 5 && !options.plain;
@@ -417,30 +417,60 @@ export function pickerHTML(g, events, type, options = {}) {
   const group = (list, label) => list.length ? `<p class="picker-label">${label}</p><div class="player-grid">${list.map(p => { const stats = totals[p.id] || {}; return action(options.action || 'pick-player', `<span class="player-button-name"><strong>${esc(p.number)}</strong><span>${esc(p.name)}</span></span><small class="player-button-stats">${stats.PTS ?? 0}点 · F${stats.PF ?? 0}</small>`, 'player-button', `data-id="${p.id}"`); }).join('')}</div>` : '';
   return `<p class="picker-instruction">${esc(options.instruction || '記録する選手をタップ')}</p>${group(tracked ? players.filter(p => on.includes(p.id)) : players, tracked ? 'ON COURT' : 'PLAYERS')}${tracked ? `<details ${options.only || options.showBench ? 'open' : ''} class="bench-list"><summary>ベンチの選手を表示</summary>${group(players.filter(p => !on.includes(p.id)), 'BENCH')}</details>` : ''}`;
 }
-const SHOT_MAP_ZONES = [
-  { id: 'three-left-corner', path: 'M10 10H65V110H10Z', labelX: 38, labelY: 58 },
-  { id: 'three-left-wing', path: 'M10 110H65C75 190 95 230 122 264C150 295 185 315 220 323C223 324 227 325 231 326L92 465H10Z', labelX: 52, labelY: 205 },
-  { id: 'three-top', path: 'M231 326C255 332 280 337 310 337C340 337 365 332 389 326L528 465H92Z', labelX: 310, labelY: 420 },
-  { id: 'three-right-wing', path: 'M389 326C392 325 396 324 400 323C435 315 470 295 498 264C525 230 545 190 555 110H610V465H528Z', labelX: 568, labelY: 205 },
-  { id: 'three-right-corner', path: 'M555 10H610V110H555Z', labelX: 582, labelY: 58 },
-  { id: 'two-left-corner', path: 'M65 10H220V110H65Z', labelX: 142, labelY: 58 },
-  { id: 'two-left-wing', path: 'M65 110H220V228L175 306C155.9 295.6 137.8 281.5 122 264C95 230 75 190 65 110Z', labelX: 132, labelY: 205 },
-  { id: 'two-top', path: 'M220 228H400L445 306C430.4 313.8 415.2 319.5 400 323C370 332 340 337 310 337C280 337 250 332 220 323C204.8 319.5 189.6 313.8 175 306Z', labelX: 310, labelY: 278 },
-  { id: 'two-right-wing', path: 'M400 110H555C545 190 525 230 498 264C482.2 281.5 464.1 295.6 445 306L400 228Z', labelX: 488, labelY: 205 },
-  { id: 'two-right-corner', path: 'M400 10H555V110H400Z', labelX: 478, labelY: 58 },
-  { id: 'paint', path: 'M220 10H400V228H220Z', labelX: 310, labelY: 160 },
-  { id: 'rim', path: 'M268 10H352V90A42 42 0 0 1 268 90Z', labelX: 310, labelY: 72 },
-];
+// Build the half-court area map from the same point classifier used when a
+// Pro shot is saved. This removes a second, hand-drawn set of zone edges that
+// had drifted from the court markings and was shared by neither view mode.
+const HALF_COURT_ZONE_GRID = 2;
+const HALF_COURT_ZONE_BOUNDS = { left: 24, right: 476, top: 24, bottom: 470 };
+function buildHalfCourtShotZones() {
+  const paths = Object.fromEntries(SHOT_ZONES.map(zone => [zone.id, []]));
+  const totals = Object.fromEntries(SHOT_ZONES.map(zone => [zone.id, { x: 0, y: 0, count: 0 }]));
+  const addRun = (zoneId, fromX, toX, y) => {
+    if (!zoneId || toX <= fromX) return;
+    paths[zoneId].push(`M${fromX} ${y}H${toX}V${y + HALF_COURT_ZONE_GRID}H${fromX}Z`);
+  };
+  for (let y = HALF_COURT_ZONE_BOUNDS.top; y < HALF_COURT_ZONE_BOUNDS.bottom; y += HALF_COURT_ZONE_GRID) {
+    let currentZone = null;
+    let runStart = HALF_COURT_ZONE_BOUNDS.left;
+    for (let x = HALF_COURT_ZONE_BOUNDS.left; x < HALF_COURT_ZONE_BOUNDS.right; x += HALF_COURT_ZONE_GRID) {
+      const point = fullCourtPointFromHalf(x + HALF_COURT_ZONE_GRID / 2, y + HALF_COURT_ZONE_GRID / 2, 'left');
+      const zoneId = shotZoneFromPoint(null, point.x, point.y);
+      if (zoneId !== currentZone) {
+        addRun(currentZone, runStart, x, y);
+        currentZone = zoneId;
+        runStart = x;
+      }
+      if (totals[zoneId]) {
+        totals[zoneId].x += x + HALF_COURT_ZONE_GRID / 2;
+        totals[zoneId].y += y + HALF_COURT_ZONE_GRID / 2;
+        totals[zoneId].count += 1;
+      }
+    }
+    addRun(currentZone, runStart, HALF_COURT_ZONE_BOUNDS.right, y);
+  }
+  return SHOT_ZONES.map(zone => {
+    const total = totals[zone.id];
+    return {
+      id: zone.id,
+      path: paths[zone.id].join(''),
+      labelX: total.count ? total.x / total.count : 250,
+      labelY: total.count ? total.y / total.count : 250,
+    };
+  });
+}
+const SHOT_MAP_ZONES = buildHalfCourtShotZones();
+const halfCourtMapDefs = '<defs><pattern id="court-wood" width="48" height="500" patternUnits="userSpaceOnUse"><rect width="48" height="500" fill="#f1dfb0"/><path d="M47 0V500M0 125H48M0 375H48" fill="none" stroke="#e4ce98" stroke-width="1" opacity=".58"/></pattern></defs>';
+const halfCourtSurface = '<rect class="court-surface" x="0" y="24" width="500" height="452" rx="2"/>';
 export function shotZonePicker(playerName, stat) {
   const isThreePoint = stat?.type?.startsWith('3');
   const active = zone => zone.id.startsWith('three-') === isThreePoint;
   const zones = SHOT_MAP_ZONES.map(zone => {
     const label = SHOT_ZONES.find(candidate => candidate.id === zone.id)?.label || zone.id;
     const interaction = active(zone) ? `data-action="shot-zone" role="button" tabindex="0" aria-label="${esc(label)}"` : 'aria-hidden="true"';
-    return `<path class="shot-map-zone ${zone.id.startsWith('three-') ? 'three-point' : 'two-point'} ${active(zone) ? 'active' : 'disabled'}" data-zone="${zone.id}" d="${zone.path}" ${interaction}><title>${esc(label)}</title></path>`;
+    return `<path class="shot-map-zone ${zone.id.startsWith('three-') ? 'three-point' : 'two-point'} ${active(zone) ? 'active' : 'disabled'} court-zone-fill" data-zone="${zone.id}" d="${zone.path}" ${interaction}><title>${esc(label)}</title></path>`;
   }).join('');
   const target = isThreePoint ? '3Pエリアをタップ' : '2Pエリアをタップ';
-  return `<p class="picker-instruction">${esc(playerName)} · ${esc(stat?.name)}。コート上の位置をタップ</p><div class="shot-zone-legend"><span class="target-zone">${target}</span><span>薄いエリアは選べません</span></div><svg class="shot-court-map" viewBox="0 0 620 475" role="group" aria-label="ハーフコートのシュート位置。${target}"><defs><pattern id="court-wood" width="48" height="475" patternUnits="userSpaceOnUse"><rect width="48" height="475" fill="#f1dfb0"/><path d="M47 0V475M0 118H48M0 356H48" fill="none" stroke="#e4ce98" stroke-width="1" opacity=".58"/></pattern></defs><rect class="court-surface" x="10" y="10" width="600" height="455" rx="2"/>${zones}<g class="court-markings"><path d="M10 10H610V465H10ZM65 10V138M555 10V138M65 138C75 190 95 230 122 264C150 295 185 315 220 323C250 332 280 337 310 337C340 337 370 332 400 323C435 315 470 295 498 264C525 230 545 190 555 138M220 10V228H400V10M250 228A60 60 0 1 0 370 228M268 90A42 42 0 0 0 352 90M275 48H345M310 48V56"/><circle cx="310" cy="70" r="13"/><path class="lane-marks" d="M210 70H220M210 112H220M210 154H220M210 196H220M400 70H410M400 112H410M400 154H410M400 196H410"/></g></svg><button type="button" class="button secondary full spaced" data-action="cancel-shot-zone">入力をやめる</button>`;
+  return `<p class="picker-instruction">${esc(playerName)} · ${esc(stat?.name)}。コート上の位置をタップ</p><div class="shot-zone-legend"><span class="target-zone">${target}</span><span>薄いエリアは選べません</span></div><svg class="shot-court-map" viewBox="0 0 500 500" role="group" aria-label="ハーフコートのシュート位置。${target}">${halfCourtMapDefs}${halfCourtSurface}${zones}<g class="court-markings">${PRO_HALF_COURT_MARKINGS}</g></svg><button type="button" class="button secondary full spaced" data-action="cancel-shot-zone">入力をやめる</button>`;
 }
 function chartShot(shot) {
   const zone = shotZoneForEvent(shot);
@@ -490,13 +520,13 @@ function zoneShotChartMapHTML(shots, playerId) {
   if (!Object.values(totals).some(stats => stats.attempts)) return '';
   const zones = SHOT_MAP_ZONES.map(zone => {
     const label = SHOT_ZONES.find(candidate => candidate.id === zone.id)?.label || zone.id;
-    return `<path class="shot-map-zone shot-chart-map-zone ${zone.id.startsWith('three-') ? 'three-point' : 'two-point'}" data-zone="${zone.id}" d="${zone.path}"><title>${esc(label)}</title></path>`;
+    return `<path class="shot-map-zone shot-chart-map-zone ${zone.id.startsWith('three-') ? 'three-point' : 'two-point'} court-zone-fill" data-zone="${zone.id}" d="${zone.path}"><title>${esc(label)}</title></path>`;
   }).join('');
   const labels = SHOT_MAP_ZONES.map(zone => {
     const stats = totals[zone.id];
     return `<g class="shot-chart-zone-label" transform="translate(${zone.labelX} ${zone.labelY})"><text class="shot-chart-zone-rate" text-anchor="middle" y="0">${esc(percent(stats.made, stats.attempts))}</text><text class="shot-chart-zone-count" text-anchor="middle" y="18">${stats.made}/${stats.attempts}</text></g>`;
   }).join('');
-  return `<svg class="shot-court-map shot-chart-map" viewBox="0 0 620 475" role="img" aria-label="ショットチャート。シュートエリアごとの成功率と成功数・試投数を表示"><rect class="court-surface" x="10" y="10" width="600" height="455" rx="2"/>${zones}<g class="court-markings"><path d="M10 10H610V465H10ZM65 10V138M555 10V138M65 138C75 190 95 230 122 264C150 295 185 315 220 323C250 332 280 337 310 337C340 337 370 332 400 323C435 315 470 295 498 264C525 230 545 190 555 138M220 10V228H400V10M250 228A60 60 0 1 0 370 228M268 90A42 42 0 0 0 352 90M275 48H345M310 48V56"/><circle cx="310" cy="70" r="13"/><path class="lane-marks" d="M210 70H220M210 112H220M210 154H220M210 196H220M400 70H410M400 112H410M400 154H410M400 196H410"/></g>${labels}</svg>`;
+  return `<svg class="shot-court-map shot-chart-map" viewBox="0 0 500 500" role="img" aria-label="ショットチャート。シュートエリアごとの成功率と成功数・試投数を表示">${halfCourtSurface}${zones}<g class="court-markings">${PRO_HALF_COURT_MARKINGS}</g>${labels}</svg>`;
 }
 function shotDisplayToggleHTML(displayMode) {
   const selected = displayMode === 'zones' ? 'zones' : 'points';

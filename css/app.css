@@ -503,6 +503,7 @@ dialog::backdrop { background: #07170f70; backdrop-filter: blur(3px); }
 .court-markings circle { fill: none; }
 .court-markings .lane-marks { stroke-width: 4; }
 .shot-map-zone { fill-opacity: .82; stroke: rgba(255, 255, 255, .86); stroke-width: 1.8; stroke-linejoin: round; transition: filter .12s, opacity .12s, stroke-width .12s; }
+.shot-map-zone.court-zone-fill { stroke: none; }
 .shot-map-zone[data-zone="three-left-corner"] { fill: #e7a85f; }
 .shot-map-zone[data-zone="three-left-wing"] { fill: #dfb86e; }
 .shot-map-zone[data-zone="three-top"] { fill: #d5a968; }
@@ -518,6 +519,7 @@ dialog::backdrop { background: #07170f70; backdrop-filter: blur(3px); }
 .shot-map-zone.active { cursor: pointer; opacity: .96; }
 .shot-map-zone.active:active { filter: brightness(.8) saturate(1.2); }
 .shot-map-zone.active:focus-visible { outline: none; stroke: #154f42; stroke-width: 5; }
+.shot-map-zone.court-zone-fill.active:focus-visible { stroke: #154f42; stroke-width: 5; }
 .shot-map-zone.disabled { opacity: .58; filter: saturate(.86) brightness(1.03); pointer-events: none; }
 .cloud-share-preview { display: grid; gap: 10px; margin: 12px 0 16px; }
 .cloud-share-preview dl { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 5px 12px; margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface-2); font-size: 12px; }

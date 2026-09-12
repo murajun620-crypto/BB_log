@@ -15,6 +15,7 @@
 .shot-chart-map .court-markings circle { fill: none; }
 .shot-chart-map .court-markings .lane-marks { stroke-width: 4; }
 .shot-chart-map .shot-map-zone { fill-opacity: .86; stroke: rgba(255, 255, 255, .9); stroke-width: 1.8; stroke-linejoin: round; }
+.shot-chart-map .shot-map-zone.court-zone-fill { stroke: none; }
 .shot-chart-map .shot-map-zone[data-zone="three-left-corner"] { fill: #e7a85f; }
 .shot-chart-map .shot-map-zone[data-zone="three-left-wing"] { fill: #dfb86e; }
 .shot-chart-map .shot-map-zone[data-zone="three-top"] { fill: #d5a968; }

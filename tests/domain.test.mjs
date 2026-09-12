@@ -53,13 +53,16 @@ test('Pro games preserve clock, opponent player stats and exact shot positions',
   assert.equal(shotZoneFromPoint('3PM', .5, .25), 'three-left-wing');
   assert.equal(shotZoneFromPoint('3PM', .3, 56 / 500), 'three-left-wing');
   assert.equal(shotZoneFromPoint('3PM', .3, 60 / 500), 'three-left-wing');
-  assert.equal(shotZoneFromPoint(null, .27, 176 / 500), 'two-left-wing');
+  // The automatic 2P/3P decision follows the visible 3P arc exactly.
+  assert.equal(shotZoneFromPoint(null, .27, 176 / 500), 'three-left-wing');
   assert.equal(shotZoneFromPoint(null, .27, 180 / 500), 'two-left-wing');
-  assert.equal(shotZoneFromPoint(null, 170 / 940, 90 / 500), 'two-left-corner');
-  assert.equal(shotZoneFromPoint(null, 210 / 940, 90 / 500), 'two-left-corner');
-  assert.equal(shotZoneFromPoint(null, 211 / 940, 90 / 500), 'two-left-wing');
-  assert.equal(shotZoneFromPoint(null, 170 / 940, 100 / 500), 'two-left-wing');
-  assert.equal(shotZoneFromPoint(null, 240 / 940, 120 / 500), 'two-left-wing');
+  // 2P corners use their own vertical reference: left x=120 / right x=820.
+  assert.equal(shotZoneFromPoint(null, 120 / 940, 90 / 500), 'two-left-corner');
+  assert.equal(shotZoneFromPoint(null, 121 / 940, 90 / 500), 'two-left-wing');
+  assert.equal(shotZoneFromPoint(null, 820 / 940, 90 / 500), 'two-left-corner');
+  assert.equal(shotZoneFromPoint(null, 819 / 940, 90 / 500), 'two-left-wing');
+  assert.equal(shotZoneFromPoint(null, 820 / 940, 410 / 500), 'two-right-corner');
+  assert.equal(shotZoneFromPoint(null, 819 / 940, 410 / 500), 'two-right-wing');
   assert.equal(shotZoneFromPoint('3PM', 140 / 940, 35 / 500), 'three-left-corner');
   assert.equal(shotZoneFromPoint('3PM', 140 / 940, 50 / 500), 'three-left-wing');
   assert.equal(shotZoneFromPoint('3PM', 145 / 940, 48 / 500), 'three-left-corner');
@@ -68,14 +71,16 @@ test('Pro games preserve clock, opponent player stats and exact shot positions',
   assert.equal(shotZoneFromPoint(null, 140 / 940, 40 / 500), 'three-left-corner');
   assert.equal(shotZoneFromPoint(null, 300 / 940, 40 / 500), 'three-left-wing');
   assert.equal(shotZoneForEvent({ eventType: '3PM', shotZone: 'three-left-corner', shotX: .3, shotY: .15 }), 'three-left-wing');
+  assert.equal(shotZoneForEvent({ eventType: '2PM', shotZone: 'three-top', shotX: .68, shotY: .5 }), 'two-top');
   const correctedShared = createSharedReport(game, [{ ...events[0], shotX: .3, shotY: .15, shotZone: 'three-left-corner' }]);
   assert.equal(correctedShared.report.shots[0].zone, 'three-left-wing');
   assert.equal(shotPointsFromPoint(.5, .5), 3); assert.equal(shotPointsFromPoint(.2, .5), 2);
-  assert.equal(shotPointsFromPoint(.12, .08), 3); assert.equal(shotPointsFromPoint(.3, .5), 2);
-  assert.equal(shotPointsFromPoint(.31, .5), 2); assert.equal(shotPointsFromPoint(.33, .5), 3); assert.equal(shotPointsFromPoint(.7, .5), 2);
+  assert.equal(shotPointsFromPoint(.12, .08), 3);
+  assert.equal(shotPointsFromPoint(264 / 940, .5), 2); assert.equal(shotPointsFromPoint(266 / 940, .5), 3);
+  assert.equal(shotPointsFromPoint(675 / 940, .5), 2); assert.equal(shotPointsFromPoint(674 / 940, .5), 3);
   assert.equal(shotZoneFromPoint(null, 74 / 940, .5), 'rim'); assert.equal(shotZoneFromPoint(null, 180 / 940, .5), 'paint');
   const pointShared = createSharedReport(game, [events[0]]);
-  assert.deepEqual(pointShared.report.shots[0], { playerId: 'p1', zone: 'two-top', result: 'made', x: .68, y: .5 });
+  assert.deepEqual(pointShared.report.shots[0], { playerId: 'p1', zone: 'three-top', result: 'made', x: .68, y: .5 });
   const pointPayload = await createCompressedSharePayload(game, [events[0]]);
   const parsedPointPayload = await parseSharePayload(pointPayload);
   assert.deepEqual(parsedPointPayload.shots, pointShared.report.shots);
@@ -103,9 +108,11 @@ test('only portrait iPhones use the Pro half court and its markings face the upp
   assert.equal(isIPhonePortrait('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', false), false);
   assert.equal(isIPhonePortrait('Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)', true), false);
   assert.match(PRO_HALF_COURT_MARKINGS, /M0 24H500V476H0ZM48 24V145M452 24V145M452 145A230 230 0 0 1 48 145/);
+  assert.match(PRO_HALF_COURT_MARKINGS, /M452 210H500M0 210H48M324 120H452M48 120H176/);
   const fullCourt = proLiveView({}, fixture().game, []);
   assert.match(fullCourt, /pro-court-surface" x="24" y="0" width="892" height="500"/);
   assert.match(fullCourt, /M24 0H916V500H24ZM470 0V500M24 48H145/);
+  assert.match(fullCourt, /M210 0V48M210 452V500M730 0V48M730 452V500M120 48V176M120 324V452M820 48V176M820 324V452/);
   assert.match(PRO_HALF_COURT_MARKINGS, /M304 210A54 54 0 0 1 196 210/);
   assert.match(PRO_HALF_COURT_MARKINGS, /M287 74A37 37 0 0 1 213 74/);
 });
@@ -193,7 +200,9 @@ test('shot court map enables only matching two- or three-point zones', () => {
   assert.match(threePoint, /shot-map-zone two-point disabled/);
   assert.match(twoPoint, /data-zone="rim"/);
   assert.match(threePoint, /data-zone="three-top"/);
-  assert.match(twoPoint, /viewBox="0 0 620 475"/);
+  assert.match(twoPoint, /viewBox="0 0 500 500"/);
+  assert.match(twoPoint, /M324 120H452M48 120H176/);
+  assert.match(twoPoint, /court-zone-fill/);
   assert.doesNotMatch(twoPoint, /<text/);
 });
 test('shot chart map shows each zone as made-attempts and percentage', () => {
