@@ -13,6 +13,7 @@ const toastNode = document.querySelector('#toast');
 const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, advancedMode: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, historySelection: new Set(), aggregateMode: 'total', aggregateGameId: null, aggregatePlayerGameId: 'total', shotDisplayMode: 'points', strategyBoard: null, proSelection: null, proSub: null, proOpponentSelection: null, proOpponentSub: null, proShotFeedback: null, page: 'home', gameId: null, busy: false, lastError: '' };
 let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, proClockTimer = null, proClockSaving = false, proShotFeedbackTimer = null, resolvedShareHash = '', sharePayloadPromise = null, pwaRegistration = null;
 const PRO_FIELD_SHOT_TYPES = new Set(['FGM', 'FGX']);
+const PRO_DIRECT_FIELD_SHOT_TYPES = new Set(['2PM', '2PX', '3PM', '3PX']);
 const PRO_SHOT_FEEDBACK_DURATION = 3200;
 function proShotPointFromEvent(button, event, direction) {
   const rect = button.getBoundingClientRect();
@@ -164,14 +165,15 @@ function render() {
     html = page === 'live' ? g.mode === 'pro' ? view.proLiveView(state, g, gameEvents(g), currentClockSeconds(g)) : view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.23 · BUILT FOR THE SIDELINES`);
-  if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode));
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.24 · BUILT FOR THE SIDELINES`);
+  if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode, game()?.roster));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
     const chartEvents = state.aggregateGameId ? gameEvents(state.data.games.find(candidate => candidate.id === state.aggregateGameId)) : state.data.events.filter(event => selectedForChart.some(candidate => candidate.id === event.gameId));
-    [...app.querySelectorAll('.section-heading')].find(element => element.querySelector('h2')?.textContent === 'チーム・シューティング')?.insertAdjacentHTML('beforebegin', view.shotChartHTML(chartEvents, null, state.shotDisplayMode));
+    const chartPlayers = state.aggregateGameId ? state.data.games.find(candidate => candidate.id === state.aggregateGameId)?.roster || [] : selectedForChart.flatMap(candidate => candidate.roster);
+    [...app.querySelectorAll('.section-heading')].find(element => element.querySelector('h2')?.textContent === 'チーム・シューティング')?.insertAdjacentHTML('beforebegin', view.shotChartHTML(chartEvents, null, state.shotDisplayMode, chartPlayers));
   }
-  if (page === 'shared') [...app.querySelectorAll('.section-heading')].find(element => element.querySelector('h2')?.textContent === 'チーム・シューティング')?.insertAdjacentHTML('beforebegin', view.sharedShotChartHTML(sharedReport.shots || [], null, state.shotDisplayMode));
+  if (page === 'shared') [...app.querySelectorAll('.section-heading')].find(element => element.querySelector('h2')?.textContent === 'チーム・シューティング')?.insertAdjacentHTML('beforebegin', view.sharedShotChartHTML(sharedReport.shots || [], null, state.shotDisplayMode, sharedReport.players));
   if (page === 'settings') app.querySelector('.settings-panel')?.insertAdjacentHTML('afterend', cloudSettingsHTML());
   if (page === 'settings' && !app.querySelector('#keepAwake')) {
     const continuous = app.querySelector('#continuous');
@@ -666,6 +668,12 @@ const handlers = {
     const shotExtra = { ...(zone ? { shotZone: zone } : {}), shotX: x, shotY: y, ...(isOpponent ? { side: 'opponent' } : {}) };
     return busy(async () => { const saved = await record(eventType, selection.playerId, shotExtra); if (isOpponent) state.proOpponentSelection = null; else state.proSelection = null; showProShotFeedback(saved); if (!isOpponent) offerFollowup(saved); });
   },
+  'pro-shot-details': button => {
+    const g = game();
+    const shot = gameEvents(g).find(event => event.id === button.dataset.eventId && !event.deletedAt);
+    if (g?.mode !== 'pro' || !shot) return;
+    showSheet('シュート詳細', view.proShotDetailsHTML(g, shot));
+  },
   'pro-backcourt': () => toast('バックコートは選択できません。', true),
   'pro-sub': () => { if (game()?.mode !== 'pro') return; state.proSelection = null; state.proSub = { outPlayerId: null }; state.proOpponentSelection = null; state.proOpponentSub = null; render(); },
   'toggle-pro-attack': () => busy(async () => {
@@ -700,6 +708,9 @@ const handlers = {
       return busy(async () => { await record('SUB', null, { side: 'opponent', outPlayerId, inPlayerId: button.dataset.id }); state.proOpponentSub = null; state.proOpponentSelection = null; render(); });
     }
     if (g?.mode !== 'pro' || g.opponentTracking !== 'player' || !selection?.type) return toast('先に相手のプレーを選んでください。', true);
+    if (PRO_DIRECT_FIELD_SHOT_TYPES.has(selection.type)) {
+      return busy(async () => { await record(selection.type, button.dataset.id, { side: 'opponent' }); state.proOpponentSelection = null; render(); });
+    }
     if (document.querySelector('.pro-court-half') && PRO_FIELD_SHOT_TYPES.has(selection.type)) return toast('スマホでは相手のシュート位置を記録できません。', true);
     if (PRO_FIELD_SHOT_TYPES.has(selection.type)) { state.proOpponentSelection = { ...selection, playerId: button.dataset.id }; render(); return; }
     return busy(async () => { await record(selection.type, button.dataset.id, { side: 'opponent' }); state.proOpponentSelection = null; render(); });
@@ -808,8 +819,8 @@ const handlers = {
   },
   finish: () => confirm('試合を終了しますか？', 'BOX SCOREに結果をまとめます。終了後も履歴の編集や記録の再開ができます。', '試合を終了', async () => { const g = await saveGameChange({ ...game(), status: 'finished' }); closeSheet(); location.hash = `#box/${g.id}`; }),
   reopen: () => confirm('記録を再開しますか？', 'この試合を記録中に戻します。', '再開する', async () => { const g = await saveGameChange({ ...game(), status: 'live' }); closeSheet(); location.hash = `#live/${g.id}`; }),
-  'player-detail': button => showSheet('選手スタッツ', `${view.playerDetail(game(), gameEvents(), button.dataset.id)}${view.shotChartHTML(gameEvents(), button.dataset.id, state.shotDisplayMode)}`),
-  'shared-player-detail': button => showSheet('選手スタッツ', `${view.sharedPlayerDetail(sharedReport, button.dataset.id)}${view.sharedShotChartHTML(sharedReport.shots || [], button.dataset.id, state.shotDisplayMode)}`),
+  'player-detail': button => showSheet('選手スタッツ', `${view.playerDetail(game(), gameEvents(), button.dataset.id)}${view.shotChartHTML(gameEvents(), button.dataset.id, state.shotDisplayMode, game()?.roster)}`),
+  'shared-player-detail': button => showSheet('選手スタッツ', `${view.sharedPlayerDetail(sharedReport, button.dataset.id)}${view.sharedShotChartHTML(sharedReport.shots || [], button.dataset.id, state.shotDisplayMode, sharedReport.players)}`),
   'share-options': () => {
     const g = game();
     const events = gameEvents(g);
@@ -852,6 +863,12 @@ document.addEventListener('click', event => {
 });
 document.addEventListener('keydown', event => {
   if (!['Enter', ' '].includes(event.key)) return;
+  const shotDetails = event.target.closest?.('[data-action="pro-shot-details"], [data-action="shot-details"]');
+  if (shotDetails) {
+    event.preventDefault();
+    shotDetails.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    return;
+  }
   const zone = event.target.closest?.('[data-action="shot-zone"]');
   if (!zone) return;
   event.preventDefault();

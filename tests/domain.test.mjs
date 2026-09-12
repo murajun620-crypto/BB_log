@@ -106,7 +106,7 @@ test('only portrait iPhones use the Pro half court and its markings face the upp
   assert.match(PRO_HALF_COURT_MARKINGS, /M304 210A54 54 0 0 1 196 210/);
   assert.match(PRO_HALF_COURT_MARKINGS, /M287 74A37 37 0 0 1 213 74/);
 });
-test('iPhone Pro view hides attack direction and opponent shot-point input', () => {
+test('iPhone Pro view hides attack direction and records opponent shots without a location', () => {
   const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
   const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
   Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)' } });
@@ -119,14 +119,25 @@ test('iPhone Pro view hides attack direction and opponent shot-point input', () 
     assert.doesNotMatch(html, /data-action="toggle-pro-attack"/);
     assert.doesNotMatch(html, /data-action="pro-opponent-action"[^>]*data-type="FGM"/);
     assert.doesNotMatch(html, /data-action="pro-opponent-action"[^>]*data-type="FGX"/);
-    assert.match(html, /data-action="pro-opponent-action"[^>]*data-type="FTM"/);
-    assert.match(html, /スマホでは相手の2P／3Pシュート位置を記録できません。/);
+    for (const type of ['2PM', '2PX', '3PM', '3PX', 'FTM', 'FTX']) assert.match(html, new RegExp(`data-action="pro-opponent-action"[^>]*data-type="${type}"`));
+    assert.match(html, /スマホでは相手のシュート位置を記録せず、2P／3P／FTの成否と選手を記録します。/);
     const staleSelection = proLiveView({ proSelection: null, proOpponentSelection: { type: 'FGM', playerId: 'opponent-1' } }, game, []);
     assert.doesNotMatch(staleSelection, /data-action="pro-shot-point"/);
   } finally {
     if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator); else delete globalThis.navigator;
     if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow); else delete globalThis.window;
   }
+});
+test('iPhone opponent field shots preserve the scorer without coordinates', () => {
+  const { game } = fixture();
+  game.mode = 'pro'; game.clockEnabled = false; game.opponentTracking = 'player'; game.opponentRoster = [{ id: 'opponent-1', number: '8' }];
+  const shot = { id: uid(), gameId: game.id, periodId: game.currentPeriodId, eventType: '3PM', playerId: 'opponent-1', side: 'opponent', points: 3, timestamp: new Date().toISOString(), seq: game.nextSeq++ };
+  validateGame(game, [shot]);
+  const summary = aggregate(game, [shot]);
+  assert.equal(summary.opponent, 3);
+  assert.equal(summary.opponentPlayers['opponent-1'].PTS, 3);
+  assert.equal(shot.shotX, undefined);
+  assert.equal(shot.shotY, undefined);
 });
 test('Pro shot selection treats the center line and the defending half as backcourt', () => {
   assert.equal(isBackcourtPoint('right', .5), true);
@@ -198,9 +209,12 @@ test('exact Pro shot positions render as markers with an area summary', () => {
   const chart = shotChartMapHTML([
     { playerId: 'player-0', zone: 'three-top', result: 'made', x: .5, y: .15 },
     { playerId: 'player-0', zone: 'three-top', result: 'miss', x: .6, y: .2 },
-  ]);
+  ], null, 'points', [{ id: 'player-0', number: '4', name: '選手1' }]);
   assert.match(chart, /pro-shot-chart-map/);
   assert.equal((chart.match(/class="pro-shot-chart-marker [^"]+/g) || []).length, 2);
+  assert.equal((chart.match(/data-action="shot-details"/g) || []).length, 2);
+  assert.match(chart, /data-shot-player="4 選手1"/);
+  assert.match(chart, /data-shot-area="左ウイング3P"/);
   assert.match(chart, /pro-shot-zone-summary/);
   assert.equal((chart.match(/data-action="toggle-shot-display"/g) || []).length, 2);
   assert.match(chart, /shot-display-view-zones/);
@@ -230,6 +244,10 @@ test('Pro shot input uses result buttons, auto-selects points and skips the cour
   assert.doesNotMatch(field, /選手をタップ|プレーを選択|相手選手をタップ/);
   assert.match(field, /pro-backcourt-overlay/); assert.match(field, /BACK COURT/);
   assert.doesNotMatch(field, /pro-court-zone-boundaries/);
+  const savedShot = { id: 'saved-shot-1', gameId: game.id, periodId: game.currentPeriodId, eventType: '3PM', playerId: 'player-0', points: 3, timestamp: new Date().toISOString(), seq: 1, shotX: .3, shotY: .1, shotZone: 'three-left-wing' };
+  const history = proLiveView(state, game, [savedShot]);
+  assert.match(history, /data-action="pro-shot-details" data-event-id="saved-shot-1"/);
+  assert.match(history, /選手とシュートエリアを表示/);
   const feedback = proLiveView({ ...state, proShotFeedback: { gameId: game.id, eventId: 'feedback-1', eventType: '3PM', shotX: 140 / 940, shotY: 35 / 500, shotZone: 'three-left-corner' } }, game, events);
   assert.match(feedback, /class="pro-shot-area-feedback" data-shot-area="左コーナー3P"/);
   assert.match(feedback, /シュートエリア/);
@@ -249,6 +267,7 @@ test('Pro LIVE keeps substitution and play changes available while guiding the n
   assert.equal(proLiveCss.includes('.pro-live-screen.pro-await-opponent-court .pro-action-panel'), false);
   assert.match(proLiveCss, /\.pro-shot-area-feedback \{[^}]*animation: pro-shot-area-feedback-fade 3\.2s/);
   assert.match(proLiveCss, /@keyframes pro-shot-area-feedback-fade/);
+  assert.match(proLiveCss, /\.pro-shot-marker \{ pointer-events: auto; cursor: pointer; \}/);
 });
 test('opponent players require a jersey number but can optionally include a name', () => {
   const { game } = fixture();

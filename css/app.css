@@ -358,8 +358,8 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-court-markings circle { fill: none; }
 .pro-backcourt-overlay { fill: rgba(82, 91, 89, .62); cursor: not-allowed; pointer-events: all; }
 .pro-backcourt-label { fill: rgba(255,255,255,.88); font-size: 22px; font-weight: 800; letter-spacing: 2px; pointer-events: none; }
-.pro-shot-marker { pointer-events: none; }
-.pro-shot-marker text { fill: var(--accent); font-size: 28px; font-weight: 850; paint-order: stroke; stroke: rgba(255,255,255,.9); stroke-width: 4px; stroke-linejoin: round; }
+.pro-shot-marker { pointer-events: auto; cursor: pointer; }
+.pro-shot-marker text { fill: var(--accent); font-size: 28px; font-weight: 850; paint-order: stroke; stroke: rgba(255,255,255,.9); stroke-width: 4px; stroke-linejoin: round; pointer-events: none; }
 .pro-shot-marker.miss text { fill: #c7483f; }
 .pro-shot-area-feedback { pointer-events: none; animation: pro-shot-area-feedback-fade 3.2s ease-out forwards; }
 .pro-shot-area-feedback-point { fill: rgba(240, 178, 74, .18); stroke: #f0b24a; stroke-width: 3; }

@@ -1,9 +1,10 @@
 import { parseSharePayload } from '../../js/shared-report.js';
 import { openCloudShare } from '../../js/cloud-share.js';
-import { shotChartMapHTML } from '../../js/views.js';
+import { shotChartMapHTML, shotDetailHTML } from '../../js/views.js';
 
 const app = document.querySelector('#app');
 const playerDialog = document.querySelector('#player-dialog');
+const shotDialog = document.querySelector('#shot-dialog');
 let report = null;
 let requestNumber = 0;
 let displayMode = 'total';
@@ -27,8 +28,8 @@ function renderApp(html) {
 function shooting(stats, games = 1) {
   return `<div class="shooting-grid">${[['FG', 'FGM', 'FGA'], ['2P', 'P2M', 'P2A'], ['3P', 'P3M', 'P3A'], ['FT', 'FTM', 'FTA']].map(([label, made, attempts]) => `<div><span>${label}</span><strong>${stats[made]}<small>/${stats[attempts]}</small></strong><b>${percent(stats[made], stats[attempts])}</b>${games > 1 ? `<em class="shooting-average">平均 ${average(stats[made], games)}/${average(stats[attempts], games)}</em>` : ''}</div>`).join('')}</div>`;
 }
-function shotChart(shots = [], playerId = null, displayMode = 'points') {
-  const map = shotChartMapHTML(shots, playerId, displayMode);
+function shotChart(shots = [], playerId = null, displayMode = 'points', players = []) {
+  const map = shotChartMapHTML(shots, playerId, displayMode, players);
   return map ? `<section class="shot-chart"><div class="section-heading"><h2>ショットチャート</h2><span>成功数/試投数・成功率</span></div>${map}</section>` : '';
 }
 
@@ -67,7 +68,7 @@ function readerReportView(data) {
   const scoreCard = `<section class="report-card"><div class="game-meta"><span>${esc(formatDate(view.date))} · ${esc(view.format)}</span><span class="report-status">${status}</span></div><div class="report-score"><div><span>MY TEAM</span><h2>${esc(view.teamName)}</h2></div><strong>${metric(view.team.PTS, gameCount)}<span>–</span>${metric(view.opponentScore, gameCount)}</strong><div><span>OPPONENT</span><h2>${esc(view.opponentName)}</h2></div></div><div class="period-scores"><div><span>PERIOD</span><b>自チーム</b><b>相手</b></div>${view.periods.map(period => `<div><span>${esc(period.label)}</span><b>${period.home}</b><b>${period.away}</b></div>`).join('')}</div></section>`;
   const gameScores = detailGames.length > 1 ? `<section class="report-card game-list-card"><div class="game-meta"><span>${esc(data.tournamentName || data.teamName)} · 各試合のスコア</span>${currentGame ? '<button class="mode-toggle" type="button" data-action="select-game" data-game-index="-1">全試合集計</button>' : '<span class="report-hint">タップで試合を表示</span>'}</div><div class="aggregate-game-scores">${detailGames.map((game, index) => `<button class="aggregate-game-score ${index === selectedGameIndex ? 'selected' : ''}" type="button" data-action="select-game" data-game-index="${index}" aria-label="${esc(formatDate(game.date))} ${esc(game.opponentName)}の試合を表示"><span class="aggregate-game-info"><b>${esc(formatDate(game.date))}</b><small>${esc(game.teamName)} vs. ${esc(game.opponentName)}</small></span><strong class="game-score">${game.team.PTS}<span>–</span>${game.opponentScore}</strong><span class="game-score-arrow">›</span></button>`).join('')}</div></section>` : '';
   const scoreBlock = detailGames.length > 1 ? `${gameScores}${currentGame ? scoreCard : ''}` : scoreCard;
-  return `<main class="reader-shell"><header class="reader-header"><div class="identity"><span class="brand-mark">C</span><div><strong>COURTSIDE</strong><span>READER</span></div></div><span class="read-only">閲覧専用</span></header><section class="intro-line"><span>${data.tournamentName ? esc(data.tournamentName) : 'SHARED BOX SCORE'}</span><span>${esc(formatDate(view.date))} · ${esc(view.format)}</span></section>${scoreBlock}${shotChart(view.shots || [], null, shotDisplayMode)}<div class="section-heading"><h2>チーム・シューティング</h2>${gameCount > 1 ? '<span class="muted">成功率は合計から計算</span>' : ''}</div><div class="panel">${shooting(view.team, gameCount)}</div><div class="rebound-total"><span>OR <b>${metric(view.team.OREB, gameCount)}</b></span><span>DR <b>${metric(view.team.DREB, gameCount)}</b></span><span>REB <b>${metric(view.team.REB, gameCount)}</b></span></div><div class="section-heading"><h2>選手スタッツ</h2>${gameCount > 1 ? `<button class="mode-toggle" type="button" data-action="toggle-stat-mode" aria-label="合計と平均を切り替え">合計 / 平均：${mode}</button>` : '<span class="muted">選手をタップで詳細</span>'}</div><div class="box-table-wrap"><table class="box-table"><thead><tr><th scope="col">PLAYER</th>${BOX_STATS.map(key => `<th scope="col">${label(key)}</th>`).join('')}</tr></thead><tbody>${rows}<tr class="total-row"><th scope="row">TEAM</th>${BOX_STATS.map(key => cell(view.team, key)).join('')}</tr></tbody></table></div><footer class="reader-footer">この画面は共有された${currentGame ? '試合結果' : data.gameCount > 1 ? `${data.gameCount}試合の集計` : '試合結果'}だけを表示しています。チームや試合の記録は保存しません。</footer></main>`;
+  return `<main class="reader-shell"><header class="reader-header"><div class="identity"><span class="brand-mark">C</span><div><strong>COURTSIDE</strong><span>READER</span></div></div><span class="read-only">閲覧専用</span></header><section class="intro-line"><span>${data.tournamentName ? esc(data.tournamentName) : 'SHARED BOX SCORE'}</span><span>${esc(formatDate(view.date))} · ${esc(view.format)}</span></section>${scoreBlock}${shotChart(view.shots || [], null, shotDisplayMode, view.players)}<div class="section-heading"><h2>チーム・シューティング</h2>${gameCount > 1 ? '<span class="muted">成功率は合計から計算</span>' : ''}</div><div class="panel">${shooting(view.team, gameCount)}</div><div class="rebound-total"><span>OR <b>${metric(view.team.OREB, gameCount)}</b></span><span>DR <b>${metric(view.team.DREB, gameCount)}</b></span><span>REB <b>${metric(view.team.REB, gameCount)}</b></span></div><div class="section-heading"><h2>選手スタッツ</h2>${gameCount > 1 ? `<button class="mode-toggle" type="button" data-action="toggle-stat-mode" aria-label="合計と平均を切り替え">合計 / 平均：${mode}</button>` : '<span class="muted">選手をタップで詳細</span>'}</div><div class="box-table-wrap"><table class="box-table"><thead><tr><th scope="col">PLAYER</th>${BOX_STATS.map(key => `<th scope="col">${label(key)}</th>`).join('')}</tr></thead><tbody>${rows}<tr class="total-row"><th scope="row">TEAM</th>${BOX_STATS.map(key => cell(view.team, key)).join('')}</tr></tbody></table></div><footer class="reader-footer">この画面は共有された${currentGame ? '試合結果' : data.gameCount > 1 ? `${data.gameCount}試合の集計` : '試合結果'}だけを表示しています。チームや試合の記録は保存しません。</footer></main>`;
 }
 
 function landingView() {
@@ -95,6 +96,7 @@ async function render(password = '') {
   if (typeof password !== 'string') password = '';
   const sequence = ++requestNumber;
   if (playerDialog.open) playerDialog.close();
+  if (shotDialog?.open) shotDialog.close();
   const payload = payloadFromHash();
   const short = location.hash.match(/^#s\/([A-Za-z0-9_-]{22})$/);
   report = null;
@@ -130,6 +132,13 @@ async function render(password = '') {
   }
 }
 
+function showShotDetails(marker) {
+  if (!shotDialog) return;
+  shotDialog.innerHTML = `<div class="dialog-handle"></div><button class="dialog-close" type="button" data-close-shot-dialog aria-label="閉じる">×</button><h2 id="shot-dialog-title">シュート詳細</h2>${shotDetailHTML({ player: marker.dataset.shotPlayer || '選手不明', area: marker.dataset.shotArea || '位置不明', result: marker.dataset.shotResult || '', points: marker.dataset.shotPoints || '' })}`;
+  if (!shotDialog.open && typeof shotDialog.showModal === 'function') shotDialog.showModal();
+  else if (!shotDialog.open) shotDialog.setAttribute('open', '');
+}
+
 function openPlayer(playerId) {
   if (!report) return;
   const detailGames = Array.isArray(report.games) && report.games.length === report.gameCount ? report.games : [];
@@ -142,13 +151,15 @@ function openPlayer(playerId) {
   const playerValue = value => playerDisplay === 'average' && !selectedGame ? average(value, report.gameCount) : value;
   const options = detailGames.length > 1 ? `<div class="detail-mode-row"><span>表示する試合</span><select data-action="select-player-game" data-player-id="${esc(playerId)}" aria-label="選手スタッツの対象試合"><option value="total" ${playerDisplay === 'total' ? 'selected' : ''}>全試合集計</option><option value="average" ${playerDisplay === 'average' ? 'selected' : ''}>1試合平均</option>${detailGames.map((game, index) => `<option value="${index}" ${String(gameIndex) === String(index) ? 'selected' : ''}>${index + 1}試合目：${esc(formatDate(game.date))} vs. ${esc(game.opponentName)}</option>`).join('')}</select></div>` : '';
   const context = selectedGame ? `${selectedGame.teamName} vs ${selectedGame.opponentName} · ${formatDate(selectedGame.date)}` : `${report.teamName} vs ${report.opponentName} · ${report.gameCount > 1 ? '全試合集計' : formatDate(report.date)}`;
-  playerDialog.innerHTML = `<div class="dialog-handle"></div><button class="dialog-close" type="button" data-close-dialog aria-label="閉じる">×</button>${options}<p class="dialog-context">${esc(context)}</p><div class="player-detail"><span class="jersey">${esc(player.number)}</span><div><h2 id="player-dialog-title">${esc(player.name)}</h2><p><b>${playerValue(player.stats.PTS)}</b> PTS</p></div></div>${shooting(player.stats, selectedCount)}<div class="detail-stats">${DETAIL_STATS.map(key => `<span><small>${statLabel(key)}</small><b>${playerValue(player.stats[key])}</b></span>`).join('')}</div>${shotChart(source.shots || [], playerId, shotDisplayMode)}`;
+  playerDialog.innerHTML = `<div class="dialog-handle"></div><button class="dialog-close" type="button" data-close-dialog aria-label="閉じる">×</button>${options}<p class="dialog-context">${esc(context)}</p><div class="player-detail"><span class="jersey">${esc(player.number)}</span><div><h2 id="player-dialog-title">${esc(player.name)}</h2><p><b>${playerValue(player.stats.PTS)}</b> PTS</p></div></div>${shooting(player.stats, selectedCount)}<div class="detail-stats">${DETAIL_STATS.map(key => `<span><small>${statLabel(key)}</small><b>${playerValue(player.stats[key])}</b></span>`).join('')}</div>${shotChart(source.shots || [], playerId, shotDisplayMode, source.players)}`;
   if (!playerDialog.open && typeof playerDialog.showModal === 'function') playerDialog.showModal();
   else if (!playerDialog.open) playerDialog.setAttribute('open', '');
 }
 
 document.addEventListener('click', event => {
   const toggle = event.target.closest('[data-action]');
+  if (event.target.closest('[data-close-shot-dialog]')) { shotDialog?.close(); return; }
+  if (toggle?.dataset.action === 'shot-details') { showShotDetails(toggle); return; }
   if (toggle?.dataset.action === 'select-player-game') return;
   if (toggle?.dataset.action === 'toggle-shot-display') {
     const root = toggle.closest('[data-shot-display-root]');
@@ -174,12 +185,22 @@ document.addEventListener('click', event => {
   if (player) { playerDisplay = selectedGameIndex === null ? displayMode : String(selectedGameIndex); openPlayer(player.dataset.playerId); }
   if (event.target.closest('[data-close-dialog]')) playerDialog.close();
 });
+document.addEventListener('keydown', event => {
+  if (!['Enter', ' '].includes(event.key)) return;
+  const marker = event.target.closest?.('[data-action="shot-details"]');
+  if (!marker) return;
+  event.preventDefault();
+  marker.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+});
 document.addEventListener('change', event => {
   const select = event.target.closest('[data-action="select-player-game"]');
   if (select) { playerDisplay = select.value; openPlayer(select.dataset.playerId); }
 });
 playerDialog.addEventListener('click', event => {
   if (event.target === playerDialog) playerDialog.close();
+});
+shotDialog?.addEventListener('click', event => {
+  if (event.target === shotDialog) shotDialog.close();
 });
 window.addEventListener('hashchange', render);
 // Recheck stopped/expired links on return; reports and passwords never enter Cache Storage.
