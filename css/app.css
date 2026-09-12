@@ -172,9 +172,10 @@ input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--accent); c
 .pro-setup-grid .segmented { margin-top: 8px; }
 .field-label { display: block; }
 .opponent-roster-input { min-width: 0; }
-.opponent-roster-fields { display: grid; grid-template-columns: minmax(92px, .8fr) minmax(0, 1.5fr); gap: 10px; margin-top: 8px; }
-.opponent-roster-fields label { min-width: 0; font-size: 12px; }
-.opponent-roster-fields textarea { margin-top: 6px; }
+.opponent-roster-editor { margin-top: 8px; }
+.opponent-roster-edit-row label { min-width: 0; font-size: 12px; }
+.opponent-roster-edit-row input { margin-top: 6px; }
+.opponent-roster-input > .button { margin-top: 10px; }
 .opponent-number-picker { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; margin-top: 7px; }
 .opponent-number-picker label { display: grid; gap: 3px; min-width: 0; }
 .opponent-number-picker label > span { color: var(--muted); font-size: 9px; }

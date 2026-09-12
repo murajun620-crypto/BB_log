@@ -1,6 +1,6 @@
 {
   "name": "courtside-log",
-  "version": "2.2.21",
+  "version": "2.2.22",
   "private": true,
   "type": "module",
   "description": "Offline-first basketball stats recorder",

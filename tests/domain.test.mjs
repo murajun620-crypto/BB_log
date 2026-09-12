@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, eventLabel, fullCourtPointFromHalf, halfCourtPointFromFull, isBackcourtPoint, normalizeShotZone, opponentLineup, oppositeDirection, percent, lineup, validateGame, validateTeam, makePeriods, shotPointsFromPoint, shotZoneForEvent, shotZoneFromPoint, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
-import { isIPhonePortrait, isIPhoneUserAgent, PRO_HALF_COURT_MARKINGS, liveSettingsHTML, proLiveView, shotZonePicker, shotChartMapHTML, strategyBoardHTML } from '../js/views.js';
+import { gameFormView, isIPhonePortrait, isIPhoneUserAgent, PRO_HALF_COURT_MARKINGS, liveSettingsHTML, proLiveView, shotZonePicker, shotChartMapHTML, strategyBoardHTML } from '../js/views.js';
 
 const fixture = () => {
   const players = Array.from({ length: 6 }, (_, i) => ({ id: `player-${i}`, number: `${i + 4}`, name: `選手${i + 1}` }));
@@ -255,17 +255,31 @@ test('opponent substitutions keep five players on court and use opponent numbers
   assert.deepEqual(opponentLineup(game, events), ['opponent-1', 'opponent-2', 'opponent-3', 'opponent-4', 'opponent-5']);
   assert.equal(eventLabel(game, substitution), '相手 4 → 9');
 });
-test('opponent roster uses separate number and name boxes in live settings', () => {
+test('opponent roster uses one row with separate number and name boxes', () => {
   const { game } = fixture();
   game.mode = 'pro'; game.clockEnabled = false; game.opponentTracking = 'player'; game.opponentRoster = [{ id: 'opponent-1', number: '8', name: '相手選手' }];
   const html = liveSettingsHTML(game);
-  assert.match(html, /name="opponentRosterNumbersText"[^>]*data-opponent-numbers/);
-  assert.match(html, /name="opponentRosterNamesText"/);
-  assert.match(html, /<textarea name="opponentRosterNumbersText"[^>]*>8<\/textarea>/);
-  assert.match(html, /<textarea name="opponentRosterNamesText"[^>]*>相手選手<\/textarea>/);
+  assert.equal((html.match(/data-opponent-roster-row/g) || []).length, 1);
+  assert.match(html, /data-opponent-roster-editor/);
+  assert.match(html, /name="opponentRosterNumber"[^>]*value="8"/);
+  assert.match(html, /name="opponentRosterName"[^>]*value="相手選手"/);
+  assert.match(html, /data-action="add-opponent-roster-player"/);
+  assert.match(html, /data-action="remove-opponent-roster-player"/);
   assert.match(html, /半角数字1〜3桁/);
-  assert.doesNotMatch(html, /name="opponentRosterText"/);
+  assert.doesNotMatch(html, /<textarea/);
+  assert.doesNotMatch(html, /name="opponentRosterNumbersText"/);
+  assert.doesNotMatch(html, /name="opponentRosterNamesText"/);
   assert.doesNotMatch(html, /ローラー/);
+});
+test('opponent roster rows are also used in Pro game creation', () => {
+  const { team } = fixture();
+  const html = gameFormView({ data: { teams: [team] }, preferences: { advancedMode: false } }, { teamId: team.id, date: '2026-09-05', opponentName: 'VISITORS', format: 'quarters', count: 4, minutes: 8, participants: team.players.map(player => player.id), starters: team.players.slice(0, 5).map(player => player.id), mode: 'pro', clockEnabled: false, opponentTracking: 'player', opponentRosterNumbersText: '8\n12', opponentRosterNamesText: '相手A\n相手B' });
+  assert.equal((html.match(/data-opponent-roster-row/g) || []).length, 2);
+  assert.match(html, /name="opponentRosterNumber"[^>]*value="8"/);
+  assert.match(html, /name="opponentRosterName"[^>]*value="相手A"/);
+  assert.match(html, /name="opponentRosterNumber"[^>]*value="12"/);
+  assert.match(html, /name="opponentRosterName"[^>]*value="相手B"/);
+  assert.match(html, /data-action="add-opponent-roster-player"/);
 });
 test('team and opponent rosters have no registration count cap and still reject full-width numbers', () => {
   const manyPlayers = Array.from({ length: 61 }, (_, i) => ({ id: `large-player-${i}`, number: String(i % 1000), name: `選手${i}` }));
