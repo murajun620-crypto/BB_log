@@ -179,7 +179,7 @@ test('Pro shot input uses result buttons, auto-selects points and skips the cour
   assert.match(field, /data-type="FGM"/); assert.match(field, /data-type="FGX"/);
   assert.doesNotMatch(field, /data-type="2PM"|data-type="3PM"/); assert.match(field, /data-action="pro-shot-point"/);
   assert.match(field, /pro-history-button/); assert.match(field, /pro-player on-court/); assert.doesNotMatch(field, /<strong>#/);
-  assert.match(field, /pro-player-stat-score/); assert.match(field, /pro-player-stat-foul/); assert.match(field, /<em>PTS<\/em>/); assert.match(field, /<em>F<\/em>/); assert.match(field, /aria-label="0点、ファウル0"/);
+  assert.match(field, /pro-player-stat-score/); assert.match(field, /pro-player-stat-foul/); assert.match(field, /<em>PTS<\/em><span class="pro-player-stat-value">0<\/span>/); assert.match(field, /<em>F<\/em><span class="pro-player-stat-value">0<\/span>/); assert.doesNotMatch(field, /class="pro-player-stat pro-player-stat-score"[^>]*>.*digital-display/); assert.match(field, /aria-label="0点、ファウル0"/);
   assert.match(field, /data-action="toggle-pro-attack"/); assert.match(field, /→ 右ゴール/);
   assert.match(field, /pro-backcourt-overlay/); assert.match(field, /BACK COURT/);
   assert.doesNotMatch(field, /pro-court-zone-boundaries/);

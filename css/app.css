@@ -370,19 +370,18 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-roster { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 5px; max-height: 28vh; overflow-y: auto; }
 .pro-player { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-width: 0; min-height: 56px; padding: 6px 8px; border: 1px solid var(--line); border-radius: 7px; background: var(--surface); text-align: left; }
 .pro-player-name { display: flex; flex: 1 1 auto; align-items: center; gap: 6px; min-width: 0; }
-.pro-player-name strong { flex: 0 0 auto; color: #fff; font-size: 17px; font-variant-numeric: tabular-nums; }
+.pro-player-name strong { flex: 0 0 auto; min-width: 1.35em; color: var(--accent); font-size: 22px; font-variant-numeric: tabular-nums; text-align: center; }
 .pro-player-name span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; }
 .pro-player-stats { display: flex; flex: 0 0 auto; align-items: stretch; gap: 7px; color: #fff; font-family: "Roboto Mono", "Share Tech Mono", "Arial Narrow", "Courier New", monospace; white-space: nowrap; font-variant-numeric: tabular-nums; }
 .pro-player-stat { display: inline-flex; min-width: 34px; flex-direction: column; align-items: center; justify-content: center; gap: 3px; line-height: 1; }
 .pro-player-stat em { font-family: inherit; font-size: 10px; font-style: normal; font-weight: 850; letter-spacing: .04em; }
 .pro-player-stat-score { color: #53d17a; }
 .pro-player-stat-foul { color: #ff4f5f; }
-.pro-player-stat .digital-display { height: 1em; color: inherit; font-size: 22px; }
-.pro-player-stat .digital-digit { width: .48em; flex-basis: .48em; }
+.pro-player-stat-value { display: block; color: inherit; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans JP", sans-serif; font-size: 22px; font-weight: 800; line-height: 1; font-variant-numeric: tabular-nums; }
 .pro-player.on-court { border-color: var(--accent); background: var(--accent-soft); }
 .pro-player.bench { background: var(--surface-2); color: var(--muted); }
 .pro-player.bench .pro-player-name { opacity: .82; }
-.pro-player.bench strong { color: var(--muted); }
+.pro-player.bench strong { color: var(--accent); opacity: .78; }
 .pro-player.selected { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
 .pro-sub-button { min-height: 39px; margin-top: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--muted); font-size: 11px; font-weight: 700; }
 .pro-opponent-score { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
@@ -558,7 +557,8 @@ body:has(dialog[open]) #toast { bottom: auto; top: max(15px, env(safe-area-inset
   .pro-player-stats { gap: 4px; }
   .pro-player-stat { min-width: 29px; gap: 2px; }
   .pro-player-stat em { font-size: 8px; }
-  .pro-player-stat .digital-display { font-size: 18px; }
+  .pro-player-name strong { font-size: 20px; }
+  .pro-player-stat-value { font-size: 18px; }
   .pro-footer { margin-top: 0; }
   .pro-court.pro-court-half { width: min(100%, 65vh); width: min(100%, 65dvh); }
   .pro-center { gap: 4px; }
