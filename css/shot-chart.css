@@ -1,5 +1,7 @@
 /* Shared by the main app and Reader so Pro shot charts cannot drift apart. */
 .shot-court-map { display: block; width: 100%; max-width: 620px; height: auto; margin: 0 auto; overflow: hidden; border: 1px solid #d6c08d; border-radius: 12px; background: #f1dfb0; touch-action: manipulation; }
+.shot-court-map, .shot-chart-map, .pro-court { -webkit-user-select: none; user-select: none; -webkit-user-drag: none; -webkit-touch-callout: none; }
+.shot-court-map *, .shot-chart-map *, .pro-court * { -webkit-user-select: none; user-select: none; }
 .shot-chart { margin-top: 24px; }
 .shot-chart .section-heading { margin-top: 0; }
 .shot-display-toggle { display: flex; justify-content: flex-end; gap: 4px; margin-top: 8px; }
@@ -43,7 +45,7 @@
 .shot-marker-detail-feedback-point { fill: rgba(240, 178, 74, .18); stroke: #f0b24a; stroke-width: 3; }
 .shot-marker-detail-feedback-connector { stroke: #f0b24a; stroke-width: 2; stroke-dasharray: 4 4; }
 .shot-marker-detail-feedback-label { fill: rgba(9, 15, 13, .94); stroke: #f0b24a; stroke-width: 2; }
-.shot-marker-detail-feedback-text { fill: #fff; font-size: 13px; font-weight: 800; paint-order: stroke; stroke: rgba(0, 0, 0, .3); stroke-width: 1px; }
+.shot-marker-detail-feedback-text { fill: #fff; font-size: 16px; font-weight: 850; paint-order: stroke; stroke: rgba(0, 0, 0, .3); stroke-width: 1px; }
 .pro-shot-zone-summary { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; margin-top: 7px; }
 .pro-shot-zone-summary-item { display: grid; gap: 2px; min-width: 0; padding: 7px 4px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface); text-align: center; }
 .pro-shot-zone-summary-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--muted); font-size: 8px; }

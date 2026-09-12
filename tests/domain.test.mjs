@@ -16,6 +16,9 @@ const fixture = () => {
   return { team, game, events, add };
 };
 const proLiveCss = readFileSync(new URL('../css/app.css', import.meta.url), 'utf8');
+const shotChartCss = readFileSync(new URL('../css/shot-chart.css', import.meta.url), 'utf8');
+const appSource = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
+const readerSource = readFileSync(new URL('../reader/js/reader.js', import.meta.url), 'utf8');
 
 test('all 14 stat types aggregate accurately, independently of event input order', () => {
   const { game, events, add } = fixture();
@@ -264,6 +267,17 @@ test('Pro shot input uses result buttons, auto-selects points and skips the cour
   assert.doesNotMatch(freeThrow, /data-action="pro-shot-point"/);
   const awaitingPlayer = proLiveView({ proSelection: { type: 'FGM', playerId: null }, proOpponentSelection: null }, game, events);
   assert.match(awaitingPlayer, /pro-await-own-player/); assert.match(awaitingPlayer, /data-action="add-member"/);
+});
+test('shot marker feedback is readable and court selection is suppressed', () => {
+  const details = shotMarkerDetailFeedbackHTML({ player: '4 選手1', area: '左ウイング3P', result: '○ 成功', points: '3P', x: 282, y: 50 });
+  assert.match(details, /tspan x="0" y="-27"/);
+  assert.match(details, /tspan x="0" y="27"/);
+  assert.match(shotChartCss, /\.shot-court-map, \.shot-chart-map, \.pro-court \{[^}]*user-select: none/);
+  assert.match(shotChartCss, /\.shot-marker-detail-feedback-text \{[^}]*font-size: 16px/);
+  for (const source of [appSource, readerSource]) {
+    assert.match(source, /document\.addEventListener\('selectstart'/);
+    assert.match(source, /document\.addEventListener\('dragstart'/);
+  }
 });
 test('Pro LIVE keeps substitution and play changes available while guiding the next tap', () => {
   assert.match(proLiveCss, /\.pro-live-screen\.pro-step-ready \.pro-court \{ pointer-events: none; \}/);

@@ -65,6 +65,9 @@ function showShotMarkerFeedback(marker) {
 function shotMarkerFromTarget(target) {
   return target?.closest?.('[data-shot-marker]');
 }
+function shotCourtFromTarget(target) {
+  return target?.closest?.('.pro-court, .shot-court-map, .shot-chart-map');
+}
 function toast(message, error = false) {
   clearTimeout(toastTimer); toastNode.textContent = message; toastNode.className = `show${error ? ' error' : ''}`;
   toastNode.setAttribute('role', error ? 'alert' : 'status');
@@ -182,7 +185,7 @@ function render() {
   } else { state.page = 'home'; html = view.homeView(state); }
   clearShotMarkerFeedback();
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.26 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.27 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode, game()?.roster));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -853,6 +856,12 @@ const handlers = {
   'export-json': () => busy(async () => { await draftQueue; await refresh(); teamDraft = null; gameDraft = null; download(JSON.stringify(backupObject(state.data), null, 2), `courtside-backup-${localDate()}.json`, 'application/json'); toast('バックアップを書き出しました。'); render(); }),
   persist: async () => { const result = await navigator.storage?.persist?.(); document.querySelector('#persist-status').textContent = result ? 'このブラウザで保存領域の保持が許可されています。JSONバックアップも続けてください。' : '保持の許可はブラウザが判断します。現在も端末内への保存は有効です。JSONバックアップをご利用ください。'; },
 };
+document.addEventListener('selectstart', event => {
+  if (shotCourtFromTarget(event.target)) event.preventDefault();
+});
+document.addEventListener('dragstart', event => {
+  if (shotCourtFromTarget(event.target)) event.preventDefault();
+});
 document.addEventListener('pointerdown', event => {
   const marker = shotMarkerFromTarget(event.target);
   if (!marker || event.button > 0) return;

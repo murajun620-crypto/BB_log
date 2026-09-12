@@ -148,6 +148,9 @@ function showShotMarkerFeedback(marker) {
 function shotMarkerFromTarget(target) {
   return target?.closest?.('[data-shot-marker]');
 }
+function shotCourtFromTarget(target) {
+  return target?.closest?.('.pro-court, .shot-court-map, .shot-chart-map');
+}
 
 function openPlayer(playerId) {
   if (!report) return;
@@ -167,6 +170,12 @@ function openPlayer(playerId) {
   else if (!playerDialog.open) playerDialog.setAttribute('open', '');
 }
 
+document.addEventListener('selectstart', event => {
+  if (shotCourtFromTarget(event.target)) event.preventDefault();
+});
+document.addEventListener('dragstart', event => {
+  if (shotCourtFromTarget(event.target)) event.preventDefault();
+});
 document.addEventListener('pointerdown', event => {
   const marker = shotMarkerFromTarget(event.target);
   if (!marker || event.button > 0) return;
