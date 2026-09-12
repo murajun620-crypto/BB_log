@@ -164,7 +164,7 @@ function render() {
     html = page === 'live' ? g.mode === 'pro' ? view.proLiveView(state, g, gameEvents(g), currentClockSeconds(g)) : view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.22 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.23 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -653,6 +653,7 @@ const handlers = {
     const g = game(), ownSelection = state.proSelection, opponentSelection = state.proOpponentSelection;
     const isOpponent = g?.opponentTracking === 'player' && !ownSelection?.playerId && opponentSelection?.playerId;
     const selection = isOpponent ? opponentSelection : ownSelection;
+    if (isOpponent && button.classList.contains('pro-court-half')) return toast('スマホでは相手のシュート位置を記録できません。', true);
     if (g?.mode !== 'pro' || !selection?.type || !selection.playerId || !PRO_FIELD_SHOT_TYPES.has(selection.type)) return toast('FGの○／×と選手を先に選んでください。FTは選手をタップすると記録されます。', true);
     const attackDirection = attackDirectionForPeriod(g);
     const shotDirection = isOpponent ? oppositeDirection(attackDirection) : attackDirection;
@@ -699,6 +700,7 @@ const handlers = {
       return busy(async () => { await record('SUB', null, { side: 'opponent', outPlayerId, inPlayerId: button.dataset.id }); state.proOpponentSub = null; state.proOpponentSelection = null; render(); });
     }
     if (g?.mode !== 'pro' || g.opponentTracking !== 'player' || !selection?.type) return toast('先に相手のプレーを選んでください。', true);
+    if (document.querySelector('.pro-court-half') && PRO_FIELD_SHOT_TYPES.has(selection.type)) return toast('スマホでは相手のシュート位置を記録できません。', true);
     if (PRO_FIELD_SHOT_TYPES.has(selection.type)) { state.proOpponentSelection = { ...selection, playerId: button.dataset.id }; render(); return; }
     return busy(async () => { await record(selection.type, button.dataset.id, { side: 'opponent' }); state.proOpponentSelection = null; render(); });
   },

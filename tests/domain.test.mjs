@@ -106,6 +106,28 @@ test('only portrait iPhones use the Pro half court and its markings face the upp
   assert.match(PRO_HALF_COURT_MARKINGS, /M304 210A54 54 0 0 1 196 210/);
   assert.match(PRO_HALF_COURT_MARKINGS, /M287 74A37 37 0 0 1 213 74/);
 });
+test('iPhone Pro view hides attack direction and opponent shot-point input', () => {
+  const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
+  const originalWindow = Object.getOwnPropertyDescriptor(globalThis, 'window');
+  Object.defineProperty(globalThis, 'navigator', { configurable: true, value: { userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)' } });
+  Object.defineProperty(globalThis, 'window', { configurable: true, value: { matchMedia: () => ({ matches: true }) } });
+  try {
+    const { game } = fixture();
+    game.mode = 'pro'; game.opponentTracking = 'player'; game.opponentRoster = [{ id: 'opponent-1', number: '8' }];
+    const html = proLiveView({ proSelection: null, proOpponentSelection: null }, game, []);
+    assert.match(html, /class="pro-court pro-court-half"/);
+    assert.doesNotMatch(html, /data-action="toggle-pro-attack"/);
+    assert.doesNotMatch(html, /data-action="pro-opponent-action"[^>]*data-type="FGM"/);
+    assert.doesNotMatch(html, /data-action="pro-opponent-action"[^>]*data-type="FGX"/);
+    assert.match(html, /data-action="pro-opponent-action"[^>]*data-type="FTM"/);
+    assert.match(html, /スマホでは相手の2P／3Pシュート位置を記録できません。/);
+    const staleSelection = proLiveView({ proSelection: null, proOpponentSelection: { type: 'FGM', playerId: 'opponent-1' } }, game, []);
+    assert.doesNotMatch(staleSelection, /data-action="pro-shot-point"/);
+  } finally {
+    if (originalNavigator) Object.defineProperty(globalThis, 'navigator', originalNavigator); else delete globalThis.navigator;
+    if (originalWindow) Object.defineProperty(globalThis, 'window', originalWindow); else delete globalThis.window;
+  }
+});
 test('Pro shot selection treats the center line and the defending half as backcourt', () => {
   assert.equal(isBackcourtPoint('right', .5), true);
   assert.equal(isBackcourtPoint('right', .49), true);

@@ -432,6 +432,7 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-opponent-score { display: grid; grid-template-columns: repeat(3, 1fr); gap: 5px; }
 .pro-opponent-score .opponent-button { min-height: 44px; }
 .pro-opponent-actions { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 4px; }
+.pro-mobile-opponent-note { margin: 3px 0 0; color: var(--muted); font-size: 10px; line-height: 1.5; }
 .pro-footer { display: flex; gap: 7px; min-height: 48px; }
 .pro-footer > * { min-height: 48px; }
 .pro-footer .undo-button { flex: 1; }
