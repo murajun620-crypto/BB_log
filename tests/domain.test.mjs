@@ -53,13 +53,15 @@ test('Pro games preserve clock, opponent player stats and exact shot positions',
   assert.equal(shotZoneFromPoint(null, .27, 176 / 500), 'two-left-wing');
   assert.equal(shotZoneFromPoint(null, .27, 180 / 500), 'two-left-wing');
   assert.equal(shotZoneFromPoint(null, 170 / 940, 90 / 500), 'two-left-corner');
-  assert.equal(shotZoneFromPoint(null, 180 / 940, 90 / 500), 'two-left-wing');
+  assert.equal(shotZoneFromPoint(null, 210 / 940, 90 / 500), 'two-left-corner');
+  assert.equal(shotZoneFromPoint(null, 211 / 940, 90 / 500), 'two-left-wing');
   assert.equal(shotZoneFromPoint(null, 170 / 940, 100 / 500), 'two-left-wing');
   assert.equal(shotZoneFromPoint(null, 240 / 940, 120 / 500), 'two-left-wing');
   assert.equal(shotZoneFromPoint('3PM', 140 / 940, 35 / 500), 'three-left-corner');
   assert.equal(shotZoneFromPoint('3PM', 140 / 940, 50 / 500), 'three-left-wing');
   assert.equal(shotZoneFromPoint('3PM', 145 / 940, 48 / 500), 'three-left-corner');
-  assert.equal(shotZoneFromPoint('3PM', 146 / 940, 48 / 500), 'three-left-wing');
+  assert.equal(shotZoneFromPoint('3PM', 210 / 940, 48 / 500), 'three-left-corner');
+  assert.equal(shotZoneFromPoint('3PM', 211 / 940, 48 / 500), 'three-left-wing');
   assert.equal(shotZoneFromPoint(null, 140 / 940, 40 / 500), 'three-left-corner');
   assert.equal(shotZoneFromPoint(null, 300 / 940, 40 / 500), 'three-left-wing');
   assert.equal(shotZoneForEvent({ eventType: '3PM', shotZone: 'three-left-corner', shotX: .3, shotY: .15 }), 'three-left-wing');
@@ -206,6 +208,9 @@ test('Pro shot input uses result buttons, auto-selects points and skips the cour
   assert.doesNotMatch(field, /選手をタップ|プレーを選択|相手選手をタップ/);
   assert.match(field, /pro-backcourt-overlay/); assert.match(field, /BACK COURT/);
   assert.doesNotMatch(field, /pro-court-zone-boundaries/);
+  const feedback = proLiveView({ ...state, proShotFeedback: { gameId: game.id, eventId: 'feedback-1', eventType: '3PM', shotX: 140 / 940, shotY: 35 / 500, shotZone: 'three-left-corner' } }, game, events);
+  assert.match(feedback, /class="pro-shot-area-feedback" data-shot-area="左コーナー3P"/);
+  assert.match(feedback, /シュートエリア/);
   assert.match(proLiveView(state, { ...game, currentPeriodId: game.periods[2].id }, events), /← 左ゴール/);
   const freeThrow = proLiveView({ ...state, proSelection: { type: 'FTM', playerId: 'player-0' } }, game, events);
   assert.doesNotMatch(freeThrow, /data-action="pro-shot-point"/);
@@ -220,6 +225,8 @@ test('Pro LIVE keeps substitution and play changes available while guiding the n
   assert.equal(proLiveCss.includes('.pro-live-screen.pro-await-opponent-player .pro-center'), false);
   assert.equal(proLiveCss.includes('.pro-live-screen.pro-await-own-court .pro-action-panel'), false);
   assert.equal(proLiveCss.includes('.pro-live-screen.pro-await-opponent-court .pro-action-panel'), false);
+  assert.match(proLiveCss, /\.pro-shot-area-feedback \{[^}]*animation: pro-shot-area-feedback-fade 3\.2s/);
+  assert.match(proLiveCss, /@keyframes pro-shot-area-feedback-fade/);
 });
 test('opponent players require a jersey number but can optionally include a name', () => {
   const { game } = fixture();

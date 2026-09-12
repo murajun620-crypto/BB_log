@@ -360,6 +360,12 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-shot-marker { pointer-events: none; }
 .pro-shot-marker text { fill: var(--accent); font-size: 28px; font-weight: 850; paint-order: stroke; stroke: rgba(255,255,255,.9); stroke-width: 4px; stroke-linejoin: round; }
 .pro-shot-marker.miss text { fill: #c7483f; }
+.pro-shot-area-feedback { pointer-events: none; animation: pro-shot-area-feedback-fade 3.2s ease-out forwards; }
+.pro-shot-area-feedback-point { fill: rgba(240, 178, 74, .18); stroke: #f0b24a; stroke-width: 3; }
+.pro-shot-area-feedback-connector { stroke: #f0b24a; stroke-width: 2; stroke-dasharray: 4 4; }
+.pro-shot-area-feedback-label { fill: rgba(9, 15, 13, .94); stroke: #f0b24a; stroke-width: 2; }
+.pro-shot-area-feedback text { fill: #fff; font-size: 15px; font-weight: 800; paint-order: stroke; stroke: rgba(0, 0, 0, .3); stroke-width: 1px; }
+@keyframes pro-shot-area-feedback-fade { 0%, 70% { opacity: 1; } 100% { opacity: 0; } }
 .pro-action-panel { display: grid; gap: 5px; }
 .pro-action-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 5px; }
 .pro-other-row { grid-template-columns: repeat(8, minmax(0, 1fr)); }

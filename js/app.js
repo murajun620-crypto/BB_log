@@ -10,9 +10,10 @@ import { cloudSettingsHTML, setupCloudShareUI } from './cloud-share-ui.js';
 const app = document.querySelector('#app');
 const sheet = document.querySelector('#sheet');
 const toastNode = document.querySelector('#toast');
-const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, advancedMode: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, historySelection: new Set(), aggregateMode: 'total', aggregateGameId: null, aggregatePlayerGameId: 'total', shotDisplayMode: 'points', strategyBoard: null, proSelection: null, proSub: null, proOpponentSelection: null, proOpponentSub: null, page: 'home', gameId: null, busy: false, lastError: '' };
-let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, proClockTimer = null, proClockSaving = false, resolvedShareHash = '', sharePayloadPromise = null, pwaRegistration = null;
+const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, advancedMode: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, historySelection: new Set(), aggregateMode: 'total', aggregateGameId: null, aggregatePlayerGameId: 'total', shotDisplayMode: 'points', strategyBoard: null, proSelection: null, proSub: null, proOpponentSelection: null, proOpponentSub: null, proShotFeedback: null, page: 'home', gameId: null, busy: false, lastError: '' };
+let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, proClockTimer = null, proClockSaving = false, proShotFeedbackTimer = null, resolvedShareHash = '', sharePayloadPromise = null, pwaRegistration = null;
 const PRO_FIELD_SHOT_TYPES = new Set(['FGM', 'FGX']);
+const PRO_SHOT_FEEDBACK_DURATION = 3200;
 function proShotPointFromEvent(button, event, direction) {
   const rect = button.getBoundingClientRect();
   const clientX = event?.clientX || rect.left + rect.width / 2;
@@ -33,6 +34,20 @@ function proShotPointFromEvent(button, event, direction) {
 const getSetting = key => state.data.settings.find(s => s.key === key)?.value;
 const game = () => state.data.games.find(g => g.id === state.gameId);
 const gameEvents = (g = game()) => state.data.events.filter(e => e.gameId === g?.id);
+function showProShotFeedback(event) {
+  const zone = shotZoneFromPoint(null, event?.shotX, event?.shotY);
+  if (!event?.gameId || !zone) return;
+  clearTimeout(proShotFeedbackTimer);
+  state.proShotFeedback = { gameId: event.gameId, eventId: event.id, eventType: event.eventType, side: event.side, shotX: event.shotX, shotY: event.shotY, shotZone: zone };
+  render();
+  const { gameId, eventId } = state.proShotFeedback;
+  proShotFeedbackTimer = setTimeout(() => {
+    if (state.proShotFeedback?.gameId !== gameId || state.proShotFeedback?.eventId !== eventId) return;
+    state.proShotFeedback = null;
+    proShotFeedbackTimer = null;
+    render();
+  }, PRO_SHOT_FEEDBACK_DURATION);
+}
 function toast(message, error = false) {
   clearTimeout(toastTimer); toastNode.textContent = message; toastNode.className = `show${error ? ' error' : ''}`;
   toastNode.setAttribute('role', error ? 'alert' : 'status');
@@ -85,6 +100,11 @@ function syncProClockTimer() {
 function render() {
   const currentHash = location.hash;
   const [requestedPage = 'home', id, ...rest] = currentHash.replace(/^#/, '').split('/');
+  if (state.proShotFeedback && (requestedPage !== 'live' || state.proShotFeedback.gameId !== id)) {
+    clearTimeout(proShotFeedbackTimer);
+    proShotFeedbackTimer = null;
+    state.proShotFeedback = null;
+  }
   const page = requestedPage === 'share' ? 'shared' : requestedPage;
   if (requestedPage === 'share' && resolvedShareHash !== currentHash) {
     resolvedShareHash = currentHash;
@@ -144,7 +164,7 @@ function render() {
     html = page === 'live' ? g.mode === 'pro' ? view.proLiveView(state, g, gameEvents(g), currentClockSeconds(g)) : view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.20 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.21 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -597,7 +617,7 @@ const handlers = {
     const eventType = `${points}${selection.type.endsWith('M') ? 'PM' : 'PX'}`;
     const zone = shotZoneFromPoint(null, x, y);
     const shotExtra = { ...(zone ? { shotZone: zone } : {}), shotX: x, shotY: y, ...(isOpponent ? { side: 'opponent' } : {}) };
-    return busy(async () => { const saved = await record(eventType, selection.playerId, shotExtra); if (isOpponent) state.proOpponentSelection = null; else state.proSelection = null; render(); if (!isOpponent) offerFollowup(saved); });
+    return busy(async () => { const saved = await record(eventType, selection.playerId, shotExtra); if (isOpponent) state.proOpponentSelection = null; else state.proSelection = null; showProShotFeedback(saved); if (!isOpponent) offerFollowup(saved); });
   },
   'pro-backcourt': () => toast('バックコートは選択できません。', true),
   'pro-sub': () => { if (game()?.mode !== 'pro') return; state.proSelection = null; state.proSub = { outPlayerId: null }; state.proOpponentSelection = null; state.proOpponentSub = null; render(); },
