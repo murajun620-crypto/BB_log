@@ -11,7 +11,7 @@ const app = document.querySelector('#app');
 const sheet = document.querySelector('#sheet');
 const toastNode = document.querySelector('#toast');
 const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, advancedMode: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, historySelection: new Set(), aggregateMode: 'total', aggregateGameId: null, aggregatePlayerGameId: 'total', shotDisplayMode: 'points', strategyBoard: null, proSelection: null, proSub: null, proOpponentSelection: null, proOpponentSub: null, proShotFeedback: null, page: 'home', gameId: null, busy: false, lastError: '' };
-let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, proClockTimer = null, proClockSaving = false, proShotFeedbackTimer = null, resolvedShareHash = '', sharePayloadPromise = null, pwaRegistration = null;
+let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, proClockTimer = null, proClockSaving = false, proShotFeedbackTimer = null, activeShotMarkerFeedback = null, resolvedShareHash = '', sharePayloadPromise = null, pwaRegistration = null;
 const PRO_FIELD_SHOT_TYPES = new Set(['FGM', 'FGX']);
 const PRO_DIRECT_FIELD_SHOT_TYPES = new Set(['2PM', '2PX', '3PM', '3PX']);
 const PRO_SHOT_FEEDBACK_DURATION = 3200;
@@ -48,6 +48,22 @@ function showProShotFeedback(event) {
     proShotFeedbackTimer = null;
     render();
   }, PRO_SHOT_FEEDBACK_DURATION);
+}
+function clearShotMarkerFeedback() {
+  activeShotMarkerFeedback?.feedback?.remove();
+  activeShotMarkerFeedback = null;
+}
+function showShotMarkerFeedback(marker) {
+  if (!marker?.dataset.shotMarker) return;
+  const values = marker.dataset;
+  const x = Number(values.shotX), y = Number(values.shotY), width = Number(values.shotViewWidth), height = Number(values.shotViewHeight);
+  if (![x, y, width, height].every(Number.isFinite)) return;
+  clearShotMarkerFeedback();
+  marker.insertAdjacentHTML('afterend', view.shotMarkerDetailFeedbackHTML({ player: values.shotPlayer, area: values.shotArea, result: values.shotResult, points: values.shotPoints, x, y, width, height }));
+  activeShotMarkerFeedback = { marker, feedback: marker.nextElementSibling };
+}
+function shotMarkerFromTarget(target) {
+  return target?.closest?.('[data-shot-marker]');
 }
 function toast(message, error = false) {
   clearTimeout(toastTimer); toastNode.textContent = message; toastNode.className = `show${error ? ' error' : ''}`;
@@ -164,8 +180,9 @@ function render() {
     if (page === 'live' && g.status === 'finished') { location.hash = `#box/${g.id}`; return; }
     html = page === 'live' ? g.mode === 'pro' ? view.proLiveView(state, g, gameEvents(g), currentClockSeconds(g)) : view.liveView(state, g, gameEvents(g)) : view.boxView(state, g, gameEvents(g));
   } else { state.page = 'home'; html = view.homeView(state); }
+  clearShotMarkerFeedback();
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.25 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.26 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode, game()?.roster));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -668,12 +685,6 @@ const handlers = {
     const shotExtra = { ...(zone ? { shotZone: zone } : {}), shotX: x, shotY: y, ...(isOpponent ? { side: 'opponent' } : {}) };
     return busy(async () => { const saved = await record(eventType, selection.playerId, shotExtra); if (isOpponent) state.proOpponentSelection = null; else state.proSelection = null; showProShotFeedback(saved); if (!isOpponent) offerFollowup(saved); });
   },
-  'pro-shot-details': button => {
-    const g = game();
-    const shot = gameEvents(g).find(event => event.id === button.dataset.eventId && !event.deletedAt);
-    if (g?.mode !== 'pro' || !shot) return;
-    showSheet('シュート詳細', view.proShotDetailsHTML(g, shot));
-  },
   'pro-backcourt': () => toast('バックコートは選択できません。', true),
   'pro-sub': () => { if (game()?.mode !== 'pro') return; state.proSelection = null; state.proSub = { outPlayerId: null }; state.proOpponentSelection = null; state.proOpponentSub = null; render(); },
   'toggle-pro-attack': () => busy(async () => {
@@ -842,6 +853,16 @@ const handlers = {
   'export-json': () => busy(async () => { await draftQueue; await refresh(); teamDraft = null; gameDraft = null; download(JSON.stringify(backupObject(state.data), null, 2), `courtside-backup-${localDate()}.json`, 'application/json'); toast('バックアップを書き出しました。'); render(); }),
   persist: async () => { const result = await navigator.storage?.persist?.(); document.querySelector('#persist-status').textContent = result ? 'このブラウザで保存領域の保持が許可されています。JSONバックアップも続けてください。' : '保持の許可はブラウザが判断します。現在も端末内への保存は有効です。JSONバックアップをご利用ください。'; },
 };
+document.addEventListener('pointerdown', event => {
+  const marker = shotMarkerFromTarget(event.target);
+  if (!marker || event.button > 0) return;
+  event.preventDefault();
+  showShotMarkerFeedback(marker);
+  marker.setPointerCapture?.(event.pointerId);
+});
+document.addEventListener('pointerup', clearShotMarkerFeedback);
+document.addEventListener('pointercancel', clearShotMarkerFeedback);
+window.addEventListener('blur', clearShotMarkerFeedback);
 document.addEventListener('click', event => {
   const button = event.target.closest('[data-action]');
   if (!button || button.disabled || state.busy) return;
@@ -863,16 +884,19 @@ document.addEventListener('click', event => {
 });
 document.addEventListener('keydown', event => {
   if (!['Enter', ' '].includes(event.key)) return;
-  const shotDetails = event.target.closest?.('[data-action="pro-shot-details"], [data-action="shot-details"]');
-  if (shotDetails) {
+  const marker = shotMarkerFromTarget(event.target);
+  if (marker) {
     event.preventDefault();
-    shotDetails.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    showShotMarkerFeedback(marker);
     return;
   }
   const zone = event.target.closest?.('[data-action="shot-zone"]');
   if (!zone) return;
   event.preventDefault();
   zone.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+});
+document.addEventListener('keyup', event => {
+  if (['Enter', ' '].includes(event.key) && shotMarkerFromTarget(event.target)) clearShotMarkerFeedback();
 });
 document.addEventListener('input', event => {
   if (event.target.matches?.('[data-jersey-number]')) {

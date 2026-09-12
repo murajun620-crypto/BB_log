@@ -163,10 +163,6 @@ function proShotAreaFeedbackHTML(feedback, halfCourt, attackDirection) {
   const connectorY = labelY > point.y ? labelY - 23 : labelY + 23;
   return `<g class="pro-shot-area-feedback" data-shot-area="${esc(label)}"><circle class="pro-shot-area-feedback-point" cx="${point.x.toFixed(1)}" cy="${point.y.toFixed(1)}" r="24"></circle><line class="pro-shot-area-feedback-connector" x1="${point.x.toFixed(1)}" y1="${point.y.toFixed(1)}" x2="${labelX.toFixed(1)}" y2="${connectorY.toFixed(1)}"></line><g transform="translate(${labelX.toFixed(1)} ${labelY.toFixed(1)})"><rect class="pro-shot-area-feedback-label" x="-${halfLabelWidth}" y="-23" width="${labelWidth}" height="46" rx="10"></rect><text text-anchor="middle"><tspan x="0" y="-3">シュートエリア</tspan><tspan x="0" y="17">${esc(label)}</tspan></text></g><title>シュートエリア：${esc(label)}</title></g>`;
 }
-export function shotDetailHTML({ player = '選手不明', area = '位置不明', result = '', points = '' } = {}) {
-  const miss = String(result).includes('×');
-  return `<div class="shot-detail-card"><div class="shot-detail-result ${miss ? 'miss' : 'made'}"><b>${esc(result)}</b><span>シュート</span></div><dl class="shot-detail-list"><div><dt>選手</dt><dd>${esc(player)}</dd></div><div><dt>シュートエリア</dt><dd>${esc(area)}</dd></div>${points ? `<div><dt>シュート種別</dt><dd>${esc(points)}</dd></div>` : ''}</dl></div>`;
-}
 function shotTypeLabel(shot) {
   if (shot?.eventType?.startsWith('3')) return '3P';
   if (shot?.eventType?.startsWith('2')) return '2P';
@@ -174,14 +170,22 @@ function shotTypeLabel(shot) {
   const zone = shotZoneForEvent(shot);
   return zone?.startsWith('three-') ? '3P' : zone ? '2P' : '';
 }
-export function proShotDetailsHTML(g, event) {
-  const roster = event?.side === 'opponent' ? g?.opponentRoster || [] : g?.roster || [];
-  const player = roster.find(candidate => candidate.id === event?.playerId);
-  const playerLabel = player ? [player.number, player.name].filter(Boolean).join(' ') : '選手不明';
-  const area = shotZoneLabel(shotZoneForEvent(event)) || '位置不明';
-  const result = event?.eventType?.endsWith('M') ? '○ 成功' : '× 失敗';
-  const points = shotTypeLabel(event) || event?.eventType || '';
-  return shotDetailHTML({ player: playerLabel, area, result, points });
+export function shotMarkerDetailFeedbackHTML({ player = '選手不明', area = '位置不明', result = '', points = '', x = 0, y = 0, width = 940, height = 500 } = {}) {
+  const viewWidth = Number.isFinite(width) && width > 0 ? width : 940;
+  const viewHeight = Number.isFinite(height) && height > 0 ? height : 500;
+  const pointX = Number.isFinite(x) ? x : 0;
+  const pointY = Number.isFinite(y) ? y : 0;
+  const labelWidth = Math.min(220, Math.max(120, viewWidth - 16));
+  const labelHeight = 66;
+  const halfLabelWidth = labelWidth / 2;
+  const labelX = Math.max(halfLabelWidth + 8, Math.min(viewWidth - halfLabelWidth - 8, pointX));
+  const placeBelow = pointY < labelHeight + 26;
+  const labelY = placeBelow
+    ? Math.min(viewHeight - labelHeight / 2 - 8, pointY + labelHeight / 2 + 18)
+    : Math.max(labelHeight / 2 + 8, pointY - labelHeight / 2 - 18);
+  const connectorY = placeBelow ? labelY - labelHeight / 2 : labelY + labelHeight / 2;
+  const resultLine = [result, points].filter(Boolean).join(' · ');
+  return `<g class="shot-marker-detail-feedback" data-shot-marker-feedback="true"><circle class="shot-marker-detail-feedback-point" cx="${pointX.toFixed(1)}" cy="${pointY.toFixed(1)}" r="24"></circle><line class="shot-marker-detail-feedback-connector" x1="${pointX.toFixed(1)}" y1="${pointY.toFixed(1)}" x2="${labelX.toFixed(1)}" y2="${connectorY.toFixed(1)}"></line><g transform="translate(${labelX.toFixed(1)} ${labelY.toFixed(1)})"><rect class="shot-marker-detail-feedback-label" x="-${halfLabelWidth}" y="-${labelHeight / 2}" width="${labelWidth}" height="${labelHeight}" rx="10"></rect><text class="shot-marker-detail-feedback-text" text-anchor="middle"><tspan x="0" y="-20">${esc(resultLine)}</tspan><tspan x="0" y="2">${esc(player)}</tspan><tspan x="0" y="24">${esc(area)}</tspan></text></g></g>`;
 }
 function proCourtHTML(g, events, interactive = false, selectionSide = null, shotFeedback = null) {
   const halfCourt = isIPhonePortraitViewport();
@@ -191,8 +195,13 @@ function proCourtHTML(g, events, interactive = false, selectionSide = null, shot
     const point = halfCourt ? halfCourtPointFromFull(event.shotX, event.shotY, markerDirection) : { x: event.shotX * 940, y: event.shotY * 500 };
     const x = point.x, y = point.y, made = event.eventType.endsWith('M');
     const label = eventLabel(g, event);
-    const markerLabel = `${label}。タップで選手とシュートエリアを表示`;
-    return `<g class="pro-shot-marker ${made ? 'made' : 'miss'}" data-action="pro-shot-details" data-event-id="${esc(event.id)}" role="button" tabindex="0" aria-label="${esc(markerLabel)}" transform="translate(${x.toFixed(1)} ${y.toFixed(1)})"><circle class="shot-marker-hit-area" r="24"></circle><text text-anchor="middle" dy=".36em">${made ? '○' : '×'}</text><title>${esc(markerLabel)}</title></g>`;
+    const roster = event.side === 'opponent' ? g.opponentRoster || [] : g.roster || [];
+    const player = shotPlayerLabel(event, roster);
+    const area = shotZoneLabel(shotZoneForEvent(event)) || '位置不明';
+    const result = made ? '○ 成功' : '× 失敗';
+    const points = shotTypeLabel(event) || event.eventType || '';
+    const markerLabel = `${label}。押し続けると選手・シュートエリア・種別を表示`;
+    return `<g class="pro-shot-marker ${made ? 'made' : 'miss'}" data-shot-marker="pro-live" data-event-id="${esc(event.id)}" data-shot-player="${esc(player)}" data-shot-area="${esc(area)}" data-shot-result="${esc(result)}" data-shot-points="${esc(points)}" data-shot-x="${x.toFixed(1)}" data-shot-y="${y.toFixed(1)}" data-shot-view-width="${halfCourt ? '500' : '940'}" data-shot-view-height="500" role="button" tabindex="0" aria-label="${esc(markerLabel)}" transform="translate(${x.toFixed(1)} ${y.toFixed(1)})"><circle class="shot-marker-hit-area" r="24"></circle><text text-anchor="middle" dy=".36em">${made ? '○' : '×'}</text><title>${esc(markerLabel)}</title></g>`;
   }).join('');
   const interaction = interactive ? 'data-action="pro-shot-point" role="button" tabindex="0"' : 'role="img"';
   const shotDirection = selectionSide === 'opponent' ? oppositeDirection(attackDirection) : attackDirection;
@@ -398,7 +407,7 @@ export function aggregatePlayerDetailWithGames(report, id, mode = 'total', games
   return `${options}<p class="shared-game-context">${esc(context)}</p><div class="player-detail-name"><span class="jersey">${esc(basePlayer.number)}</span><h3>${esc(basePlayer.name)}</h3><div class="detail-points"><b>${value(playerStats.PTS)}</b> PTS</div></div>${shooting(playerStats, averageMode ? games.length : selectedDetail ? 1 : games.length)}<div class="detail-stats">${DETAIL_STAT_KEYS.map(key => `<div><span>${({ OREB: 'OR', DREB: 'DR', PF: 'F' }[key] || key)}</span><strong>${value(playerStats[key])}</strong></div>`).join('')}</div>`;
 }
 export function settingsView(s) {
-  return shell(s, `${heading('PREFERENCES', '設定とデータ')}<section class="panel settings-panel"><h2>入力・表示</h2><label class="setting-row"><span><strong>連続入力</strong><small>標準・Proでシュート後にAST / OR・DRを提案</small></span><input type="checkbox" role="switch" id="continuous" ${s.preferences.continuous ? 'checked' : ''}></label><label class="setting-row"><span><strong>外観</strong><small>見やすい明るさを選択</small></span><select id="theme" aria-label="外観">${[['system', '端末に合わせる'], ['light', 'ライト'], ['dark', 'ダーク']].map(([v, label]) => `<option value="${v}" ${s.preferences.theme === v ? 'selected' : ''}>${label}</option>`).join('')}</select></label></section><section class="panel settings-panel"><h2>受け取った共有レポート</h2><p class="help">共有された1試合のファイルを、データへ取り込まず読み取り専用で開きます。</p><label class="button primary full" for="shared-report-file">${icon('share')}共有レポートを開く</label><input type="file" id="shared-report-file" accept=".json,application/json" class="sr-only"></section><section class="panel settings-panel"><h2>バックアップ</h2><p class="help">試合・チーム・設定を1つのJSONに保存します。定期的に「ファイル」などへ書き出してください。</p>${action('export-json', `${icon('download')}全データを書き出す`, 'button primary full')}<label class="button secondary full spaced" for="restore-file">JSONから復元</label><input type="file" id="restore-file" accept=".json,application/json" class="sr-only"><p class="help">復元前に内容を検証し、件数を表示します。復元すると現在の全データが置き換わります。</p></section><section class="panel settings-panel"><h2>この端末の保存状態</h2><div class="storage-status">${statusChip(s)}<span>${s.data.teams.length}チーム / ${s.data.games.length}試合 / ${activeEvents(s.data.events).length}記録</span></div><p class="help">${s.pwa.error ? esc(s.pwa.error) : s.pwa.ready ? 'アプリ本体のキャッシュが完了しました。通信がなくても利用できます。' : '初回のキャッシュ完了までオンラインでお待ちください。'}</p>${s.pwa.update ? '<p class="notice">更新があります。下のボタンから適用できます。</p>' + action('apply-update', '最新版に更新', 'button primary full') : action('check-update', '最新版を確認', 'button secondary full')}${action('persist', '保存領域の保持をリクエスト', 'button secondary full')}<p class="help" id="persist-status">ブラウザのデータ削除や端末の故障に備え、JSONバックアップもご利用ください。</p></section><section class="panel settings-panel"><h2>iPhoneのホーム画面に追加</h2><ol class="install-steps"><li>Safariでこのアプリを開く</li><li>共有メニューから「ホーム画面に追加」</li><li>表示される場合は「Webアプリとして開く」をONにし、追加</li><li>追加したアプリを起動し、「オフライン利用OK」を確認</li></ol></section><p class="version-note">COURTSIDE 2.2.25 · BUILT FOR THE SIDELINES</p>`);
+  return shell(s, `${heading('PREFERENCES', '設定とデータ')}<section class="panel settings-panel"><h2>入力・表示</h2><label class="setting-row"><span><strong>連続入力</strong><small>標準・Proでシュート後にAST / OR・DRを提案</small></span><input type="checkbox" role="switch" id="continuous" ${s.preferences.continuous ? 'checked' : ''}></label><label class="setting-row"><span><strong>外観</strong><small>見やすい明るさを選択</small></span><select id="theme" aria-label="外観">${[['system', '端末に合わせる'], ['light', 'ライト'], ['dark', 'ダーク']].map(([v, label]) => `<option value="${v}" ${s.preferences.theme === v ? 'selected' : ''}>${label}</option>`).join('')}</select></label></section><section class="panel settings-panel"><h2>受け取った共有レポート</h2><p class="help">共有された1試合のファイルを、データへ取り込まず読み取り専用で開きます。</p><label class="button primary full" for="shared-report-file">${icon('share')}共有レポートを開く</label><input type="file" id="shared-report-file" accept=".json,application/json" class="sr-only"></section><section class="panel settings-panel"><h2>バックアップ</h2><p class="help">試合・チーム・設定を1つのJSONに保存します。定期的に「ファイル」などへ書き出してください。</p>${action('export-json', `${icon('download')}全データを書き出す`, 'button primary full')}<label class="button secondary full spaced" for="restore-file">JSONから復元</label><input type="file" id="restore-file" accept=".json,application/json" class="sr-only"><p class="help">復元前に内容を検証し、件数を表示します。復元すると現在の全データが置き換わります。</p></section><section class="panel settings-panel"><h2>この端末の保存状態</h2><div class="storage-status">${statusChip(s)}<span>${s.data.teams.length}チーム / ${s.data.games.length}試合 / ${activeEvents(s.data.events).length}記録</span></div><p class="help">${s.pwa.error ? esc(s.pwa.error) : s.pwa.ready ? 'アプリ本体のキャッシュが完了しました。通信がなくても利用できます。' : '初回のキャッシュ完了までオンラインでお待ちください。'}</p>${s.pwa.update ? '<p class="notice">更新があります。下のボタンから適用できます。</p>' + action('apply-update', '最新版に更新', 'button primary full') : action('check-update', '最新版を確認', 'button secondary full')}${action('persist', '保存領域の保持をリクエスト', 'button secondary full')}<p class="help" id="persist-status">ブラウザのデータ削除や端末の故障に備え、JSONバックアップもご利用ください。</p></section><section class="panel settings-panel"><h2>iPhoneのホーム画面に追加</h2><ol class="install-steps"><li>Safariでこのアプリを開く</li><li>共有メニューから「ホーム画面に追加」</li><li>表示される場合は「Webアプリとして開く」をONにし、追加</li><li>追加したアプリを起動し、「オフライン利用OK」を確認</li></ol></section><p class="version-note">COURTSIDE 2.2.26 · BUILT FOR THE SIDELINES</p>`);
 }
 export function pickerHTML(g, events, type, options = {}) {
   const on = lineup(g, events); const tracked = g.starters.length === 5 && !options.plain;
@@ -467,8 +476,8 @@ function fullCourtShotChartMapHTML(shots, playerId, players = []) {
       const area = shotZoneLabel(normalized.zone) || '位置不明';
       const result = normalized.made ? '○ 成功' : '× 失敗';
       const points = shotTypeLabel(raw);
-      const label = `${player} · ${area} · ${result}。タップで詳細を表示`;
-      return `<g class="pro-shot-chart-marker ${normalized.made ? 'made' : 'miss'}" data-action="shot-details" role="button" tabindex="0" data-shot-player="${esc(player)}" data-shot-area="${esc(area)}" data-shot-result="${esc(result)}"${points ? ` data-shot-points="${esc(points)}"` : ''} aria-label="${esc(label)}" transform="translate(${(normalized.x * 940).toFixed(1)} ${(normalized.y * 500).toFixed(1)})"><circle class="shot-marker-hit-area" r="24"></circle><text text-anchor="middle" dy=".36em">${normalized.made ? '○' : '×'}</text><title>${esc(label)}</title></g>`;
+      const label = `${player} · ${area} · ${result}。押し続けると詳細を表示`;
+      return `<g class="pro-shot-chart-marker ${normalized.made ? 'made' : 'miss'}" data-shot-marker="chart" role="button" tabindex="0" data-shot-player="${esc(player)}" data-shot-area="${esc(area)}" data-shot-result="${esc(result)}" data-shot-points="${esc(points)}" data-shot-x="${(normalized.x * 940).toFixed(1)}" data-shot-y="${(normalized.y * 500).toFixed(1)}" data-shot-view-width="940" data-shot-view-height="500" aria-label="${esc(label)}" transform="translate(${(normalized.x * 940).toFixed(1)} ${(normalized.y * 500).toFixed(1)})"><circle class="shot-marker-hit-area" r="24"></circle><text text-anchor="middle" dy=".36em">${normalized.made ? '○' : '×'}</text><title>${esc(label)}</title></g>`;
     })
     .join('');
   const summary = SHOT_ZONES.map(zone => { const stats = totals[zone.id]; return `<div class="pro-shot-zone-summary-item"><span>${esc(zone.label)}</span><strong>${stats.made}/${stats.attempts}</strong><b>${percent(stats.made, stats.attempts)}</b></div>`; }).join('');

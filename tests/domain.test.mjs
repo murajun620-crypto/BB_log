@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, eventLabel, fullCourtPointFromHalf, halfCourtPointFromFull, isBackcourtPoint, normalizeShotZone, opponentLineup, oppositeDirection, percent, lineup, validateGame, validateTeam, makePeriods, shotPointsFromPoint, shotZoneForEvent, shotZoneFromPoint, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
-import { gameFormView, isIPhonePortrait, isIPhoneUserAgent, PRO_HALF_COURT_MARKINGS, liveSettingsHTML, proLiveView, proShotDetailsHTML, shotZonePicker, shotChartMapHTML, strategyBoardHTML } from '../js/views.js';
+import { gameFormView, isIPhonePortrait, isIPhoneUserAgent, PRO_HALF_COURT_MARKINGS, liveSettingsHTML, proLiveView, shotMarkerDetailFeedbackHTML, shotZonePicker, shotChartMapHTML, strategyBoardHTML } from '../js/views.js';
 
 const fixture = () => {
   const players = Array.from({ length: 6 }, (_, i) => ({ id: `player-${i}`, number: `${i + 4}`, name: `選手${i + 1}` }));
@@ -212,7 +212,8 @@ test('exact Pro shot positions render as markers with an area summary', () => {
   ], null, 'points', [{ id: 'player-0', number: '4', name: '選手1' }]);
   assert.match(chart, /pro-shot-chart-map/);
   assert.equal((chart.match(/class="pro-shot-chart-marker [^"]+/g) || []).length, 2);
-  assert.equal((chart.match(/data-action="shot-details"/g) || []).length, 2);
+  assert.equal((chart.match(/data-shot-marker="chart"/g) || []).length, 2);
+  assert.doesNotMatch(chart, /data-action="shot-details"/);
   assert.match(chart, /data-shot-player="4 選手1"/);
   assert.match(chart, /data-shot-area="左ウイング3P"/);
   assert.match(chart, /data-shot-points="3P"/);
@@ -248,11 +249,13 @@ test('Pro shot input uses result buttons, auto-selects points and skips the cour
   assert.doesNotMatch(field, /pro-court-zone-boundaries/);
   const savedShot = { id: 'saved-shot-1', gameId: game.id, periodId: game.currentPeriodId, eventType: '3PM', playerId: 'player-0', points: 3, timestamp: new Date().toISOString(), seq: 1, shotX: .3, shotY: .1, shotZone: 'three-left-wing' };
   const history = proLiveView(state, game, [savedShot]);
-  assert.match(history, /data-action="pro-shot-details" data-event-id="saved-shot-1"/);
-  assert.match(history, /選手とシュートエリアを表示/);
-  const details = proShotDetailsHTML(game, savedShot);
-  assert.match(details, /シュートエリア.*左ウイング3P/);
-  assert.match(details, /シュート種別.*3P/);
+  assert.match(history, /data-shot-marker="pro-live" data-event-id="saved-shot-1"/);
+  assert.match(history, /押し続けると選手・シュートエリア・種別を表示/);
+  const details = shotMarkerDetailFeedbackHTML({ player: '4 選手1', area: '左ウイング3P', result: '○ 成功', points: '3P', x: 282, y: 50 });
+  assert.match(details, /shot-marker-detail-feedback/);
+  assert.match(details, /○ 成功 · 3P/);
+  assert.match(details, /4 選手1/);
+  assert.match(details, /左ウイング3P/);
   const feedback = proLiveView({ ...state, proShotFeedback: { gameId: game.id, eventId: 'feedback-1', eventType: '3PM', shotX: 140 / 940, shotY: 35 / 500, shotZone: 'three-left-corner' } }, game, events);
   assert.match(feedback, /class="pro-shot-area-feedback" data-shot-area="左コーナー3P"/);
   assert.match(feedback, /シュートエリア/);

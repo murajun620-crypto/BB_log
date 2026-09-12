@@ -1,16 +1,16 @@
 import { parseSharePayload } from '../../js/shared-report.js';
 import { openCloudShare } from '../../js/cloud-share.js';
-import { shotChartMapHTML, shotDetailHTML } from '../../js/views.js';
+import { shotChartMapHTML, shotMarkerDetailFeedbackHTML } from '../../js/views.js';
 
 const app = document.querySelector('#app');
 const playerDialog = document.querySelector('#player-dialog');
-const shotDialog = document.querySelector('#shot-dialog');
 let report = null;
 let requestNumber = 0;
 let displayMode = 'total';
 let selectedGameIndex = null;
 let playerDisplay = 'total';
 let shotDisplayMode = 'points';
+let activeShotMarkerFeedback = null;
 
 const esc = value => String(value ?? '').replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
 const percent = (made, attempts) => attempts ? `${(made / attempts * 100).toFixed(1)}%` : '—';
@@ -96,7 +96,7 @@ async function render(password = '') {
   if (typeof password !== 'string') password = '';
   const sequence = ++requestNumber;
   if (playerDialog.open) playerDialog.close();
-  if (shotDialog?.open) shotDialog.close();
+  clearShotMarkerFeedback();
   const payload = payloadFromHash();
   const short = location.hash.match(/^#s\/([A-Za-z0-9_-]{22})$/);
   report = null;
@@ -132,11 +132,21 @@ async function render(password = '') {
   }
 }
 
-function showShotDetails(marker) {
-  if (!shotDialog) return;
-  shotDialog.innerHTML = `<div class="dialog-handle"></div><button class="dialog-close" type="button" data-close-shot-dialog aria-label="閉じる">×</button><h2 id="shot-dialog-title">シュート詳細</h2>${shotDetailHTML({ player: marker.dataset.shotPlayer || '選手不明', area: marker.dataset.shotArea || '位置不明', result: marker.dataset.shotResult || '', points: marker.dataset.shotPoints || '' })}`;
-  if (!shotDialog.open && typeof shotDialog.showModal === 'function') shotDialog.showModal();
-  else if (!shotDialog.open) shotDialog.setAttribute('open', '');
+function clearShotMarkerFeedback() {
+  activeShotMarkerFeedback?.feedback?.remove();
+  activeShotMarkerFeedback = null;
+}
+function showShotMarkerFeedback(marker) {
+  if (!marker?.dataset.shotMarker) return;
+  const values = marker.dataset;
+  const x = Number(values.shotX), y = Number(values.shotY), width = Number(values.shotViewWidth), height = Number(values.shotViewHeight);
+  if (![x, y, width, height].every(Number.isFinite)) return;
+  clearShotMarkerFeedback();
+  marker.insertAdjacentHTML('afterend', shotMarkerDetailFeedbackHTML({ player: values.shotPlayer, area: values.shotArea, result: values.shotResult, points: values.shotPoints, x, y, width, height }));
+  activeShotMarkerFeedback = { marker, feedback: marker.nextElementSibling };
+}
+function shotMarkerFromTarget(target) {
+  return target?.closest?.('[data-shot-marker]');
 }
 
 function openPlayer(playerId) {
@@ -147,6 +157,7 @@ function openPlayer(playerId) {
   const source = selectedGame || report;
   const player = source.players.find(item => item.id === playerId);
   if (!player) return;
+  clearShotMarkerFeedback();
   const selectedCount = selectedGame ? 1 : report.gameCount;
   const playerValue = value => playerDisplay === 'average' && !selectedGame ? average(value, report.gameCount) : value;
   const options = detailGames.length > 1 ? `<div class="detail-mode-row"><span>表示する試合</span><select data-action="select-player-game" data-player-id="${esc(playerId)}" aria-label="選手スタッツの対象試合"><option value="total" ${playerDisplay === 'total' ? 'selected' : ''}>全試合集計</option><option value="average" ${playerDisplay === 'average' ? 'selected' : ''}>1試合平均</option>${detailGames.map((game, index) => `<option value="${index}" ${String(gameIndex) === String(index) ? 'selected' : ''}>${index + 1}試合目：${esc(formatDate(game.date))} vs. ${esc(game.opponentName)}</option>`).join('')}</select></div>` : '';
@@ -156,10 +167,18 @@ function openPlayer(playerId) {
   else if (!playerDialog.open) playerDialog.setAttribute('open', '');
 }
 
+document.addEventListener('pointerdown', event => {
+  const marker = shotMarkerFromTarget(event.target);
+  if (!marker || event.button > 0) return;
+  event.preventDefault();
+  showShotMarkerFeedback(marker);
+  marker.setPointerCapture?.(event.pointerId);
+});
+document.addEventListener('pointerup', clearShotMarkerFeedback);
+document.addEventListener('pointercancel', clearShotMarkerFeedback);
+window.addEventListener('blur', clearShotMarkerFeedback);
 document.addEventListener('click', event => {
   const toggle = event.target.closest('[data-action]');
-  if (event.target.closest('[data-close-shot-dialog]')) { shotDialog?.close(); return; }
-  if (toggle?.dataset.action === 'shot-details') { showShotDetails(toggle); return; }
   if (toggle?.dataset.action === 'select-player-game') return;
   if (toggle?.dataset.action === 'toggle-shot-display') {
     const root = toggle.closest('[data-shot-display-root]');
@@ -187,10 +206,14 @@ document.addEventListener('click', event => {
 });
 document.addEventListener('keydown', event => {
   if (!['Enter', ' '].includes(event.key)) return;
-  const marker = event.target.closest?.('[data-action="shot-details"]');
-  if (!marker) return;
-  event.preventDefault();
-  marker.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  const marker = shotMarkerFromTarget(event.target);
+  if (marker) {
+    event.preventDefault();
+    showShotMarkerFeedback(marker);
+  }
+});
+document.addEventListener('keyup', event => {
+  if (['Enter', ' '].includes(event.key) && shotMarkerFromTarget(event.target)) clearShotMarkerFeedback();
 });
 document.addEventListener('change', event => {
   const select = event.target.closest('[data-action="select-player-game"]');
@@ -198,9 +221,6 @@ document.addEventListener('change', event => {
 });
 playerDialog.addEventListener('click', event => {
   if (event.target === playerDialog) playerDialog.close();
-});
-shotDialog?.addEventListener('click', event => {
-  if (event.target === shotDialog) shotDialog.close();
 });
 window.addEventListener('hashchange', render);
 // Recheck stopped/expired links on return; reports and passwords never enter Cache Storage.
