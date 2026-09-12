@@ -601,6 +601,7 @@ const handlers = {
     if (g?.mode !== 'pro' || g.opponentTracking !== 'player') return;
     if ((g.opponentRoster || []).length < 5) return toast('相手選手は5人以上入力してください。', true);
     if ((g.opponentRoster || []).length <= 5) return toast('交代できる相手ベンチ選手がいません。', true);
+    if (opponentLineup(g, gameEvents(g)).length !== 5) return toast('相手チームのコート上選手を5人に設定してから交代してください。', true);
     state.proOpponentSelection = null; state.proSelection = null; state.proSub = null; state.proOpponentSub = { outPlayerId: null }; render();
   },
   'pro-select-opponent': button => {
@@ -891,6 +892,11 @@ document.addEventListener('submit', event => {
     const previousInitialIds = Array.isArray(g.opponentStarters) && g.opponentStarters.length ? g.opponentStarters : (g.opponentRoster || []).slice(0, 5).map(player => player.id);
     const previousInitialNumbers = new Set(previousInitialIds.map(id => previousOpponentPlayers.get(id)?.number).filter(Boolean));
     const opponentStarters = opponentRoster.filter(player => previousInitialNumbers.has(player.number)).slice(0, 5).map(player => player.id);
+    const hasOpponentSubstitutions = activeEvents(gameEvents(g)).some(event => event.side === 'opponent' && event.eventType === 'SUB');
+    if (!hasOpponentSubstitutions && opponentStarters.length < 5) {
+      const selectedStarters = new Set(opponentStarters);
+      opponentRoster.forEach(player => { if (opponentStarters.length < 5 && !selectedStarters.has(player.id)) { selectedStarters.add(player.id); opponentStarters.push(player.id); } });
+    }
     const clockEnabled = mode === 'pro' && values.get('clockEnabled') === 'on';
     const currentSeconds = currentClockSeconds(g);
     const period = g.periods.find(candidate => candidate.id === g.currentPeriodId);
