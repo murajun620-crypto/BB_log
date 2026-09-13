@@ -77,6 +77,14 @@ export function createGame(game) {
     tx.objectStore('settings').delete('gameDraft'); result(game);
   });
 }
+export function importSharedRecords({ team = null, games = [], events = [] }) {
+  return checkedWrite(['teams', 'games', 'events'], (tx, result) => {
+    if (team) tx.objectStore('teams').add(team);
+    for (const game of games) tx.objectStore('games').add(game);
+    for (const event of events) tx.objectStore('events').add(event);
+    result({ team, games, events });
+  });
+}
 export function commitGame(game, event = null) {
   return checkedWrite(['games', 'events'], (tx, result, fail) => {
     const store = tx.objectStore('games');

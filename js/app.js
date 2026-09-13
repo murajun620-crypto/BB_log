@@ -3,6 +3,7 @@ import { uid, localDate, STATS, activeEvents, attackDirectionForPeriod, fullCour
 import { backupObject, parseBackup, gameCSV, download, copyText, shareFile, shareUrl } from './transfer.js';
 import { boxScoreImage, playerStatsImage, safeFilename, shareImage } from './share-image.js';
 import { createSharedReport, createAggregateSharedReport, createCompressedSharePayload, parseSharePayload, parseSharedReport, sharedReportFile } from './shared-report.js';
+import { buildImportedRecords } from './shared-import.js';
 import * as view from './views.js';
 import { cloudShareEnabled } from './cloud-share.js';
 import { cloudSettingsHTML, setupCloudShareUI } from './cloud-share-ui.js';
@@ -489,7 +490,7 @@ function render() {
   } else { state.page = 'home'; html = view.homeView(state); }
   clearShotMarkerFeedback();
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.37 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.38 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode, game()?.roster, true, [game()]));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -772,6 +773,24 @@ function aggregateShareContext() {
     description: `${summary.teamName}の${games.length}試合分の合計スタッツ・1試合平均`,
   };
 }
+function matchingTeamForSharedReport(report) {
+  return state.data.teams.find(team => team.name === report.teamName && team.players.length === report.players.length && report.players.every(player => team.players.some(candidate => candidate.number === player.number && candidate.name === player.name))) || null;
+}
+async function importCloudReport({ report, shareId, title }) {
+  if (!report || !shareId) throw new Error('共有データを確認できません。');
+  if (state.data.games.some(game => game.importedFromShareId === shareId)) throw new Error('この共有リンクはすでにこの端末へ取り込まれています。');
+  const normalized = parseSharedReport(JSON.stringify({ app: 'courtside-report', schemaVersion: 1, report }));
+  const existingTeam = matchingTeamForSharedReport(normalized);
+  const records = buildImportedRecords(normalized, { existingTeam, sourceId: shareId, sourceTitle: title || '' });
+  const validationTeam = records.team || existingTeam;
+  validateTeam(validationTeam);
+  const eventsByGame = new Map(records.games.map(game => [game.id, []]));
+  for (const event of records.events) eventsByGame.get(event.gameId)?.push(event);
+  for (const game of records.games) validateGame(game, eventsByGame.get(game.id) || []);
+  await db.importSharedRecords(records);
+  await refresh();
+  return { games: records.games.length };
+}
 function reportLink(payload) {
   // Reader has its own app shell, so a received link never exposes recording controls.
   const link = new URL('./reader/', location.href);
@@ -969,7 +988,7 @@ function openStrategyBoard() {
   setupStrategyBoard();
 }
 const handlers = {
-  ...setupCloudShareUI({ showSheet, closeSheet, toast, refreshView: render, getGame: game, getEvents: gameEvents, getAggregate: aggregateShareContext, message: gameShareMessage }),
+  ...setupCloudShareUI({ showSheet, closeSheet, toast, refreshView: render, getGame: game, getEvents: gameEvents, getAggregate: aggregateShareContext, message: gameShareMessage, importReport: importCloudReport }),
   'close-sheet': closeSheet,
   'apply-update': applyPWAUpdate,
   'check-update': checkPWAUpdate,

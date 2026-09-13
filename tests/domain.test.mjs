@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, eventLabel, fullCourtPointFromHalf, halfCourtPointFromFull, isBackcourtPoint, normalizeShotZone, opponentLineup, oppositeDirection, percent, lineup, validateGame, validateTeam, makePeriods, shotDirectionForEvent, shotPointsFromPoint, shotZoneForEvent, shotZoneFromPoint, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
+import { buildImportedRecords } from '../js/shared-import.js';
 import { gameFormView, isIPhonePortrait, isIPhoneUserAgent, PRO_HALF_COURT_MARKINGS, liveSettingsHTML, proLiveView, shotChartHTML, shotMarkerDetailFeedbackHTML, shotZonePicker, shotChartMapHTML, strategyBoardHTML } from '../js/views.js';
 
 const fixture = () => {
@@ -19,6 +20,7 @@ const proLiveCss = readFileSync(new URL('../css/app.css', import.meta.url), 'utf
 const shotChartCss = readFileSync(new URL('../css/shot-chart.css', import.meta.url), 'utf8');
 const appSource = readFileSync(new URL('../js/app.js', import.meta.url), 'utf8');
 const readerSource = readFileSync(new URL('../reader/js/reader.js', import.meta.url), 'utf8');
+const cloudShareUiSource = readFileSync(new URL('../js/cloud-share-ui.js', import.meta.url), 'utf8');
 
 test('all 14 stat types aggregate accurately, independently of event input order', () => {
   const { game, events, add } = fixture();
@@ -472,6 +474,46 @@ test('selected games aggregate team and player stats by stable player identity',
   assert.equal(shared.games[0].players.find(player => player.id === 'p1').stats.PTS, 3);
   assert.equal(shared.games[1].players.find(player => player.id === 'p2').stats.PTS, 2);
   assert.equal(shared.tournamentName, '夏季総体');
+});
+test('managed cloud shares can open Reader, copy their URL, and import a local finished game', () => {
+  const { game, events, add } = fixture();
+  add('3PM', { shotX: .68, shotY: .5, shotZone: shotZoneFromPoint('3PM', .68, .5) });
+  add('2PM', { shotX: .2, shotY: .5, shotZone: shotZoneFromPoint('2PM', .2, .5) });
+  add('FTM');
+  add('AST', { playerId: 'player-1' });
+  add('OPP', { points: 3 }); add('OPP', { points: 2 });
+  const report = parseSharedReport(JSON.stringify(createSharedReport(game, events)));
+  const records = buildImportedRecords(report, { sourceId: 'share-id-123', sourceTitle: '共有テスト' });
+  validateTeam(records.team);
+  const grouped = new Map(records.games.map(candidate => [candidate.id, []]));
+  for (const event of records.events) grouped.get(event.gameId).push(event);
+  records.games.forEach(candidate => validateGame(candidate, grouped.get(candidate.id)));
+  const summary = aggregate(records.games[0], records.events);
+  assert.equal(records.games[0].status, 'finished');
+  assert.equal(summary.team.PTS, report.team.PTS);
+  assert.equal(summary.opponent, report.opponentScore);
+  assert.deepEqual(summary.periods.map(period => [period.home, period.away]), report.periods.map(period => [period.home, period.away]));
+  assert.equal(records.games[0].importedFromShareId, 'share-id-123');
+  assert.match(cloudShareUiSource, /data-cloud-copy/);
+  assert.match(cloudShareUiSource, /target="_blank" rel="noopener">Readerで開く/);
+  assert.match(cloudShareUiSource, /importReport\(\{ report, shareId: entry\.id/);
+});
+test('aggregate cloud shares import each source game and can reuse an identical local team', () => {
+  const first = fixture(); first.add('3PM');
+  const second = structuredClone(first.game);
+  second.id = 'game-2'; second.date = '2026-09-06'; second.opponentName = 'VISITORS 2';
+  second.periods = makePeriods('quarters', 4, 8); second.currentPeriodId = second.periods[0].id;
+  const secondEvent = { id: uid(), gameId: second.id, periodId: second.currentPeriodId, eventType: '2PM', playerId: 'player-1', points: 2, timestamp: new Date().toISOString(), seq: 1 };
+  const report = parseSharedReport(JSON.stringify(createAggregateSharedReport([first.game, second], [...first.events, secondEvent])));
+  const records = buildImportedRecords(report, { sourceId: 'aggregate-share-id', sourceTitle: '大会合計' });
+  assert.equal(records.games.length, 2);
+  records.games.forEach(game => validateGame(game, records.events.filter(event => event.gameId === game.id)));
+  assert.equal(aggregate(records.games[0], records.events.filter(event => event.gameId === records.games[0].id)).team.PTS, 3);
+  assert.equal(aggregate(records.games[1], records.events.filter(event => event.gameId === records.games[1].id)).team.PTS, 2);
+  const reused = buildImportedRecords(report, { existingTeam: records.team, sourceId: 'aggregate-share-id-2' });
+  assert.equal(reused.team, null);
+  assert.equal(reused.games[0].teamId, records.team.id);
+  assert.deepEqual(reused.games[0].roster.map(player => player.id), records.team.players.map(player => player.id));
 });
 test('substitutions support undo; deleting a prerequisite substitution is rejected', () => {
   const { game, events, add } = fixture();
