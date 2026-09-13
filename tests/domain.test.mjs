@@ -63,12 +63,16 @@ test('Pro games preserve clock, opponent player stats and exact shot positions',
   assert.equal(shotZoneFromPoint(null, 819 / 940, 90 / 500), 'two-left-wing');
   assert.equal(shotZoneFromPoint(null, 820 / 940, 410 / 500), 'two-right-corner');
   assert.equal(shotZoneFromPoint(null, 819 / 940, 410 / 500), 'two-right-wing');
-  assert.equal(shotZoneFromPoint('3PM', 140 / 940, 35 / 500), 'three-left-corner');
+  // Both 3P and 2P corners share the left x=120 / right x=820 split.
+  assert.equal(shotZoneFromPoint('3PM', 120 / 940, 35 / 500), 'three-left-corner');
   assert.equal(shotZoneFromPoint('3PM', 140 / 940, 50 / 500), 'three-left-wing');
-  assert.equal(shotZoneFromPoint('3PM', 145 / 940, 48 / 500), 'three-left-corner');
-  assert.equal(shotZoneFromPoint('3PM', 210 / 940, 48 / 500), 'three-left-corner');
-  assert.equal(shotZoneFromPoint('3PM', 211 / 940, 48 / 500), 'three-left-wing');
-  assert.equal(shotZoneFromPoint(null, 140 / 940, 40 / 500), 'three-left-corner');
+  assert.equal(shotZoneFromPoint('3PM', 120 / 940, 48 / 500), 'three-left-corner');
+  assert.equal(shotZoneFromPoint('3PM', 121 / 940, 48 / 500), 'three-left-wing');
+  assert.equal(shotZoneFromPoint('3PM', 820 / 940, 48 / 500), 'three-left-corner');
+  assert.equal(shotZoneFromPoint('3PM', 819 / 940, 48 / 500), 'three-left-wing');
+  assert.equal(shotZoneFromPoint('3PM', 820 / 940, 452 / 500), 'three-right-corner');
+  assert.equal(shotZoneFromPoint('3PM', 819 / 940, 452 / 500), 'three-right-wing');
+  assert.equal(shotZoneFromPoint(null, 100 / 940, 40 / 500), 'three-left-corner');
   assert.equal(shotZoneFromPoint(null, 300 / 940, 40 / 500), 'three-left-wing');
   assert.equal(shotZoneForEvent({ eventType: '3PM', shotZone: 'three-left-corner', shotX: .3, shotY: .15 }), 'three-left-wing');
   assert.equal(shotZoneForEvent({ eventType: '2PM', shotZone: 'three-top', shotX: .68, shotY: .5 }), 'two-top');
@@ -108,11 +112,12 @@ test('only portrait iPhones use the Pro half court and its markings face the upp
   assert.equal(isIPhonePortrait('Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X)', false), false);
   assert.equal(isIPhonePortrait('Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X)', true), false);
   assert.match(PRO_HALF_COURT_MARKINGS, /M0 24H500V476H0ZM48 24V145M452 24V145M452 145A230 230 0 0 1 48 145/);
-  assert.match(PRO_HALF_COURT_MARKINGS, /M452 210H500M0 210H48M324 120H452M48 120H176/);
+  assert.doesNotMatch(PRO_HALF_COURT_MARKINGS, /M452 210H500|M0 210H48|M324 120H452|M48 120H176/);
   const fullCourt = proLiveView({}, fixture().game, []);
   assert.match(fullCourt, /pro-court-surface" x="24" y="0" width="892" height="500"/);
   assert.match(fullCourt, /M24 0H916V500H24ZM470 0V500M24 48H145/);
-  assert.match(fullCourt, /M210 0V48M210 452V500M730 0V48M730 452V500M120 48V176M120 324V452M820 48V176M820 324V452/);
+  assert.match(fullCourt, /M24 176H210V324H24M916 176H730V324H916/);
+  assert.doesNotMatch(fullCourt, /M210 0V48|M730 0V48|M120 48V176|M820 48V176/);
   assert.match(PRO_HALF_COURT_MARKINGS, /M304 210A54 54 0 0 1 196 210/);
   assert.match(PRO_HALF_COURT_MARKINGS, /M287 74A37 37 0 0 1 213 74/);
 });
@@ -201,7 +206,7 @@ test('shot court map enables only matching two- or three-point zones', () => {
   assert.match(twoPoint, /data-zone="rim"/);
   assert.match(threePoint, /data-zone="three-top"/);
   assert.match(twoPoint, /viewBox="0 0 500 500"/);
-  assert.match(twoPoint, /M324 120H452M48 120H176/);
+  assert.match(twoPoint, /M176 24H324V210H176/);
   assert.match(twoPoint, /court-zone-fill/);
   assert.doesNotMatch(twoPoint, /<text/);
 });
@@ -268,7 +273,7 @@ test('Pro shot input uses result buttons, auto-selects points and skips the cour
   assert.match(details, /4 選手1/);
   assert.match(details, /左ウイング3P/);
   assert.doesNotMatch(details, /○ 成功 · 3P/);
-  const feedback = proLiveView({ ...state, proShotFeedback: { gameId: game.id, eventId: 'feedback-1', eventType: '3PM', shotX: 140 / 940, shotY: 35 / 500, shotZone: 'three-left-corner' } }, game, events);
+  const feedback = proLiveView({ ...state, proShotFeedback: { gameId: game.id, eventId: 'feedback-1', eventType: '3PM', shotX: 120 / 940, shotY: 35 / 500, shotZone: 'three-left-corner' } }, game, events);
   assert.match(feedback, /class="pro-shot-area-feedback" data-shot-area="左コーナー3P"/);
   assert.match(feedback, /シュートエリア/);
   assert.match(proLiveView(state, { ...game, currentPeriodId: game.periods[2].id }, events), /← 左ゴール/);
@@ -286,9 +291,13 @@ test('shot marker feedback is readable and court selection is suppressed', () =>
   assert.match(shotChartCss, /\.shot-court-map, \.shot-chart-map, \.pro-court \{[^}]*user-select: none/);
   assert.match(shotChartCss, /\.shot-marker-detail-feedback-text \{[^}]*font-size: 16px/);
   assert.match(shotChartCss, /\.pro-shot-draft-preview \{[^}]*pointer-events: none/);
+  assert.match(shotChartCss, /\.pro-shot-draft-preview-halo \{[^}]*stroke: #f0b24a/);
   assert.match(shotChartCss, /\.pro-shot-editing[^}]*touch-action: none/);
   assert.match(appSource, /document\.addEventListener\('pointermove'/);
   assert.match(appSource, /document\.addEventListener\('touchforcechange'/);
+  assert.match(appSource, /preview\.classList\.add\('pro-shot-marker', 'pro-shot-draft-preview'/);
+  assert.match(appSource, /moveProShotMarker\(gesture\.marker/);
+  assert.match(appSource, /restoreProShotMarker\(activeProShotGesture\)/);
   assert.match(appSource, /data-action="pro-edit-shot-point"/);
   assert.match(appSource, /activeShotMarkerFeedback\?\.marker === marker/);
   assert.doesNotMatch(readerSource, /document\.addEventListener\('pointerup', clearShotMarkerFeedback\)/);

@@ -39,19 +39,51 @@ function proShotViewPoint(button, point, direction) {
   if (button.classList.contains('pro-court-half')) return halfCourtPointFromFull(point.x, point.y, direction);
   return { x: point.x * 940, y: point.y * 500 };
 }
+function proShotGestureMade(gesture) {
+  const type = gesture?.kind === 'edit' ? gesture.context?.event?.eventType : gesture?.context?.selection?.type;
+  return String(type || '').endsWith('M');
+}
+function moveProShotMarker(marker, viewPoint) {
+  if (!marker || !viewPoint) return;
+  marker.setAttribute('transform', `translate(${viewPoint.x.toFixed(1)} ${viewPoint.y.toFixed(1)})`);
+  marker.dataset.shotX = viewPoint.x.toFixed(1);
+  marker.dataset.shotY = viewPoint.y.toFixed(1);
+}
+function restoreProShotMarker(gesture) {
+  const marker = gesture?.marker;
+  const origin = gesture?.markerOrigin;
+  if (!marker || !origin) return;
+  if (origin.transform === null) marker.removeAttribute('transform'); else marker.setAttribute('transform', origin.transform);
+  marker.dataset.shotX = origin.shotX;
+  marker.dataset.shotY = origin.shotY;
+  marker.classList.remove('pro-shot-marker-dragging');
+}
 function updateProShotPreview(gesture) {
   if (!gesture?.button || !gesture.point) return;
   const point = proShotViewPoint(gesture.button, gesture.point, gesture.direction);
   if (!point) return;
+  if (gesture.marker) {
+    moveProShotMarker(gesture.marker, point);
+    gesture.marker.classList.add('pro-shot-marker-dragging');
+    return;
+  }
   let preview = gesture.button.querySelector('[data-pro-shot-draft]');
   if (!preview) {
-    preview = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-    preview.classList.add('pro-shot-draft-preview');
+    preview = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    preview.classList.add('pro-shot-marker', 'pro-shot-draft-preview', proShotGestureMade(gesture) ? 'made' : 'miss');
     preview.dataset.proShotDraft = 'true';
+    preview.setAttribute('aria-hidden', 'true');
+    const halo = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    halo.classList.add('pro-shot-draft-preview-halo');
+    halo.setAttribute('r', '24');
+    const symbol = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    symbol.setAttribute('text-anchor', 'middle');
+    symbol.setAttribute('dy', '.36em');
+    symbol.textContent = proShotGestureMade(gesture) ? '○' : '×';
+    preview.append(halo, symbol);
     gesture.button.append(preview);
   }
-  preview.setAttribute('cx', point.x.toFixed(1));
-  preview.setAttribute('cy', point.y.toFixed(1));
+  preview.setAttribute('transform', `translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})`);
 }
 function clearProShotPreview(gesture) {
   gesture?.button?.querySelector('[data-pro-shot-draft]')?.remove();
@@ -268,7 +300,9 @@ function startProShotGesture(surface, event, kind) {
   const direction = kind === 'edit' ? shotEditDirection(context) : context.shotDirection;
   const point = proShotPointFromEvent(surface, event, direction);
   if (!point) return false;
-  activeProShotGesture = { kind, button: surface, context, direction, pointerId: event.pointerId, point };
+  const marker = kind === 'edit' ? shotMarkerByEventId(context.event.id, surface) : null;
+  const markerOrigin = marker ? { transform: marker.getAttribute('transform'), shotX: marker.dataset.shotX, shotY: marker.dataset.shotY } : null;
+  activeProShotGesture = { kind, button: surface, context, direction, pointerId: event.pointerId, point, marker, markerOrigin };
   surface.setPointerCapture?.(event.pointerId);
   updateProShotPreview(activeProShotGesture);
   event.preventDefault();
@@ -296,11 +330,14 @@ function finishProShotGesture(event) {
   releaseProShotPointer(gesture, event.pointerId);
   activeProShotGesture = null;
   suppressProShotClickOnce();
-  if (gesture.kind === 'edit') saveShotPosition(gesture.context, point);
+  gesture.marker?.classList.remove('pro-shot-marker-dragging');
+  if (gesture.kind === 'edit') saveShotPosition(gesture.context, point, gesture);
   else recordProShotAt(gesture.button, event, point, gesture.context);
+  event.preventDefault();
   return true;
 }
 function cancelProShotGesture() {
+  restoreProShotMarker(activeProShotGesture);
   clearProShotPreview(activeProShotGesture);
   releaseProShotPointer(activeProShotGesture, activeProShotGesture?.pointerId);
   activeProShotGesture = null;
@@ -450,7 +487,7 @@ function render() {
   } else { state.page = 'home'; html = view.homeView(state); }
   clearShotMarkerFeedback();
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.31 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.32 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode, game()?.roster, true));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -629,21 +666,26 @@ function recordProShotAt(button, event, pointOverride = null, contextOverride = 
   const shotExtra = { ...(zone ? { shotZone: zone } : {}), shotX: x, shotY: y, ...(isOpponent ? { side: 'opponent' } : {}) };
   return busy(async () => { const saved = await record(eventType, selection.playerId, shotExtra); if (isOpponent) state.proOpponentSelection = null; else state.proSelection = null; showProShotFeedback(saved); if (!isOpponent) offerFollowup(saved); });
 }
-function saveShotPosition(context, point) {
+function saveShotPosition(context, point, gesture = null) {
   const { g, event } = context;
-  if (!point || ![point.x, point.y].every(value => Number.isFinite(value) && value >= 0 && value <= 1)) return toast('シュート位置を取得できません。', true);
+  if (!point || ![point.x, point.y].every(value => Number.isFinite(value) && value >= 0 && value <= 1)) { restoreProShotMarker(gesture); return toast('シュート位置を取得できません。', true); }
   const attackDirection = attackDirectionForPeriod(g);
-  if (isBackcourtPoint(attackDirection, point.x, event.side === 'opponent')) return toast('バックコートには移動できません。', true);
+  if (isBackcourtPoint(attackDirection, point.x, event.side === 'opponent')) { restoreProShotMarker(gesture); return toast('バックコートには移動できません。', true); }
   const points = shotPointsFromPoint(point.x, point.y);
   const zone = shotZoneFromPoint(null, point.x, point.y);
-  if (!points || !zone) return toast('シュートエリアを判定できません。', true);
+  if (!points || !zone) { restoreProShotMarker(gesture); return toast('シュートエリアを判定できません。', true); }
   const eventType = `${points}${event.eventType.endsWith('M') ? 'PM' : 'PX'}`;
   return busy(async () => {
-    await saveGameChange(g, { ...event, eventType, points: STATS[eventType]?.points || 0, shotX: point.x, shotY: point.y, shotZone: zone, updatedAt: new Date().toISOString() });
-    cancelShotPositionEdit();
-    closeSheet();
-    render();
-    toast('シュート位置を変更しました。');
+    try {
+      await saveGameChange(g, { ...event, eventType, points: STATS[eventType]?.points || 0, shotX: point.x, shotY: point.y, shotZone: zone, updatedAt: new Date().toISOString() });
+      cancelShotPositionEdit();
+      closeSheet();
+      render();
+      toast('シュート位置を変更しました。');
+    } catch (error) {
+      restoreProShotMarker(gesture);
+      throw error;
+    }
   });
 }
 function pickStat(type, options = {}) {

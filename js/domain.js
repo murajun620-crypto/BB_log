@@ -34,8 +34,8 @@ export const PRO_COURT = {
   courtLeftX: 24, courtRightX: 916,
   leftBasketX: 74, rightBasketX: 866,
   threeLineCornerY: 48, threeZoneCornerY: 48,
-  // 3P corner/wing: left x=210, right x=730.
-  threeCornerDepth: 210,
+  // 3P corner/wing: left x=120, right x=820.
+  threeCornerDepth: 120,
   // 2P corner/wing: left x=120, right x=820.
   twoCornerDepth: 120,
   threeRadius: 230, leftThreeArcEndpointX: 145, rightThreeArcEndpointX: 795,
