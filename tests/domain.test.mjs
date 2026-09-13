@@ -286,7 +286,10 @@ test('Pro shot input uses result buttons, auto-selects points and skips the cour
   const savedShot = { id: 'saved-shot-1', gameId: game.id, periodId: game.currentPeriodId, eventType: '3PM', playerId: 'player-0', points: 3, timestamp: new Date().toISOString(), seq: 1, shotX: .3, shotY: .1, shotZone: 'three-left-wing' };
   const history = proLiveView(state, game, [savedShot]);
   assert.match(history, /data-shot-marker="pro-live" data-shot-editable="true" data-event-id="saved-shot-1"/);
+  assert.match(history, /class="pro-shot-marker made pro-shot-marker-selecting"/);
   assert.match(history, /タップで詳細、長押し／3Dタッチで編集/);
+  const idle = proLiveView({ proSelection: null, proOpponentSelection: null }, game, [savedShot]);
+  assert.doesNotMatch(idle, /pro-shot-marker-selecting/);
   const details = shotMarkerDetailFeedbackHTML({ player: '4 選手1', area: '左ウイング3P', result: '○ 成功', points: '3P', x: 282, y: 50 });
   assert.match(details, /shot-marker-detail-feedback/);
   assert.match(details, /4 選手1/);
@@ -317,6 +320,7 @@ test('shot marker feedback is readable and court selection is suppressed', () =>
   assert.match(appSource, /preview\.classList\.add\('pro-shot-marker', 'pro-shot-draft-preview'/);
   assert.match(appSource, /moveProShotMarker\(gesture\.marker/);
   assert.match(appSource, /restoreProShotMarker\(activeProShotGesture\)/);
+  assert.match(appSource, /if \(shotSurface && !backcourt && startProShotGesture\(shotSurface, event, 'new'\)\) return;/);
   assert.match(appSource, /data-action="pro-edit-shot-point"/);
   assert.match(appSource, /activeShotMarkerFeedback\?\.marker === marker/);
   assert.doesNotMatch(readerSource, /document\.addEventListener\('pointerup', clearShotMarkerFeedback\)/);

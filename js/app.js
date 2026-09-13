@@ -489,7 +489,7 @@ function render() {
   } else { state.page = 'home'; html = view.homeView(state); }
   clearShotMarkerFeedback();
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.36 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.37 · BUILT FOR THE SIDELINES`);
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode, game()?.roster, true, [game()]));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -1209,9 +1209,10 @@ document.addEventListener('pointerdown', event => {
   const backcourt = target.closest?.('[data-action="pro-backcourt"]');
   const editSurface = target.closest?.('[data-action="pro-edit-shot-point"]');
   if (editSurface && state.proShotEdit && !backcourt && startProShotGesture(editSurface, event, 'edit')) return;
+  const shotSurface = target.closest?.('[data-action="pro-shot-point"]');
+  if (shotSurface && !backcourt && startProShotGesture(shotSurface, event, 'new')) return;
   const marker = shotMarkerFromTarget(event.target);
   if (marker && startShotMarkerGesture(marker, event)) return;
-  const shotSurface = target.closest?.('[data-action="pro-shot-point"]');
   if (shotSurface && !backcourt) startProShotGesture(shotSurface, event, 'new');
 });
 document.addEventListener('pointermove', event => {
