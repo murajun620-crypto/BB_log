@@ -1,5 +1,5 @@
 import * as db from './db.js';
-import { uid, localDate, STATS, activeEvents, attackDirectionForPeriod, fullCourtPointFromHalf, halfCourtPointFromFull, isBackcourtPoint, makePeriods, opponentLineup, oppositeDirection, shotPointsFromPoint, shotZoneFromPoint, shotZoneForEvent, shotZoneLabel, validateTeam, validateGame, lineup, eventLabel, aggregate, aggregateGames } from './domain.js';
+import { uid, localDate, STATS, activeEvents, attackDirectionForPeriod, fullCourtPointFromHalf, halfCourtPointFromFull, isBackcourtPoint, makePeriods, opponentLineup, oppositeDirection, shotDirectionForEvent, shotPointsFromPoint, shotZoneFromPoint, shotZoneForEvent, shotZoneLabel, validateTeam, validateGame, lineup, eventLabel, aggregate, aggregateGames } from './domain.js';
 import { backupObject, parseBackup, gameCSV, download, copyText, shareFile, shareUrl } from './transfer.js';
 import { boxScoreImage, playerStatsImage, safeFilename, shareImage } from './share-image.js';
 import { createSharedReport, createAggregateSharedReport, createCompressedSharePayload, parseSharePayload, parseSharedReport, sharedReportFile } from './shared-report.js';
@@ -92,10 +92,12 @@ const getSetting = key => state.data.settings.find(s => s.key === key)?.value;
 const game = () => state.data.games.find(g => g.id === state.gameId);
 const gameEvents = (g = game()) => state.data.events.filter(e => e.gameId === g?.id);
 function showProShotFeedback(event) {
-  const zone = shotZoneFromPoint(null, event?.shotX, event?.shotY);
+  const g = state.data.games.find(candidate => candidate.id === event?.gameId);
+  const shotDirection = shotDirectionForEvent(g, event);
+  const zone = shotZoneForEvent(event, shotDirection);
   if (!event?.gameId || !zone) return;
   clearTimeout(proShotFeedbackTimer);
-  state.proShotFeedback = { gameId: event.gameId, eventId: event.id, eventType: event.eventType, side: event.side, shotX: event.shotX, shotY: event.shotY, shotZone: zone };
+  state.proShotFeedback = { gameId: event.gameId, eventId: event.id, eventType: event.eventType, side: event.side, shotX: event.shotX, shotY: event.shotY, shotZone: zone, shotDirection };
   render();
   const { gameId, eventId } = state.proShotFeedback;
   proShotFeedbackTimer = setTimeout(() => {
@@ -142,7 +144,7 @@ function shotPlayerName(g, event) {
 }
 function shotMarkerEditHTML(context) {
   const { g, event } = context;
-  const area = view.esc(shotZoneLabel(shotZoneForEvent(event)) || '位置不明');
+  const area = view.esc(shotZoneLabel(shotZoneForEvent(event, shotDirectionForEvent(g, event))) || '位置不明');
   const player = view.esc(shotPlayerName(g, event));
   const attributes = `data-event-id="${view.esc(event.id)}" data-shot-game-id="${view.esc(g.id)}"`;
   return `<p class="help">選手：${player}<br>シュートエリア：${area}</p><div class="card-list"><button type="button" class="button secondary full" data-action="change-shot-position" ${attributes}>位置を変更</button><button type="button" class="button secondary full" data-action="open-shot-player-picker" ${attributes}>選手を変更</button><button type="button" class="button danger full" data-action="delete-shot-marker" ${attributes}>シュートを削除</button></div>`;
@@ -487,13 +489,13 @@ function render() {
   } else { state.page = 'home'; html = view.homeView(state); }
   clearShotMarkerFeedback();
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.33 · BUILT FOR THE SIDELINES`);
-  if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode, game()?.roster, true));
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.34 · BUILT FOR THE SIDELINES`);
+  if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode, game()?.roster, true, [game()]));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
     const chartEvents = state.aggregateGameId ? gameEvents(state.data.games.find(candidate => candidate.id === state.aggregateGameId)) : state.data.events.filter(event => selectedForChart.some(candidate => candidate.id === event.gameId));
     const chartPlayers = state.aggregateGameId ? state.data.games.find(candidate => candidate.id === state.aggregateGameId)?.roster || [] : selectedForChart.flatMap(candidate => candidate.roster);
-    [...app.querySelectorAll('.section-heading')].find(element => element.querySelector('h2')?.textContent === 'チーム・シューティング')?.insertAdjacentHTML('beforebegin', view.shotChartHTML(chartEvents, null, state.shotDisplayMode, chartPlayers, true));
+    [...app.querySelectorAll('.section-heading')].find(element => element.querySelector('h2')?.textContent === 'チーム・シューティング')?.insertAdjacentHTML('beforebegin', view.shotChartHTML(chartEvents, null, state.shotDisplayMode, chartPlayers, true, selectedForChart));
   }
   if (page === 'shared') [...app.querySelectorAll('.section-heading')].find(element => element.querySelector('h2')?.textContent === 'チーム・シューティング')?.insertAdjacentHTML('beforebegin', view.sharedShotChartHTML(sharedReport.shots || [], null, state.shotDisplayMode, sharedReport.players));
   if (page === 'settings') app.querySelector('.settings-panel')?.insertAdjacentHTML('afterend', cloudSettingsHTML());
@@ -662,17 +664,18 @@ function recordProShotAt(button, event, pointOverride = null, contextOverride = 
   if (isBackcourtPoint(attackDirection, x, isOpponent)) return toast('バックコートは選択できません。', true);
   const points = shotPointsFromPoint(x, y);
   const eventType = `${points}${selection.type.endsWith('M') ? 'PM' : 'PX'}`;
-  const zone = shotZoneFromPoint(null, x, y);
+  const zone = shotZoneFromPoint(null, x, y, shotDirection);
   const shotExtra = { ...(zone ? { shotZone: zone } : {}), shotX: x, shotY: y, ...(isOpponent ? { side: 'opponent' } : {}) };
   return busy(async () => { const saved = await record(eventType, selection.playerId, shotExtra); if (isOpponent) state.proOpponentSelection = null; else state.proSelection = null; showProShotFeedback(saved); if (!isOpponent) offerFollowup(saved); });
 }
 function saveShotPosition(context, point, gesture = null) {
   const { g, event } = context;
   if (!point || ![point.x, point.y].every(value => Number.isFinite(value) && value >= 0 && value <= 1)) { restoreProShotMarker(gesture); return toast('シュート位置を取得できません。', true); }
-  const attackDirection = attackDirectionForPeriod(g);
+  const attackDirection = attackDirectionForPeriod(g, event.periodId);
   if (isBackcourtPoint(attackDirection, point.x, event.side === 'opponent')) { restoreProShotMarker(gesture); return toast('バックコートには移動できません。', true); }
   const points = shotPointsFromPoint(point.x, point.y);
-  const zone = shotZoneFromPoint(null, point.x, point.y);
+  const shotDirection = event.side === 'opponent' ? oppositeDirection(attackDirection) : attackDirection;
+  const zone = shotZoneFromPoint(null, point.x, point.y, shotDirection);
   if (!points || !zone) { restoreProShotMarker(gesture); return toast('シュートエリアを判定できません。', true); }
   const eventType = `${points}${event.eventType.endsWith('M') ? 'PM' : 'PX'}`;
   return busy(async () => {
@@ -1171,7 +1174,7 @@ const handlers = {
   },
   finish: () => confirm('試合を終了しますか？', 'BOX SCOREに結果をまとめます。終了後も履歴の編集や記録の再開ができます。', '試合を終了', async () => { const g = await saveGameChange({ ...game(), status: 'finished' }); closeSheet(); location.hash = `#box/${g.id}`; }),
   reopen: () => confirm('記録を再開しますか？', 'この試合を記録中に戻します。', '再開する', async () => { const g = await saveGameChange({ ...game(), status: 'live' }); closeSheet(); location.hash = `#live/${g.id}`; }),
-  'player-detail': button => showSheet('選手スタッツ', `${view.playerDetail(game(), gameEvents(), button.dataset.id)}${view.shotChartHTML(gameEvents(), button.dataset.id, state.shotDisplayMode, game()?.roster, true)}`),
+  'player-detail': button => showSheet('選手スタッツ', `${view.playerDetail(game(), gameEvents(), button.dataset.id)}${view.shotChartHTML(gameEvents(), button.dataset.id, state.shotDisplayMode, game()?.roster, true, [game()])}`),
   'shared-player-detail': button => showSheet('選手スタッツ', `${view.sharedPlayerDetail(sharedReport, button.dataset.id)}${view.sharedShotChartHTML(sharedReport.shots || [], button.dataset.id, state.shotDisplayMode, sharedReport.players)}`),
   'share-options': () => {
     const g = game();

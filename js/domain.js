@@ -84,11 +84,17 @@ export function shotPointsFromPoint(x, y) {
   if (![x, y].every(value => Number.isFinite(value) && value >= 0 && value <= 1)) return null;
   return pointIsThree(x, y) ? 3 : 2;
 }
-export function shotZoneFromPoint(type, x, y) {
+export function shotZoneFromPoint(type, x, y, direction = null) {
   if ((type !== null && type !== undefined && !SHOT_EVENT_TYPES.has(type) && !['FGM', 'FGX'].includes(type)) || ![x, y].every(value => Number.isFinite(value) && value >= 0 && value <= 1)) return null;
   const px = x * PRO_COURT.width, py = y * PRO_COURT.height, leftBasket = px <= PRO_COURT.centerX;
   const basketX = leftBasket ? PRO_COURT.leftBasketX : PRO_COURT.rightBasketX;
   const side = (py - PRO_COURT.centerY) / ((PRO_COURT.height - 48) / 2), distanceFromCenter = Math.abs(side);
+  // The zone side is named from the shooter's point of view. With the right
+  // basket as the target, the upper half is the shooter's left; with the left
+  // basket as the target, the lower half is the shooter's left.
+  const sideLabel = direction === 'left'
+    ? (side < 0 ? 'right' : 'left')
+    : (side < 0 ? 'left' : 'right');
   const prefix = type?.startsWith('3') ? 'three' : type?.startsWith('2') ? 'two' : pointIsThree(x, y) ? 'three' : 'two';
   const distanceToBasket = Math.hypot(px - basketX, py - PRO_COURT.centerY);
   const inPaint = leftBasket ? px <= PRO_COURT.leftFreeThrowX : px >= PRO_COURT.rightFreeThrowX;
@@ -98,11 +104,16 @@ export function shotZoneFromPoint(type, x, y) {
   const inCorner = prefix === 'three'
     ? depth <= PRO_COURT.threeCornerDepth && (py <= PRO_COURT.threeZoneCornerY || py >= PRO_COURT.height - PRO_COURT.threeZoneCornerY)
     : depth <= PRO_COURT.twoCornerDepth;
-  if (inCorner) return `${prefix}-${side < 0 ? 'left' : 'right'}-corner`;
-  if (distanceFromCenter > .27) return `${prefix}-${side < 0 ? 'left' : 'right'}-wing`;
+  if (inCorner) return `${prefix}-${sideLabel}-corner`;
+  if (distanceFromCenter > .27) return `${prefix}-${sideLabel}-wing`;
   return `${prefix}-top`;
 }
-export function shotZoneForEvent(event) {
+export function shotDirectionForEvent(game, event) {
+  if (!['left', 'right'].includes(game?.attackDirection)) return null;
+  const direction = attackDirectionForPeriod(game, event?.periodId);
+  return event?.side === 'opponent' ? oppositeDirection(direction) : direction;
+}
+export function shotZoneForEvent(event, direction = null) {
   const x = Number.isFinite(event?.shotX) ? event.shotX : event?.x;
   const y = Number.isFinite(event?.shotY) ? event.shotY : event?.y;
   // A saved event already has its 2P/3P type. Keep that type when rendering
@@ -110,7 +121,12 @@ export function shotZoneForEvent(event) {
   // point family from the score that was recorded. New Pro taps still use the
   // coordinate classifier before the event is saved.
   const type = SHOT_EVENT_TYPES.has(event?.eventType) ? event.eventType : null;
-  return shotZoneFromPoint(type, x, y) || normalizeShotZone(event?.shotZone ?? event?.zone);
+  const shotDirection = ['left', 'right'].includes(direction)
+    ? direction
+    : ['left', 'right'].includes(event?.shotDirection)
+      ? event.shotDirection
+      : ['left', 'right'].includes(event?.direction) ? event.direction : null;
+  return shotZoneFromPoint(type, x, y, shotDirection) || normalizeShotZone(event?.shotZone ?? event?.zone);
 }
 export const shotZoneLabel = zoneId => SHOT_ZONES.find(zone => zone.id === normalizeShotZone(zoneId))?.label || '';
 export const uid = () => crypto.randomUUID();
@@ -200,7 +216,7 @@ export function eventLabel(game, event) {
   const player = (id, side = 'home') => { const p = (side === 'opponent' ? game.opponentRoster || [] : game.roster).find(p => p.id === id); return p ? side === 'opponent' ? [p.number, p.name].filter(Boolean).join(' ') : `${p.number} ${p.name}` : '不明'; };
   if (event.eventType === 'OPP') return `相手 +${event.points}`;
   if (event.eventType === 'SUB') return `${event.side === 'opponent' ? '相手 ' : ''}${player(event.outPlayerId, event.side)} → ${player(event.inPlayerId, event.side)}`;
-  const eventZone = shotZoneForEvent(event);
+  const eventZone = shotZoneForEvent(event, shotDirectionForEvent(game, event));
   const zone = eventZone ? ` · ${shotZoneLabel(eventZone)}` : '';
   return `${event.side === 'opponent' ? '相手 ' : ''}${player(event.playerId, event.side)} · ${STATS[event.eventType]?.label || event.eventType}${zone}`;
 }

@@ -1,4 +1,4 @@
-import { aggregate, aggregateGames, blankStats, formatGame, normalizeShotZone, shotZoneForEvent, SHOT_ZONE_IDS } from './domain.js';
+import { aggregate, aggregateGames, blankStats, formatGame, normalizeShotZone, shotDirectionForEvent, shotZoneForEvent, SHOT_ZONE_IDS } from './domain.js';
 
 const STAT_KEYS = Object.keys(blankStats());
 const BASE_STAT_KEYS = ['P2M', 'P2A', 'P3M', 'P3A', 'FTM', 'FTA', 'OREB', 'DREB', 'AST', 'STL', 'BLK', 'TO', 'PF', 'FD'];
@@ -9,9 +9,11 @@ const statsCopy = stats => Object.fromEntries(STAT_KEYS.map(key => [key, stats[k
 function shotsCopy(game, events) {
   const playerIds = new Map(game.roster.map((player, index) => [player.id, `p${index + 1}`]));
   return events.filter(event => !event.deletedAt && playerIds.has(event.playerId) && ['2PM', '2PX', '3PM', '3PX'].includes(event.eventType)).map(event => {
-    const zone = shotZoneForEvent(event);
+    const direction = shotDirectionForEvent(game, event);
+    const zone = shotZoneForEvent(event, direction);
     if (!SHOT_ZONE_IDS.has(zone)) return null;
     const shot = { playerId: playerIds.get(event.playerId), zone, result: event.eventType.endsWith('M') ? 'made' : 'miss' };
+    if (direction) shot.direction = direction;
     if ([event.shotX, event.shotY].every(value => Number.isFinite(value) && value >= 0 && value <= 1)) { shot.x = event.shotX; shot.y = event.shotY; }
     return shot;
   }).filter(Boolean);
@@ -116,6 +118,7 @@ function validateShots(shots, players) {
   const ids = new Set(players.map(player => player.id));
   for (const shot of shots) {
     ensure(shot && ids.has(shot.playerId) && SHOT_ZONE_IDS.has(shot.zone) && ['made', 'miss'].includes(shot.result));
+    if (shot.direction !== undefined) ensure(['left', 'right'].includes(shot.direction));
     if (shot.x !== undefined || shot.y !== undefined) ensure([shot.x, shot.y].every(value => Number.isFinite(value) && value >= 0 && value <= 1));
   }
 }
@@ -209,7 +212,7 @@ function compactReport(game, events) {
     p: report.periods.map(period => [period.label, period.home, period.away]),
     a: statsArray(report.team),
     r: report.players.map(player => [player.number, player.name, statsArray(player.stats)]),
-    z: report.shots?.map(shot => [Number(shot.playerId.slice(1)) - 1, shot.zone, shot.result === 'made' ? 1 : 0, shot.x, shot.y]),
+    z: report.shots?.map(shot => [Number(shot.playerId.slice(1)) - 1, shot.zone, shot.result === 'made' ? 1 : 0, shot.x, shot.y, ...(shot.direction ? [shot.direction] : [])]),
   };
 }
 
@@ -324,7 +327,7 @@ export async function parseSharePayload(payload) {
     periods: compact.p.map(period => ({ label: period[0], home: period[1], away: period[2] })),
     team: statsObject(compact.a),
     players: compact.r.map((player, index) => ({ id: `p${index + 1}`, number: player[0], name: player[1], stats: statsObject(player[2]) })),
-    shots: Array.isArray(compact.z) ? compact.z.map(shot => ({ playerId: `p${shot[0] + 1}`, zone: shot[1], result: shot[2] ? 'made' : 'miss', ...(Number.isFinite(shot[3]) && Number.isFinite(shot[4]) ? { x: shot[3], y: shot[4] } : {}) })) : undefined,
+    shots: Array.isArray(compact.z) ? compact.z.map(shot => ({ playerId: `p${shot[0] + 1}`, zone: shot[1], result: shot[2] ? 'made' : 'miss', ...(Number.isFinite(shot[3]) && Number.isFinite(shot[4]) ? { x: shot[3], y: shot[4] } : {}), ...(['left', 'right'].includes(shot[5]) ? { direction: shot[5] } : {}) })) : undefined,
   };
   return parseSharedReport(JSON.stringify({ app: 'courtside-report', schemaVersion: 1, report }));
 }

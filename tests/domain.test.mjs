@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, eventLabel, fullCourtPointFromHalf, halfCourtPointFromFull, isBackcourtPoint, normalizeShotZone, opponentLineup, oppositeDirection, percent, lineup, validateGame, validateTeam, makePeriods, shotPointsFromPoint, shotZoneForEvent, shotZoneFromPoint, uid } from '../js/domain.js';
+import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, eventLabel, fullCourtPointFromHalf, halfCourtPointFromFull, isBackcourtPoint, normalizeShotZone, opponentLineup, oppositeDirection, percent, lineup, validateGame, validateTeam, makePeriods, shotDirectionForEvent, shotPointsFromPoint, shotZoneForEvent, shotZoneFromPoint, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
-import { gameFormView, isIPhonePortrait, isIPhoneUserAgent, PRO_HALF_COURT_MARKINGS, liveSettingsHTML, proLiveView, shotMarkerDetailFeedbackHTML, shotZonePicker, shotChartMapHTML, strategyBoardHTML } from '../js/views.js';
+import { gameFormView, isIPhonePortrait, isIPhoneUserAgent, PRO_HALF_COURT_MARKINGS, liveSettingsHTML, proLiveView, shotChartHTML, shotMarkerDetailFeedbackHTML, shotZonePicker, shotChartMapHTML, strategyBoardHTML } from '../js/views.js';
 
 const fixture = () => {
   const players = Array.from({ length: 6 }, (_, i) => ({ id: `player-${i}`, number: `${i + 4}`, name: `選手${i + 1}` }));
@@ -62,6 +62,16 @@ test('Pro games preserve clock, opponent player stats and exact shot positions',
   assert.equal(shotZoneFromPoint(null, 820 / 940, 90 / 500), 'two-left-corner');
   assert.equal(shotZoneFromPoint(null, 819 / 940, 90 / 500), 'two-left-wing');
   assert.equal(shotZoneFromPoint(null, 820 / 940, 410 / 500), 'two-right-corner');
+  // Left/right labels are from the shooter's point of view when a target
+  // direction is supplied, while the legacy no-direction call stays global.
+  assert.equal(shotZoneFromPoint('2PM', 120 / 940, 410 / 500, 'left'), 'two-left-corner');
+  assert.equal(shotZoneFromPoint('2PM', 120 / 940, 90 / 500, 'left'), 'two-right-corner');
+  assert.equal(shotZoneFromPoint('2PM', 820 / 940, 90 / 500, 'right'), 'two-left-corner');
+  assert.equal(shotZoneForEvent({ eventType: '2PM', shotX: 120 / 940, shotY: 410 / 500 }, 'left'), 'two-left-corner');
+  assert.equal(shotDirectionForEvent(game, events[0]), 'right');
+  game.attackDirection = 'left';
+  assert.equal(shotDirectionForEvent(game, events[0]), 'left');
+  game.attackDirection = 'right';
   assert.equal(shotZoneFromPoint(null, 819 / 940, 410 / 500), 'two-right-wing');
   // Both 3P and 2P corners share the left x=120 / right x=820 split.
   assert.equal(shotZoneFromPoint('3PM', 120 / 940, 35 / 500), 'three-left-corner');
@@ -84,7 +94,7 @@ test('Pro games preserve clock, opponent player stats and exact shot positions',
   assert.equal(shotPointsFromPoint(675 / 940, .5), 2); assert.equal(shotPointsFromPoint(674 / 940, .5), 3);
   assert.equal(shotZoneFromPoint(null, 74 / 940, .5), 'rim'); assert.equal(shotZoneFromPoint(null, 180 / 940, .5), 'paint');
   const pointShared = createSharedReport(game, [events[0]]);
-  assert.deepEqual(pointShared.report.shots[0], { playerId: 'p1', zone: 'three-top', result: 'made', x: .68, y: .5 });
+  assert.deepEqual(pointShared.report.shots[0], { playerId: 'p1', zone: 'three-top', result: 'made', direction: 'right', x: .68, y: .5 });
   const pointPayload = await createCompressedSharePayload(game, [events[0]]);
   const parsedPointPayload = await parseSharePayload(pointPayload);
   assert.deepEqual(parsedPointPayload.shots, pointShared.report.shots);
@@ -241,6 +251,15 @@ test('exact Pro shot positions render as markers with an area summary', () => {
   assert.doesNotMatch(chart, /pro-court-zone-boundaries/);
   assert.match(chart, /1\/2/);
   assert.match(chart, /50\.0%/);
+});
+test('point and area displays use the same shooter-relative side for left attacks', () => {
+  const { game } = fixture();
+  game.mode = 'pro'; game.attackDirection = 'left';
+  const shot = { id: 'left-side-shot', gameId: game.id, periodId: game.currentPeriodId, eventType: '2PM', playerId: 'player-0', points: 2, timestamp: new Date().toISOString(), seq: 1, shotX: 120 / 940, shotY: 410 / 500, shotZone: 'two-right-corner' };
+  const chart = shotChartHTML([shot], null, 'points', game.roster, true, [game]);
+  assert.match(chart, /data-shot-area="左コーナー2P"/);
+  assert.match(chart, /data-zone="two-left-corner"/);
+  assert.doesNotMatch(chart, /data-shot-area="右コーナー2P"/);
 });
 test('shot chart display can start in area mode while keeping point and area views', () => {
   const chart = shotChartMapHTML([
