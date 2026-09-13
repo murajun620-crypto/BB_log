@@ -5,7 +5,8 @@ import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod,
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
 import { buildImportedRecords } from '../js/shared-import.js';
-import { gameFormView, isIPhonePortrait, isIPhoneUserAgent, PRO_HALF_COURT_MARKINGS, liveSettingsHTML, proLiveView, shotChartHTML, shotMarkerDetailFeedbackHTML, shotZonePicker, shotChartMapHTML, strategyBoardHTML } from '../js/views.js';
+import { gameFormView, isIPhonePortrait, isIPhoneUserAgent, PRO_HALF_COURT_MARKINGS, liveSettingsHTML, proLiveView, settingsView, shotChartHTML, shotMarkerDetailFeedbackHTML, shotZonePicker, shotChartMapHTML, strategyBoardHTML } from '../js/views.js';
+import { APP_VERSION } from '../js/version.js';
 
 const fixture = () => {
   const players = Array.from({ length: 6 }, (_, i) => ({ id: `player-${i}`, number: `${i + 4}`, name: `選手${i + 1}` }));
@@ -406,6 +407,13 @@ test('opponent roster uses one row with separate number and name boxes', () => {
   assert.doesNotMatch(html, /name="opponentRosterNamesText"/);
   assert.doesNotMatch(html, /ローラー/);
 });
+test('v3 settings render all preference controls once and expose a cloud slot', () => {
+  const html = settingsView({ page: 'settings', preferences: { continuous: true, keepAwake: true, advancedMode: true, theme: 'dark' }, data: { teams: [], games: [], events: [] }, pwa: { ready: false, error: '', update: false } });
+  for (const id of ['continuous', 'advancedMode', 'keepAwake', 'theme']) assert.equal((html.match(new RegExp(`id="${id}"`, 'g')) || []).length, 1);
+  assert.match(html, /data-cloud-settings-slot/);
+  assert.match(html, new RegExp(`COURTSIDE ${APP_VERSION}`));
+  assert.match(html, /settings-help/);
+});
 test('opponent roster rows are also used in Pro game creation', () => {
   const { team } = fixture();
   const html = gameFormView({ data: { teams: [team] }, preferences: { advancedMode: false } }, { teamId: team.id, date: '2026-09-05', opponentName: 'VISITORS', format: 'quarters', count: 4, minutes: 8, participants: team.players.map(player => player.id), starters: team.players.slice(0, 5).map(player => player.id), mode: 'pro', clockEnabled: false, opponentTracking: 'player', opponentRosterNumbersText: '8\n12', opponentRosterNamesText: '相手A\n相手B' });
@@ -496,6 +504,8 @@ test('managed cloud shares can open Reader, copy their URL, and import a local f
   assert.equal(records.games[0].importedFromShareId, 'share-id-123');
   assert.match(cloudShareUiSource, /data-cloud-copy/);
   assert.match(cloudShareUiSource, /target="_blank" rel="noopener">Readerで開く/);
+  assert.match(cloudShareUiSource, /cloud-share-actions/);
+  assert.match(cloudShareUiSource, /取り込み済み/);
   assert.match(cloudShareUiSource, /importReport\(\{ report, shareId: entry\.id/);
 });
 test('aggregate cloud shares import each source game and can reuse an identical local team', () => {

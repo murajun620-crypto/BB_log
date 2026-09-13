@@ -7,6 +7,7 @@ import { buildImportedRecords } from './shared-import.js';
 import * as view from './views.js';
 import { cloudShareEnabled } from './cloud-share.js';
 import { cloudSettingsHTML, setupCloudShareUI } from './cloud-share-ui.js';
+import { APP_VERSION } from './version.js';
 
 const app = document.querySelector('#app');
 const sheet = document.querySelector('#sheet');
@@ -490,7 +491,8 @@ function render() {
   } else { state.page = 'home'; html = view.homeView(state); }
   clearShotMarkerFeedback();
   app.innerHTML = html;
-  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE 2.2.38 · BUILT FOR THE SIDELINES`);
+  app.querySelector('.version-note')?.replaceChildren(`COURTSIDE ${APP_VERSION} · BUILT FOR THE SIDELINES`);
+  app.querySelector('.save-state')?.replaceChildren();
   if (page === 'box') app.querySelector('.report-card')?.insertAdjacentHTML('afterend', view.shotChartHTML(gameEvents(game()), null, state.shotDisplayMode, game()?.roster, true, [game()]));
   if (page === 'aggregate') {
     const selectedForChart = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
@@ -499,18 +501,9 @@ function render() {
     [...app.querySelectorAll('.section-heading')].find(element => element.querySelector('h2')?.textContent === 'チーム・シューティング')?.insertAdjacentHTML('beforebegin', view.shotChartHTML(chartEvents, null, state.shotDisplayMode, chartPlayers, true, selectedForChart));
   }
   if (page === 'shared') [...app.querySelectorAll('.section-heading')].find(element => element.querySelector('h2')?.textContent === 'チーム・シューティング')?.insertAdjacentHTML('beforebegin', view.sharedShotChartHTML(sharedReport.shots || [], null, state.shotDisplayMode, sharedReport.players));
-  if (page === 'settings') app.querySelector('.settings-panel')?.insertAdjacentHTML('afterend', cloudSettingsHTML());
-  if (page === 'settings' && !app.querySelector('#keepAwake')) {
-    const continuous = app.querySelector('#continuous');
-    if (continuous) {
-      const row = document.createElement('label'); row.className = 'setting-row';
-      row.innerHTML = `<span><strong>試合中は画面をスリープさせない</strong><small>試合画面を開いている間だけ自動ロックを防ぎます。電池を消費します。</small></span><input type="checkbox" role="switch" id="keepAwake" ${state.preferences.keepAwake ? 'checked' : ''}>`;
-      continuous.closest('.setting-row')?.after(row);
-    }
-    const advanced = document.createElement('label'); advanced.className = 'setting-row';
-    advanced.innerHTML = '<span><strong>Advancedモード</strong><small>2P・3Pのシュート位置を記録します。</small></span><input type="checkbox" role="switch" id="advancedMode">';
-    advanced.querySelector('input').checked = state.preferences.advancedMode;
-    app.querySelector('#continuous')?.closest('.setting-row')?.after(advanced);
+  if (page === 'settings') {
+    const cloudSlot = app.querySelector('[data-cloud-settings-slot]');
+    if (cloudSlot) cloudSlot.outerHTML = cloudSettingsHTML();
   }
   void syncWakeLock();
   if (state.lastError && page === 'live') {
@@ -988,7 +981,7 @@ function openStrategyBoard() {
   setupStrategyBoard();
 }
 const handlers = {
-  ...setupCloudShareUI({ showSheet, closeSheet, toast, refreshView: render, getGame: game, getEvents: gameEvents, getAggregate: aggregateShareContext, message: gameShareMessage, importReport: importCloudReport }),
+  ...setupCloudShareUI({ showSheet, closeSheet, toast, refreshView: render, getGame: game, getEvents: gameEvents, getAggregate: aggregateShareContext, message: gameShareMessage, importReport: importCloudReport, isImportedShare: shareId => state.data.games.some(candidate => candidate.importedFromShareId === shareId) }),
   'close-sheet': closeSheet,
   'apply-update': applyPWAUpdate,
   'check-update': checkPWAUpdate,
