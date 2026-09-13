@@ -336,6 +336,7 @@ test('Pro LIVE keeps substitution and play changes available while guiding the n
   assert.equal(proLiveCss.includes('.pro-live-screen.pro-await-opponent-player .pro-center'), false);
   assert.equal(proLiveCss.includes('.pro-live-screen.pro-await-own-court .pro-action-panel'), false);
   assert.equal(proLiveCss.includes('.pro-live-screen.pro-await-opponent-court .pro-action-panel'), false);
+  assert.match(proLiveCss, /\.pro-direction-button \{[^}]*top: 8px;[^}]*transform: translateX\(-50%\)/);
   assert.match(proLiveCss, /\.pro-shot-area-feedback \{[^}]*animation: pro-shot-area-feedback-fade 3\.2s/);
   assert.match(proLiveCss, /@keyframes pro-shot-area-feedback-fade/);
   assert.match(proLiveCss, /\.pro-shot-marker \{ pointer-events: auto; cursor: pointer; \}/);
