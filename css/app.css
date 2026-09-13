@@ -410,7 +410,7 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-sub-button { min-height: 39px; margin-top: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--muted); font-size: 11px; font-weight: 700; }
 .pro-live-screen.pro-step-ready .pro-court { pointer-events: none; }
 .pro-live-screen.pro-step-ready .pro-player,
-.pro-live-screen.pro-step-ready .pro-roster-key { opacity: .35; filter: grayscale(.8); pointer-events: none; }
+.pro-live-screen.pro-step-ready .pro-roster-key { pointer-events: none; }
 .pro-live-screen.pro-await-own-player .pro-court,
 .pro-live-screen.pro-await-own-player .pro-direction-button,
 .pro-live-screen.pro-await-own-player .pro-away-side,

@@ -309,6 +309,9 @@ test('shot marker feedback is readable and court selection is suppressed', () =>
 test('Pro LIVE keeps substitution and play changes available while guiding the next tap', () => {
   assert.match(proLiveCss, /\.pro-live-screen\.pro-step-ready \.pro-court \{ pointer-events: none; \}/);
   assert.doesNotMatch(proLiveCss, /\.pro-live-screen\.pro-step-ready \.pro-court \{[^}]*opacity/);
+  assert.match(proLiveCss, /\.pro-live-screen\.pro-step-ready \.pro-player,\s*\.pro-live-screen\.pro-step-ready \.pro-roster-key \{ pointer-events: none; \}/);
+  assert.doesNotMatch(proLiveCss, /\.pro-live-screen\.pro-step-ready \.pro-player[^}]*opacity/);
+  assert.match(proLiveCss, /\.pro-live-screen\.pro-await-own-court \.pro-home-side,[^}]*opacity: \.28/);
   assert.equal(proLiveCss.includes('.pro-live-screen.pro-step-ready .pro-sub-button'), false);
   assert.equal(proLiveCss.includes('.pro-live-screen.pro-await-own-player .pro-center'), false);
   assert.equal(proLiveCss.includes('.pro-live-screen.pro-await-opponent-player .pro-center'), false);
