@@ -164,6 +164,15 @@ function proPlayerButton(player, selected, opponent = false, onCourt = false, st
   const fouls = stats.PF ?? 0;
   return `<button class="pro-player ${status} ${selected ? 'selected' : ''}" data-action="${opponent ? 'pro-select-opponent' : 'pro-select-player'}" data-id="${esc(player.id)}" aria-pressed="${selected ? 'true' : 'false'}"><span class="pro-player-name"><strong>${esc(player.number)}</strong>${player.name ? `<span>${esc(player.name)}</span>` : ''}</span><small class="pro-player-stats" aria-label="${points}点、ファウル${fouls}"><span class="pro-player-stat pro-player-stat-score" aria-hidden="true"><em>PTS</em><span class="pro-player-stat-value">${points}</span></span><span class="pro-player-stat pro-player-stat-foul" aria-hidden="true"><em>F</em><span class="pro-player-stat-value">${fouls}</span></span></small></button>`;
 }
+const proJerseyNumber = player => {
+  const number = Number(String(player?.number ?? '').trim());
+  return Number.isFinite(number) ? number : Number.POSITIVE_INFINITY;
+};
+const sortProRoster = (players, onCourt) => [...players].sort((left, right) =>
+  Number(onCourt.has(right.id)) - Number(onCourt.has(left.id))
+  || proJerseyNumber(left) - proJerseyNumber(right)
+  || String(left.number ?? '').localeCompare(String(right.number ?? ''), 'en')
+);
 function proShotAreaFeedbackHTML(feedback, halfCourt, attackDirection) {
   if (!feedback || !Number.isFinite(feedback.shotX) || !Number.isFinite(feedback.shotY)) return '';
   const markerDirection = feedback.side === 'opponent' ? oppositeDirection(attackDirection) : attackDirection;
@@ -248,11 +257,9 @@ export function proLiveView(s, g, events, clockSeconds = null) {
   const visibleOpponentSelection = !opponentShotPointAllowed && PRO_FIELD_SHOT_TYPES.has(opponentSelection.type) ? {} : opponentSelection;
   const onCourt = new Set(lineup(g, events));
   const opponentOnCourt = new Set(opponentLineup(g, events));
-  const ownPlayers = [...g.roster]
-    .sort((left, right) => Number(onCourt.has(right.id)) - Number(onCourt.has(left.id)))
+  const ownPlayers = sortProRoster(g.roster, onCourt)
     .map(player => proPlayerButton(player, selection.playerId === player.id || s.proSub?.outPlayerId === player.id, false, onCourt.has(player.id), a.players[player.id]));
-  const opponentPlayers = [...(g.opponentRoster || [])]
-    .sort((left, right) => Number(opponentOnCourt.has(right.id)) - Number(opponentOnCourt.has(left.id)))
+  const opponentPlayers = sortProRoster(g.opponentRoster || [], opponentOnCourt)
     .map(player => proPlayerButton(player, visibleOpponentSelection.playerId === player.id || s.proOpponentSub?.outPlayerId === player.id, true, opponentOnCourt.has(player.id), a.opponentPlayers[player.id]));
   const selectedAction = selection.type ? PRO_SHOT_ACTIONS.find(actionData => actionData[0] === selection.type)?.[4] || STATS[selection.type]?.name || STATS[selection.type]?.label : '';
   const selectedPlayer = g.roster.find(player => player.id === selection.playerId);

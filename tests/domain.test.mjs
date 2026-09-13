@@ -368,6 +368,22 @@ test('opponent substitutions keep five players on court and use opponent numbers
   assert.deepEqual(opponentLineup(game, events), ['opponent-1', 'opponent-2', 'opponent-3', 'opponent-4', 'opponent-5']);
   assert.equal(eventLabel(game, substitution), '相手 4 → 9');
 });
+test('Pro roster display keeps on-court and bench players ordered by jersey number after substitutions', () => {
+  const { game, events } = fixture();
+  game.mode = 'pro'; game.clockEnabled = false; game.opponentTracking = 'player';
+  game.roster = [...game.roster].reverse();
+  game.opponentRoster = Array.from({ length: 6 }, (_, i) => ({ id: `opponent-${i}`, number: `${i + 4}` })).reverse();
+  game.opponentStarters = game.opponentRoster.slice(0, 5).map(player => player.id);
+  const initial = proLiveView({ proSelection: null, proOpponentSelection: null }, game, events);
+  const ids = (html, actionName) => [...html.matchAll(new RegExp(`data-action="${actionName}" data-id="([^"]+)"`, 'g'))].map(match => match[1]);
+  assert.deepEqual(ids(initial, 'pro-select-player'), ['player-0', 'player-1', 'player-2', 'player-3', 'player-4', 'player-5']);
+  assert.deepEqual(ids(initial, 'pro-select-opponent'), ['opponent-1', 'opponent-2', 'opponent-3', 'opponent-4', 'opponent-5', 'opponent-0']);
+  events.push({ id: uid(), gameId: game.id, periodId: game.currentPeriodId, eventType: 'SUB', side: 'home', playerId: null, outPlayerId: 'player-0', inPlayerId: 'player-5', points: 0, timestamp: new Date().toISOString(), seq: game.nextSeq++ });
+  events.push({ id: uid(), gameId: game.id, periodId: game.currentPeriodId, eventType: 'SUB', side: 'opponent', playerId: null, outPlayerId: 'opponent-5', inPlayerId: 'opponent-0', points: 0, timestamp: new Date().toISOString(), seq: game.nextSeq++ });
+  const afterSubstitution = proLiveView({ proSelection: null, proOpponentSelection: null }, game, events);
+  assert.deepEqual(ids(afterSubstitution, 'pro-select-player'), ['player-1', 'player-2', 'player-3', 'player-4', 'player-5', 'player-0']);
+  assert.deepEqual(ids(afterSubstitution, 'pro-select-opponent'), ['opponent-0', 'opponent-1', 'opponent-2', 'opponent-3', 'opponent-4', 'opponent-5']);
+});
 test('opponent roster uses one row with separate number and name boxes', () => {
   const { game } = fixture();
   game.mode = 'pro'; game.clockEnabled = false; game.opponentTracking = 'player'; game.opponentRoster = [{ id: 'opponent-1', number: '8', name: '相手選手' }];
