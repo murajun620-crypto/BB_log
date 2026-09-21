@@ -79,6 +79,25 @@ test('unprotected snapshots contain only allowlisted fields and expired links ca
     assert.equal(env.DB.sqlite.prepare('SELECT COUNT(*) AS count FROM shares').get().count, 0);
   } finally { env.DB.sqlite.close(); }
 });
+test('custom title and note are stored in management and Reader snapshots', async () => {
+  const env = testEnv();
+  try {
+    const response = await req(env, '/v1/shares', 'POST', { report: fixture().report, title: '準決勝', note: '第4Q終了時点の記録', days: 30 }, testToken);
+    assert.equal(response.status, 200, await response.clone().text());
+    const created = await response.json();
+    assert.equal(created.title, '準決勝');
+    const list = await (await req(env, '/v1/shares', 'GET', undefined, testToken)).json();
+    assert.equal(list.shares[0].title, '準決勝');
+    const open = await req(env, `/v1/shares/${created.id}/open`, 'POST', {});
+    assert.equal(open.status, 200);
+    const opened = await open.json();
+    assert.equal(opened.report.title, '準決勝');
+    assert.equal(opened.report.note, '第4Q終了時点の記録');
+    const detail = await (await req(env, `/v1/shares/${created.id}`, 'GET', undefined, testToken)).json();
+    assert.equal(detail.report.title, '準決勝');
+    assert.equal(detail.report.note, '第4Q終了時点の記録');
+  } finally { env.DB.sqlite.close(); }
+});
 test('unlimited shares remain readable and visible in management', async () => {
   const env = testEnv();
   try {

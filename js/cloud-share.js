@@ -38,7 +38,7 @@ const admin = () => {
 export const verifyPublisherKey = token => request('/v1/shares', { token });
 export const listCloudShares = () => request('/v1/shares', { token: admin() });
 export const getCloudShare = id => request(`/v1/shares/${validId(id)}`, { token: admin() });
-export const createCloudShare = (report, { password = '', days = 30 } = {}) => request('/v1/shares', { method: 'POST', token: admin(), data: { report, password, days } });
+export const createCloudShare = (report, { password = '', days = 30, title, note } = {}) => request('/v1/shares', { method: 'POST', token: admin(), data: { report, password, days, ...(title === undefined ? {} : { title }), ...(note === undefined ? {} : { note }) } });
 export const deleteCloudShare = id => request(`/v1/shares/${validId(id)}`, { method: 'DELETE', token: admin() });
 export const stopCloudShare = deleteCloudShare;
 export async function openCloudShare(id, password = '') {

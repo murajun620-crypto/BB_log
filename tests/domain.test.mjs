@@ -255,6 +255,16 @@ test('exact Pro shot positions render as markers with an area summary', () => {
   assert.match(chart, /1\/2/);
   assert.match(chart, /50\.0%/);
 });
+test('shared report metadata keeps optional title and note', () => {
+  const { game, events } = fixture();
+  const source = createSharedReport(game, events);
+  source.report.title = '準決勝';
+  source.report.note = '第4Q終了時点の記録';
+  const parsed = parseSharedReport(JSON.stringify(source));
+  assert.equal(parsed.title, '準決勝');
+  assert.equal(parsed.note, '第4Q終了時点の記録');
+  assert.equal(parseSharedReport(JSON.stringify(createSharedReport(game, events))).title, '');
+});
 test('point and area displays use the same shooter-relative side for left attacks', () => {
   const { game } = fixture();
   game.mode = 'pro'; game.attackDirection = 'left';
@@ -532,6 +542,9 @@ test('managed cloud shares can open Reader, copy their URL, and import a local f
   assert.match(cloudShareUiSource, /cloud-share-actions/);
   assert.match(cloudShareUiSource, /取り込み済み/);
   assert.match(cloudShareUiSource, /importReport\(\{ report, shareId: entry\.id/);
+  assert.match(cloudShareUiSource, /name="title"/);
+  assert.match(cloudShareUiSource, /name="note"/);
+  assert.match(readerSource, /shared-report-note/);
 });
 test('aggregate cloud shares import each source game and can reuse an identical local team', () => {
   const first = fixture(); first.add('3PM');

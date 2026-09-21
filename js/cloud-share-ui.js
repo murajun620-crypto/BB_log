@@ -25,23 +25,27 @@ export function setupCloudShareUI({ showSheet, closeSheet, toast, refreshView, g
     const g = getGame();
     if (!g && !context) throw new Error('試合が見つかりません。');
     const snapshot = context?.snapshot || createSharedReport(g, getEvents(g));
-    const title = context?.title || context?.getTitle?.('') || (g ? `${g.date} ${g.teamName} vs ${g.opponentName}` : '共有レポート');
+    const defaultTitle = context?.title || context?.getTitle?.('') || (g ? `${g.date} ${g.teamName} vs ${g.opponentName}` : '共有レポート');
     const shareMessage = context?.message || context?.getMessage?.('') || (g ? message(g) : 'Courtside Readerで合計スタッツを見る');
     const description = context?.description || (g ? `${g.teamName} vs ${g.opponentName}の集計・選手名` : '選択した試合の集計・選手名');
     created = null;
-    const tournamentField = context?.aggregate ? '<label>大会名（任意）<input name="tournamentName" maxlength="40" placeholder="例：夏季総体、○○カップ"></label>' : '';
-    showSheet('共有リンクを作成', `<form id="cloud-create-form"><p class="help">${esc(description)}をCloudflareに保存します。後から元の試合を編集しても、この共有結果は変わりません。</p>${tournamentField}<label class="spaced">有効期限<select name="days"><option value="7">7日間</option><option value="30" selected>30日間</option><option value="90">90日間</option><option value="365">365日間</option><option value="unlimited">無期限</option></select></label><label class="spaced">閲覧パスワード（任意）<input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" placeholder="設定する場合は8文字以上"></label><p class="help">パスワードなし：リンクを知る人が閲覧できます。設定する場合は、パスワードをリンクとは別に伝えてください。</p><button type="submit" class="button primary full spaced">リンクを作成</button><p class="help">作成・閲覧には通信が必要です。「設定」で共有を停止できます。</p></form>`);
+    const tournamentField = context?.aggregate ? '<label class="spaced">大会名（任意）<input name="tournamentName" maxlength="40" placeholder="例：夏季総体、○○カップ"></label>' : '';
+    showSheet('共有リンクを作成', `<form id="cloud-create-form"><p class="help">${esc(description)}をCloudflareに保存します。後から元の試合を編集しても、この共有結果は変わりません。</p><label>タイトル（任意）<input name="title" maxlength="80" placeholder="例：準決勝"></label>${tournamentField}<label class="spaced">備考（任意）<textarea name="note" maxlength="500" rows="3" placeholder="例：第4Q終了時点の記録"></textarea></label><label class="spaced">有効期限<select name="days"><option value="7">7日間</option><option value="30" selected>30日間</option><option value="90">90日間</option><option value="365">365日間</option><option value="unlimited">無期限</option></select></label><label class="spaced">閲覧パスワード（任意）<input name="password" type="password" autocomplete="new-password" minlength="8" maxlength="128" placeholder="設定する場合は8文字以上"></label><p class="help">パスワードなし：リンクを知る人が閲覧できます。設定する場合は、パスワードをリンクとは別に伝えてください。</p><button type="submit" class="button primary full spaced">リンクを作成</button><p class="help">作成・閲覧には通信が必要です。「設定」で共有を停止できます。</p></form>`);
     document.querySelector('#cloud-create-form').addEventListener('submit', event => {
       event.preventDefault();
       const form = event.currentTarget;
       const values = new FormData(form);
       void work(async () => {
         const selectedDays = String(values.get('days'));
+        const customTitle = String(values.get('title') || '').trim();
+        const note = String(values.get('note') || '').trim();
         const tournamentName = context?.aggregate ? String(values.get('tournamentName') || '').trim() : '';
-        const report = context?.makeSnapshot ? context.makeSnapshot(tournamentName) : snapshot;
-        const result = await createCloudShare(report, { days: selectedDays === 'unlimited' ? null : Number(selectedDays), password: String(values.get('password')) });
+        const baseReport = context?.makeSnapshot ? context.makeSnapshot(tournamentName) : snapshot;
+        const report = { ...baseReport, report: { ...baseReport.report, title: customTitle, note } };
+        const result = await createCloudShare(report, { days: selectedDays === 'unlimited' ? null : Number(selectedDays), password: String(values.get('password')), title: customTitle, note });
         form.reset();
-        created = { ...result, title: context?.getTitle ? context.getTitle(tournamentName) : title, link: shortShareLink(result.id), message: context?.getMessage ? context.getMessage(tournamentName) : shareMessage };
+        const resolvedTitle = customTitle || (context?.getTitle ? context.getTitle(tournamentName) : defaultTitle);
+        created = { ...result, title: resolvedTitle, link: shortShareLink(result.id), message: customTitle ? `${customTitle}\n${context?.getMessage ? context.getMessage(tournamentName) : shareMessage}` : (context?.getMessage ? context.getMessage(tournamentName) : shareMessage) };
         showReady();
       });
     });
@@ -89,7 +93,7 @@ export function setupCloudShareUI({ showSheet, closeSheet, toast, refreshView, g
       const json = JSON.stringify(report, null, 2);
       const link = shortShareLink(entry.id);
        const alreadyImported = !!isImportedShare?.(entry.id);
-       showSheet('共有データを確認', `<p class="help">Cloudflareに保存されている共有用スナップショットです。元の試合データのイベントや管理キーは含まれません。</p><div class="cloud-share-preview"><dl><dt>タイトル</dt><dd>${esc(detail.title || entry.title)}</dd><dt>大会名</dt><dd>${esc(report.tournamentName || 'なし')}</dd><dt>作成日時</dt><dd>${esc(createdAt)}</dd><dt>試合数</dt><dd>${esc(report.gameCount ?? 1)}試合</dd><dt>チーム</dt><dd>${esc(report.teamName || '')}</dd><dt>対戦相手</dt><dd>${esc(report.opponentName || '')}</dd><dt>選手</dt><dd>${players.map(p => `${esc(p.number)} ${esc(p.name)}`).join('、') || 'なし'}</dd><dt>有効期限</dt><dd>${date(detail.expiresAt)}</dd><dt>パスワード</dt><dd>${detail.passwordRequired ? 'あり' : 'なし'}</dd></dl><details><summary>保存されているJSONを表示</summary><pre class="cloud-share-json">${esc(json)}</pre></details></div><a class="button primary full" href="${esc(link)}" target="_blank" rel="noopener">Readerで開く</a><button class="button secondary full spaced" id="cloud-detail-copy">リンクURLをコピー</button><button class="button secondary full spaced" id="cloud-detail-import" ${alreadyImported ? 'disabled' : ''}>${alreadyImported ? '取り込み済み' : 'この端末に取り込む'}</button><button class="button danger-solid full spaced" id="cloud-detail-delete">共有停止・データ削除</button><p class="help">削除するとこのリンクは開けなくなり、Cloudflare上の共有データ本体も即時削除されます。すでに相手が保存した画像やコピーは消せません。</p>`);
+       showSheet('共有データを確認', `<p class="help">Cloudflareに保存されている共有用スナップショットです。元の試合データのイベントや管理キーは含まれません。</p><div class="cloud-share-preview"><dl><dt>タイトル</dt><dd>${esc(detail.title || report.title || entry.title)}</dd><dt>大会名</dt><dd>${esc(report.tournamentName || 'なし')}</dd><dt>備考</dt><dd>${esc(report.note || 'なし')}</dd><dt>作成日時</dt><dd>${esc(createdAt)}</dd><dt>試合数</dt><dd>${esc(report.gameCount ?? 1)}試合</dd><dt>チーム</dt><dd>${esc(report.teamName || '')}</dd><dt>対戦相手</dt><dd>${esc(report.opponentName || '')}</dd><dt>選手</dt><dd>${players.map(p => `${esc(p.number)} ${esc(p.name)}`).join('、') || 'なし'}</dd><dt>有効期限</dt><dd>${date(detail.expiresAt)}</dd><dt>パスワード</dt><dd>${detail.passwordRequired ? 'あり' : 'なし'}</dd></dl><details><summary>保存されているJSONを表示</summary><pre class="cloud-share-json">${esc(json)}</pre></details></div><a class="button primary full" href="${esc(link)}" target="_blank" rel="noopener">Readerで開く</a><button class="button secondary full spaced" id="cloud-detail-copy">リンクURLをコピー</button><button class="button secondary full spaced" id="cloud-detail-import" ${alreadyImported ? 'disabled' : ''}>${alreadyImported ? '取り込み済み' : 'この端末に取り込む'}</button><button class="button danger-solid full spaced" id="cloud-detail-delete">共有停止・データ削除</button><p class="help">削除するとこのリンクは開けなくなり、Cloudflare上の共有データ本体も即時削除されます。すでに相手が保存した画像やコピーは消せません。</p>`);
       document.querySelector('#cloud-detail-copy').addEventListener('click', () => void work(async () => {
         if (!(await copyText(link))) throw new Error('リンクURLをコピーできませんでした。');
         toast('リンクURLをコピーしました。');

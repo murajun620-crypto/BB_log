@@ -134,6 +134,8 @@ export function parseSharedReport(text) {
   ensure(validText(report.format, 40) && ['live', 'finished'].includes(report.status));
   ensure(report.gameCount === undefined || (Number.isSafeInteger(report.gameCount) && report.gameCount >= 1 && report.gameCount <= 999));
   ensure(report.tournamentName === undefined || (typeof report.tournamentName === 'string' && report.tournamentName.length <= 40));
+  ensure(report.title === undefined || (typeof report.title === 'string' && report.title.length <= 80));
+  ensure(report.note === undefined || (typeof report.note === 'string' && report.note.length <= 500));
   ensure(validText(report.teamName, 40) && validText(report.opponentName, 40));
   ensure(Number.isSafeInteger(report.opponentScore) && report.opponentScore >= 0 && report.opponentScore <= 999999);
   ensure(Array.isArray(report.periods) && report.periods.length >= 1 && report.periods.length <= 50);
@@ -169,6 +171,8 @@ export function parseSharedReport(text) {
   ensure(report.periods.reduce((sum, period) => sum + period.away, 0) === report.opponentScore);
   const normalized = structuredClone(report);
   normalized.gameCount = report.gameCount || 1;
+  normalized.title = typeof report.title === 'string' ? report.title.trim() : '';
+  normalized.note = typeof report.note === 'string' ? report.note.trim() : '';
   const normalizeStats = stats => { if (stats && stats.FD === undefined) stats.FD = 0; };
   normalizeStats(normalized.team);
   normalized.players.forEach(player => normalizeStats(player.stats));

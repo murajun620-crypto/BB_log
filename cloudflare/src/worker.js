@@ -50,16 +50,25 @@ async function readJSON(request, max = MAX_BODY) {
   catch { fail(400, 'invalid_data', '共有データを読み取れません。'); }
 }
 
-function canonicalReport(data) {
+function canonicalReport(data, metadata = {}) {
   let report;
   try { report = parseSharedReport(JSON.stringify(data)); }
   catch { fail(400, 'invalid_report', '共有レポートの形式が不正です。'); }
   const stats = value => Object.fromEntries(statKeys.map(key => [key, value[key]]));
+  const optionalText = (value, max, label) => {
+    if (value === undefined) return '';
+    if (typeof value !== 'string' || value.length > max) fail(400, 'invalid_report', `${label}を確認してください。`);
+    return value.trim();
+  };
+  const title = optionalText(metadata.title === undefined ? report.title : metadata.title, 80, 'タイトル');
+  const note = optionalText(metadata.note === undefined ? report.note : metadata.note, 500, '備考');
   // Allowlist fields: never store injected settings, internal IDs, or event logs.
   return { app: 'courtside-report', schemaVersion: 1, report: {
     date: report.date, format: report.format, status: report.status,
     gameCount: report.gameCount || 1,
     tournamentName: report.tournamentName || '',
+    title,
+    note,
     games: Array.isArray(report.games) ? report.games.map(game => ({
       date: game.date, format: game.format, status: game.status,
       gameCount: 1, teamName: game.teamName, opponentName: game.opponentName, opponentScore: game.opponentScore,
@@ -105,13 +114,13 @@ async function route(request, env) {
     if (!data || (data.days !== null && ![7, 30, 90, 365].includes(data.days))) fail(400, 'invalid_expiry', '有効期限を選んでください。');
     const password = data.password ?? '';
     if (typeof password !== 'string' || (password && (password.length < 8 || password.length > 128))) fail(400, 'invalid_password', 'パスワードは8〜128文字で設定してください。');
-    const report = canonicalReport(data.report);
+    const report = canonicalReport(data.report, { title: data.title, note: data.note });
     const count = await db.prepare('SELECT COUNT(*) AS total FROM shares WHERE revoked_at IS NULL AND (expires_at IS NULL OR expires_at > ?)').bind(now).first();
     if (count.total >= 1000) fail(409, 'storage_limit', '共有の上限に達しました。不要な共有を停止してください。');
     const id = random(), salt = password ? random() : null;
     const hash = password ? await passwordHash(password, salt, env.PASSWORD_PEPPER) : null;
     const expiresAt = data.days === null ? null : now + data.days * DAY;
-    const title = `${report.report.tournamentName ? `${report.report.tournamentName} · ` : ''}${report.report.date} ${report.report.teamName} vs ${report.report.opponentName}`;
+    const title = report.report.title || `${report.report.tournamentName ? `${report.report.tournamentName} · ` : ''}${report.report.date} ${report.report.teamName} vs ${report.report.opponentName}`;
     await db.prepare('INSERT INTO shares (id, report, title, created_at, expires_at, password_salt, password_hash) VALUES (?, ?, ?, ?, ?, ?, ?)')
       .bind(id, JSON.stringify(report), title, now, expiresAt, salt, hash).run();
     return { id, title, createdAt: now, expiresAt, passwordRequired: !!password };
