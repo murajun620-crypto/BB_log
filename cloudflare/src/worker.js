@@ -5,7 +5,9 @@ const ID = /^[A-Za-z0-9_-]{22}$/;
 const MAX_BODY = 128 * 1024;
 const DAY = 86400000;
 const encoder = new TextEncoder();
-const statKeys = Object.keys(blankStats());
+// Keep the shared allowlist explicit for stats added after an older Worker
+// bundle was published. FD must survive canonicalization for Reader reports.
+const statKeys = [...new Set([...Object.keys(blankStats()), 'FD'])];
 const base64 = bytes => btoa(String.fromCharCode(...new Uint8Array(bytes))).replaceAll('+', '-').replaceAll('/', '_').replace(/=+$/, '');
 const random = () => base64(crypto.getRandomValues(new Uint8Array(16)));
 const sha = async text => base64(await crypto.subtle.digest('SHA-256', encoder.encode(text)));

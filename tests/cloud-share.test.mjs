@@ -98,6 +98,25 @@ test('custom title and note are stored in management and Reader snapshots', asyn
     assert.equal(detail.report.note, '第4Q終了時点の記録');
   } finally { env.DB.sqlite.close(); }
 });
+test('Reader snapshots preserve FD in single-game and per-game aggregate payloads', async () => {
+  const env = testEnv();
+  try {
+    const source = fixture().report;
+    source.report.team.FD = 2;
+    source.report.players[0].stats.FD = 2;
+    source.report.games = [{ ...structuredClone(source.report), gameCount: 1, games: undefined }];
+    const response = await req(env, '/v1/shares', 'POST', { report: source, days: 30 }, testToken);
+    assert.equal(response.status, 200, await response.clone().text());
+    const created = await response.json();
+    const opened = await req(env, `/v1/shares/${created.id}/open`, 'POST', {});
+    assert.equal(opened.status, 200);
+    const body = await opened.json();
+    assert.equal(body.report.team.FD, 2);
+    assert.equal(body.report.players[0].stats.FD, 2);
+    assert.equal(body.report.games[0].team.FD, 2);
+    assert.equal(body.report.games[0].players[0].stats.FD, 2);
+  } finally { env.DB.sqlite.close(); }
+});
 test('unlimited shares remain readable and visible in management', async () => {
   const env = testEnv();
   try {
