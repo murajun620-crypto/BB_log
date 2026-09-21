@@ -132,6 +132,7 @@ export const shotZoneLabel = zoneId => SHOT_ZONES.find(zone => zone.id === norma
 export const uid = () => crypto.randomUUID();
 export const activeEvents = events => events.filter(e => !e.deletedAt).sort((a, b) => a.seq - b.seq);
 export const percent = (made, attempts) => attempts ? `${(made / attempts * 100).toFixed(1)}%` : '—';
+export const efficiency = stats => stats.PTS + stats.REB + stats.AST + stats.STL + stats.BLK - (stats.FGA - stats.FGM) - (stats.FTA - stats.FTM) - stats.TO;
 export const localDate = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
 export const formatGame = g => `${g.format === 'quarters' ? '4Q' : g.format === 'halves' ? '2H' : `${g.regulationCount}P`} × ${g.minutes}分`;
 export function makePeriods(format, count, minutes) {

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, eventLabel, fullCourtPointFromHalf, halfCourtPointFromFull, isBackcourtPoint, normalizeShotZone, opponentLineup, oppositeDirection, percent, lineup, validateGame, validateTeam, makePeriods, shotDirectionForEvent, shotPointsFromPoint, shotZoneForEvent, shotZoneFromPoint, uid } from '../js/domain.js';
+import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, efficiency, eventLabel, fullCourtPointFromHalf, halfCourtPointFromFull, isBackcourtPoint, normalizeShotZone, opponentLineup, oppositeDirection, percent, lineup, validateGame, validateTeam, makePeriods, shotDirectionForEvent, shotPointsFromPoint, shotZoneForEvent, shotZoneFromPoint, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
 import { buildImportedRecords } from '../js/shared-import.js';
@@ -133,6 +133,9 @@ test('only portrait iPhones use the Pro half court and its markings face the upp
   assert.doesNotMatch(fullCourt, /M210 0V48|M730 0V48|M120 48V176|M820 48V176/);
   assert.match(PRO_HALF_COURT_MARKINGS, /M304 210A54 54 0 0 1 196 210/);
   assert.match(PRO_HALF_COURT_MARKINGS, /M287 74A37 37 0 0 1 213 74/);
+});
+test('EFF uses made and missed field goals and free throws', () => {
+  assert.equal(efficiency({ PTS: 10, REB: 5, AST: 3, STL: 2, BLK: 1, FGA: 8, FGM: 4, FTA: 4, FTM: 3, TO: 2 }), 14);
 });
 test('iPhone Pro view hides attack direction and records opponent shots without a location', () => {
   const originalNavigator = Object.getOwnPropertyDescriptor(globalThis, 'navigator');
@@ -611,6 +614,7 @@ test('CSV includes every shooting metric, Japanese BOM, totals and safe escaping
   game.roster[0].name = '=HYPERLINK("bad")'; game.opponentName = '相手,チーム';
   const csv = gameCSV(game, events);
   assert.ok(csv.startsWith('\uFEFF')); assert.ok(csv.includes('"2PM","2PA","2P%"'));
+  assert.ok(csv.includes('"PTS","EFF","FGM"'));
   assert.ok(csv.includes('"\'=HYPERLINK(""bad"")"')); assert.ok(csv.includes('"相手,チーム"'));
   assert.ok(csv.includes('"TEAM TOTAL"')); assert.ok(csv.includes('"Period"'));
 });
