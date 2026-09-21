@@ -1015,6 +1015,9 @@ const handlers = {
   'follow-reb': button => pickStat(button.dataset.type, { followup: true }),
   'pro-action': button => {
     if (game()?.mode !== 'pro') return;
+    if (state.proSelection?.type === button.dataset.type) {
+      state.proSelection = null; render(); return;
+    }
     const playerId = state.proSelection?.playerId || null;
     state.proSub = null; state.proOpponentSelection = null; state.proOpponentSub = null; state.proSelection = { type: button.dataset.type, playerId }; render();
   },
@@ -1042,6 +1045,10 @@ const handlers = {
   'select-shot-player': button => changeShotPlayer(button),
   'delete-shot-marker': button => deleteShotMarker(button),
   'pro-backcourt': () => toast('バックコートは選択できません。', true),
+  'pro-cancel-selection': () => {
+    if (game()?.mode !== 'pro') return;
+    state.proSelection = null; state.proOpponentSelection = null; state.proSub = null; state.proOpponentSub = null; render();
+  },
   'pro-sub': () => { if (game()?.mode !== 'pro') return; state.proSelection = null; state.proSub = { outPlayerId: null }; state.proOpponentSelection = null; state.proOpponentSub = null; render(); },
   'toggle-pro-attack': () => busy(async () => {
     const g = game(); if (g?.mode !== 'pro') return;
@@ -1051,6 +1058,9 @@ const handlers = {
   }),
   'pro-opponent-action': button => {
     if (game()?.mode !== 'pro' || game().opponentTracking !== 'player') return;
+    if (state.proOpponentSelection?.type === button.dataset.type) {
+      state.proOpponentSelection = null; render(); return;
+    }
     const playerId = state.proOpponentSelection?.playerId || null;
     state.proOpponentSelection = { type: button.dataset.type, playerId }; state.proSelection = null; state.proSub = null; state.proOpponentSub = null; render();
   },

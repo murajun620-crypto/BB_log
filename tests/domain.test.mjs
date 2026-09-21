@@ -348,6 +348,31 @@ test('Pro LIVE keeps substitution and play changes available while guiding the n
   assert.match(proLiveCss, /@keyframes pro-shot-area-feedback-fade/);
   assert.match(proLiveCss, /\.pro-shot-marker \{ pointer-events: auto; cursor: pointer; \}/);
 });
+test('Pro LIVE can cancel a play selection and focuses the bench after choosing OUT', () => {
+  const { game, events } = fixture();
+  game.mode = 'pro'; game.clockEnabled = false;
+  const selected = proLiveView({ proSelection: { type: 'FGM', playerId: null }, proOpponentSelection: null, proSub: null, proOpponentSub: null }, game, events);
+  assert.match(selected, /data-action="pro-cancel-selection"[^>]*aria-label="選択したプレーをキャンセル"/);
+  assert.match(selected, /class="pro-selection-cancel"/);
+  const idle = proLiveView({ proSelection: null, proOpponentSelection: null, proSub: null, proOpponentSub: null }, game, events);
+  assert.doesNotMatch(idle, /data-action="pro-cancel-selection"/);
+
+  const ownSub = proLiveView({ proSelection: null, proOpponentSelection: null, proSub: { outPlayerId: 'player-0' }, proOpponentSub: null }, game, events);
+  assert.match(ownSub, /class="pro-player on-court selected" data-action="pro-select-player" data-id="player-0"/);
+  assert.match(ownSub, /class="pro-player on-court substitution-locked"[^>]*disabled aria-disabled="true"/);
+  assert.match(ownSub, /class="pro-player bench" data-action="pro-select-player" data-id="player-5"/);
+  assert.match(ownSub, /data-action="pro-cancel-selection"[^>]*aria-label="交代操作をキャンセル"/);
+  assert.match(proLiveCss, /\.pro-player\.substitution-locked \{[^}]*opacity: \.28[^}]*pointer-events: none/);
+  assert.match(proLiveCss, /\.pro-live-screen\.pro-await-own-sub \.pro-player\.bench,[\s\S]*\.pro-live-screen\.pro-await-opponent-sub \.pro-player\.bench/);
+
+  game.opponentTracking = 'player';
+  game.opponentRoster = Array.from({ length: 6 }, (_, i) => ({ id: `opponent-${i}`, number: `${i + 4}` }));
+  game.opponentStarters = game.opponentRoster.slice(0, 5).map(player => player.id);
+  const opponentSub = proLiveView({ proSelection: null, proOpponentSelection: null, proSub: null, proOpponentSub: { outPlayerId: 'opponent-0' } }, game, events);
+  assert.match(opponentSub, /class="pro-player on-court selected" data-action="pro-select-opponent" data-id="opponent-0"/);
+  assert.match(opponentSub, /class="pro-player on-court substitution-locked"[^>]*disabled aria-disabled="true"/);
+  assert.match(opponentSub, /class="pro-player bench" data-action="pro-select-opponent" data-id="opponent-5"/);
+});
 test('opponent players require a jersey number but can optionally include a name', () => {
   const { game } = fixture();
   game.mode = 'pro'; game.clockEnabled = false; game.opponentTracking = 'player'; game.opponentRoster = [{ id: 'opponent-1', number: '8' }];

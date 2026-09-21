@@ -386,6 +386,7 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-action-button.miss { color: var(--miss); }
 .pro-action-button.other { background: var(--surface-2); color: var(--muted); }
 .pro-action-button.selected { border-color: #f0b24a; background: #26331d; box-shadow: inset 0 0 0 2px #f0b24a, 0 0 0 1px rgba(240, 178, 74, .22); color: #fff; }
+.pro-selection-cancel { min-height: 34px; margin-left: 4px; padding: 5px 10px; border: 1px solid #b87333; border-radius: 7px; background: rgba(184, 115, 51, .16); color: #f0b24a; font-size: 10px; font-weight: 800; white-space: nowrap; }
 .pro-side { display: flex; flex-direction: column; gap: 5px; min-width: 0; order: 2; }
 .pro-side-heading { display: flex; align-items: baseline; justify-content: space-between; padding: 4px 2px; }
 .pro-side-heading span { color: var(--muted); font-size: 10px; font-weight: 750; letter-spacing: 1px; }
@@ -412,6 +413,11 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-player.bench .pro-player-name { opacity: .82; }
 .pro-player.bench strong { color: var(--accent); opacity: .78; }
 .pro-player.selected { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
+.pro-player.substitution-locked { opacity: .28; filter: grayscale(.85); pointer-events: none; cursor: default; }
+.pro-live-screen.pro-await-own-sub .pro-player.bench,
+.pro-live-screen.pro-await-opponent-sub .pro-player.bench { opacity: 1; filter: none; border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 1px rgba(240, 178, 74, .24); }
+.pro-live-screen.pro-await-own-sub .pro-player.bench .pro-player-name,
+.pro-live-screen.pro-await-opponent-sub .pro-player.bench .pro-player-name { opacity: 1; }
 .pro-roster-add { display: inline-flex; grid-column: 1 / -1; align-items: center; justify-content: center; gap: 5px; min-height: 42px; padding: 6px 8px; border: 1px dashed var(--line); border-radius: 8px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 700; }
 .pro-roster-add .icon { width: 15px; height: 15px; }
 .pro-sub-button { min-height: 39px; margin-top: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--muted); font-size: 11px; font-weight: 700; }
