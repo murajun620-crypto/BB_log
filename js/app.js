@@ -21,7 +21,8 @@ function proShotPointFromClient(button, clientX, clientY, direction) {
   const rect = button.getBoundingClientRect();
   const pointX = Number.isFinite(clientX) ? clientX : rect.left + rect.width / 2;
   const pointY = Number.isFinite(clientY) ? clientY : rect.top + rect.height / 2;
-  if (!button.classList.contains('pro-court-half')) {
+  const halfCourtSurface = button.classList.contains('pro-court-half') || button.classList.contains('pro-shot-chart-half-map');
+  if (!halfCourtSurface) {
     return {
       x: Math.max(0, Math.min(1, (pointX - rect.left) / rect.width)),
       y: Math.max(0, Math.min(1, (pointY - rect.top) / rect.height)),
@@ -38,7 +39,7 @@ function proShotPointFromEvent(button, event, direction) {
   return proShotPointFromClient(button, event?.clientX, event?.clientY, direction);
 }
 function proShotViewPoint(button, point, direction) {
-  if (button.classList.contains('pro-court-half')) return halfCourtPointFromFull(point.x, point.y, direction);
+  if (button.classList.contains('pro-court-half') || button.classList.contains('pro-shot-chart-half-map')) return halfCourtPointFromFull(point.x, point.y, direction);
   return { x: point.x * 940, y: point.y * 500 };
 }
 function proShotGestureMade(gesture) {

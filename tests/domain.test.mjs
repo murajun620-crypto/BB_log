@@ -258,6 +258,17 @@ test('exact Pro shot positions render as markers with an area summary', () => {
   assert.match(chart, /1\/2/);
   assert.match(chart, /50\.0%/);
 });
+test('point shot charts combine both attacking directions on a top-goal half court', () => {
+  const chart = shotChartMapHTML([
+    { playerId: 'player-0', zone: 'three-top', result: 'made', x: 766 / 940, y: .5, direction: 'right' },
+    { playerId: 'player-0', zone: 'three-top', result: 'miss', x: 174 / 940, y: .5, direction: 'left' },
+  ], null, 'points', [{ id: 'player-0', number: '4', name: '選手1' }]);
+  assert.match(chart, /pro-shot-chart-half-map/);
+  assert.match(chart, /viewBox="0 0 500 500"/);
+  assert.match(chart, /pro-chart-court-markings/);
+  assert.equal((chart.match(/transform="translate\(250\.0 174\.0\)"/g) || []).length, 2);
+  assert.doesNotMatch(chart, /viewBox="0 0 940 500"/);
+});
 test('shared report metadata keeps optional title and note', () => {
   const { game, events } = fixture();
   const source = createSharedReport(game, events);

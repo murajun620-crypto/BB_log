@@ -513,12 +513,15 @@ export function shotZonePicker(playerName, stat) {
   return `<p class="picker-instruction">${esc(playerName)} · ${esc(stat?.name)}。コート上の位置をタップ</p><div class="shot-zone-legend"><span class="target-zone">${target}</span><span>薄いエリアは選べません</span></div><svg class="shot-court-map" viewBox="0 0 500 500" role="group" aria-label="ハーフコートのシュート位置。${target}">${halfCourtMapDefs}${halfCourtSurface}${zones}<g class="court-markings">${PRO_HALF_COURT_MARKINGS}</g></svg><button type="button" class="button secondary full spaced" data-action="cancel-shot-zone">入力をやめる</button>`;
 }
 function chartShot(shot) {
-  const zone = shotZoneForEvent(shot, shot?.shotDirection ?? shot?.direction);
+  const direction = ['left', 'right'].includes(shot?.shotDirection)
+    ? shot.shotDirection
+    : ['left', 'right'].includes(shot?.direction) ? shot.direction : 'right';
+  const zone = shotZoneForEvent(shot, direction);
   if (!SHOT_ZONES.some(candidate => candidate.id === zone)) return null;
   const made = shot?.result ? shot.result === 'made' : shot?.eventType?.endsWith('M');
   const x = Number.isFinite(shot?.x) ? shot.x : Number.isFinite(shot?.shotX) ? shot.shotX : null;
   const y = Number.isFinite(shot?.y) ? shot.y : Number.isFinite(shot?.shotY) ? shot.shotY : null;
-  return { zone, made, ...(x !== null && y !== null && [x, y].every(value => value >= 0 && value <= 1) ? { x, y } : {}) };
+  return { zone, made, direction, ...(x !== null && y !== null && [x, y].every(value => value >= 0 && value <= 1) ? { x, y } : {}) };
 }
 function shotChartTotals(shots, playerId) {
   const totals = Object.fromEntries(SHOT_ZONES.map(zone => [zone.id, { made: 0, attempts: 0 }]));
@@ -543,17 +546,22 @@ function fullCourtShotChartMapHTML(shots, playerId, players = [], editable = fal
     .map(shot => ({ raw: shot, normalized: chartShot(shot) }))
     .filter(({ normalized }) => normalized?.x !== undefined && normalized?.y !== undefined)
     .map(({ raw, normalized }) => {
+      // Normalize both attacking directions to one top-goal half court. The
+      // stored full-court point remains unchanged; only this display point is
+      // rotated, so first- and second-half shots can be combined safely.
+      const point = halfCourtPointFromFull(normalized.x, normalized.y, normalized.direction);
+      if (!point) return '';
       const player = shotPlayerLabel(raw, players);
       const area = shotZoneLabel(normalized.zone) || '位置不明';
       const result = normalized.made ? '○ 成功' : '× 失敗';
       const points = shotTypeLabel(raw);
       const label = `${player} · ${area} · ${result}。タップで詳細${editable ? '、長押し／3Dタッチで編集' : ''}`;
       const editAttributes = editable && raw.id ? ` data-shot-editable="true" data-event-id="${esc(raw.id)}" data-shot-game-id="${esc(raw.gameId)}" data-shot-side="${esc(raw.side || 'home')}"` : '';
-      return `<g class="pro-shot-chart-marker ${normalized.made ? 'made' : 'miss'}" data-shot-marker="chart"${editAttributes} role="button" tabindex="0" data-shot-player="${esc(player)}" data-shot-area="${esc(area)}" data-shot-result="${esc(result)}" data-shot-points="${esc(points)}" data-shot-x="${(normalized.x * 940).toFixed(1)}" data-shot-y="${(normalized.y * 500).toFixed(1)}" data-shot-view-width="940" data-shot-view-height="500" aria-label="${esc(label)}" transform="translate(${(normalized.x * 940).toFixed(1)} ${(normalized.y * 500).toFixed(1)})"><circle class="shot-marker-hit-area" r="24"></circle><text text-anchor="middle" dy=".36em">${normalized.made ? '○' : '×'}</text><title>${esc(label)}</title></g>`;
+      return `<g class="pro-shot-chart-marker ${normalized.made ? 'made' : 'miss'}" data-shot-marker="chart"${editAttributes} role="button" tabindex="0" data-shot-player="${esc(player)}" data-shot-area="${esc(area)}" data-shot-result="${esc(result)}" data-shot-points="${esc(points)}" data-shot-x="${point.x.toFixed(1)}" data-shot-y="${point.y.toFixed(1)}" data-shot-view-width="500" data-shot-view-height="500" data-shot-direction="${normalized.direction}" aria-label="${esc(label)}" transform="translate(${point.x.toFixed(1)} ${point.y.toFixed(1)})"><circle class="shot-marker-hit-area" r="24"></circle><text text-anchor="middle" dy=".36em">${normalized.made ? '○' : '×'}</text><title>${esc(label)}</title></g>`;
     })
     .join('');
   const summary = SHOT_ZONES.map(zone => { const stats = totals[zone.id]; return `<div class="pro-shot-zone-summary-item"><span>${esc(zone.label)}</span><strong>${stats.made}/${stats.attempts}</strong><b>${percent(stats.made, stats.attempts)}</b></div>`; }).join('');
-  return `<svg class="shot-court-map shot-chart-map pro-shot-chart-map"${editable ? ' data-shot-editable-surface="true"' : ''} viewBox="0 0 940 500" role="img" aria-label="ショットチャート。○×で各シュートの成功・失敗を表示"><rect class="pro-chart-court-surface" x="24" y="0" width="892" height="500"></rect><g class="pro-chart-court-markings">${PRO_COURT_MARKINGS}</g><g class="pro-shot-chart-markers">${markerHTML}</g></svg><div class="pro-shot-zone-summary">${summary}</div>`;
+  return `<svg class="shot-court-map shot-chart-map pro-shot-chart-map pro-shot-chart-half-map"${editable ? ' data-shot-editable-surface="true"' : ''} viewBox="0 0 500 500" role="img" aria-label="ショットチャート。ゴールを上にしたハーフコートで○×を表示"><rect class="pro-chart-court-surface" x="0" y="24" width="500" height="452"></rect><g class="pro-chart-court-markings">${PRO_HALF_COURT_MARKINGS}</g><g class="pro-shot-chart-markers">${markerHTML}</g></svg><div class="pro-shot-zone-summary">${summary}</div>`;
 }
 function zoneShotChartMapHTML(shots, playerId) {
   const totals = shotChartTotals(shots, playerId);
