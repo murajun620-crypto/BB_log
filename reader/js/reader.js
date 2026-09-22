@@ -1,6 +1,6 @@
 import { parseSharePayload } from '../../js/shared-report.js';
 import { openCloudShare } from '../../js/cloud-share.js';
-import { shotChartMapHTML, shotMarkerDetailFeedbackHTML, BOX_STAT_KEYS as BOX_STATS, DETAIL_STAT_KEYS as DETAIL_STATS, statLabel, statValue } from '../../js/views.js';
+import { shotChartMapHTML, shotMarkerDetailFeedbackHTML, BOX_STAT_KEYS as BOX_STATS, DETAIL_STAT_KEYS as DETAIL_STATS, statLabel, statValue, sortPlayersByNumber } from '../../js/views.js';
 
 const app = document.querySelector('#app');
 const playerDialog = document.querySelector('#player-dialog');
@@ -63,7 +63,7 @@ function readerReportView(data) {
   const reportNote = data.note ? `<p class="shared-report-note">${esc(data.note)}</p>` : '';
   const label = statLabel;
   const cell = (stats, key) => `<td${key === 'PTS' ? ' class="pts-cell"' : ''}>${metric(statValue(stats, key), gameCount)}</td>`;
-  const rows = view.players.map(player => `<tr><th scope="row"><button type="button" data-player-id="${esc(player.id)}" aria-label="${esc(player.number)} ${esc(player.name)}の詳細を開く"><b>${esc(player.number)}</b><span>${esc(player.name)}</span></button></th>${BOX_STATS.map(key => cell(player.stats, key)).join('')}</tr>`).join('');
+  const rows = sortPlayersByNumber(view.players).map(player => `<tr><th scope="row"><button type="button" data-player-id="${esc(player.id)}" aria-label="${esc(player.number)} ${esc(player.name)}の詳細を開く"><b>${esc(player.number)}</b><span>${esc(player.name)}</span></button></th>${BOX_STATS.map(key => cell(player.stats, key)).join('')}</tr>`).join('');
   const scoreCard = `<section class="report-card"><div class="game-meta"><span>${esc(formatDate(view.date))} · ${esc(view.format)}</span><span class="report-status">${status}</span></div><div class="report-score"><div><span>MY TEAM</span><h2>${esc(view.teamName)}</h2></div><strong>${metric(view.team.PTS, gameCount)}<span>–</span>${metric(view.opponentScore, gameCount)}</strong><div><span>OPPONENT</span><h2>${esc(view.opponentName)}</h2></div></div><div class="period-scores"><div><span>PERIOD</span><b>自チーム</b><b>相手</b></div>${view.periods.map(period => `<div><span>${esc(period.label)}</span><b>${period.home}</b><b>${period.away}</b></div>`).join('')}</div></section>`;
   const gameScores = detailGames.length > 1 ? `<section class="report-card game-list-card"><div class="game-meta"><span>${esc(reportTitle || data.teamName)} · 各試合のスコア</span>${currentGame ? '<button class="mode-toggle" type="button" data-action="select-game" data-game-index="-1">全試合集計</button>' : '<span class="report-hint">タップで試合を表示</span>'}</div><div class="aggregate-game-scores">${detailGames.map((game, index) => `<button class="aggregate-game-score ${index === selectedGameIndex ? 'selected' : ''}" type="button" data-action="select-game" data-game-index="${index}" aria-label="${esc(formatDate(game.date))} ${esc(game.opponentName)}の試合を表示"><span class="aggregate-game-info"><b>${esc(formatDate(game.date))}</b><small>${esc(game.teamName)} vs. ${esc(game.opponentName)}</small></span><strong class="game-score">${game.team.PTS}<span>–</span>${game.opponentScore}</strong><span class="game-score-arrow">›</span></button>`).join('')}</div></section>` : '';
   const scoreBlock = detailGames.length > 1 ? `${gameScores}${currentGame ? scoreCard : ''}` : scoreCard;

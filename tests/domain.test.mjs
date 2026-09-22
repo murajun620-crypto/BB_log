@@ -5,7 +5,7 @@ import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod,
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
 import { buildImportedRecords } from '../js/shared-import.js';
-import { boxView, gameFormView, isIPhonePortrait, isIPhoneUserAgent, PRO_HALF_COURT_MARKINGS, liveSettingsHTML, proLiveView, settingsView, shotChartHTML, shotMarkerDetailFeedbackHTML, shotZonePicker, shotChartMapHTML, strategyBoardHTML, teamFormView } from '../js/views.js';
+import { aggregateViewUnified, boxView, gameFormView, isIPhonePortrait, isIPhoneUserAgent, PRO_HALF_COURT_MARKINGS, liveSettingsHTML, proLiveView, settingsView, sharedReportView, shotChartHTML, shotMarkerDetailFeedbackHTML, shotZonePicker, shotChartMapHTML, sortPlayersByNumber, strategyBoardHTML, teamFormView } from '../js/views.js';
 import { APP_VERSION } from '../js/version.js';
 
 const fixture = () => {
@@ -492,6 +492,24 @@ test('team editing and game participant selection sort players by numeric jersey
   assert.deepEqual([...teamHtml.matchAll(/data-player-id="([^"]+)"/g)].map(match => match[1]), ['player-2', 'player-10', 'player-21']);
   const gameHtml = gameFormView({ data: { teams: [team] }, preferences: { advancedMode: false } }, { teamId: team.id, date: '2026-09-05', opponentName: 'VISITORS', format: 'quarters', count: 4, minutes: 8, participants: players.map(player => player.id), starters: [], mode: 'standard', clockEnabled: false, opponentTracking: 'score', opponentRosterNumbersText: '', opponentRosterNamesText: '' });
   assert.deepEqual([...gameHtml.matchAll(/name="participants" value="([^"]+)"/g)].map(match => match[1]), ['player-2', 'player-10', 'player-21']);
+});
+test('BOX SCORE and shared reports display members in numeric jersey order', () => {
+  const { game } = fixture();
+  game.roster[0].number = '10';
+  game.roster[1].number = '2';
+  game.roster[2].number = '21';
+  game.mode = 'pro'; game.opponentTracking = 'player';
+  game.opponentRoster = [{ id: 'opponent-12', number: '12' }, { id: 'opponent-3', number: '3' }];
+  const state = { page: 'box', preferences: {}, aggregateGameId: null, aggregateMode: 'total' };
+  const boxHtml = boxView(state, game, []);
+  assert.deepEqual([...boxHtml.matchAll(/data-action="player-detail" data-id="([^"]+)"/g)].map(match => match[1]), ['player-1', 'player-3', 'player-4', 'player-5', 'player-0', 'player-2']);
+  assert.ok(boxHtml.indexOf('<b>3</b>', boxHtml.indexOf('相手選手スタッツ')) < boxHtml.indexOf('<b>12</b>', boxHtml.indexOf('相手選手スタッツ')));
+  const aggregateHtml = aggregateViewUnified(state, [game], []);
+  assert.deepEqual([...aggregateHtml.matchAll(/data-action="aggregate-player-detail" data-id="([^"]+)"/g)].map(match => match[1]), ['player-1', 'player-3', 'player-4', 'player-5', 'player-0', 'player-2']);
+  const sharedHtml = sharedReportView(state, createSharedReport(game, []).report);
+  assert.deepEqual([...sharedHtml.matchAll(/data-action="shared-player-detail" data-id="([^"]+)"/g)].map(match => match[1]), ['p2', 'p4', 'p5', 'p6', 'p1', 'p3']);
+  assert.deepEqual(game.roster.map(player => player.id), ['player-0', 'player-1', 'player-2', 'player-3', 'player-4', 'player-5']);
+  assert.deepEqual(sortPlayersByNumber([{ number: '10' }, { number: '2' }, { number: '' }]).map(player => player.number), ['2', '10', '']);
 });
 test('team and opponent rosters have no registration count cap and still reject full-width numbers', () => {
   const manyPlayers = Array.from({ length: 61 }, (_, i) => ({ id: `large-player-${i}`, number: String(i % 1000), name: `選手${i}` }));
