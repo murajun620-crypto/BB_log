@@ -1174,6 +1174,7 @@ const handlers = {
   'add-opponent-player': opponentMemberForm,
   'game-menu': () => showSheet('試合メニュー', `<div class="card-list"><a class="button secondary full" href="#box/${game().id}">BOX SCOREを表示</a><button class="button secondary full" data-action="game-settings">試合設定</button><button class="button secondary full" data-action="add-member">メンバーを追加</button><button class="button secondary full" data-action="period-menu">ピリオド操作</button><button class="button secondary full" data-action="events">イベント履歴・編集</button><button class="button primary full" data-action="finish">試合を終了する</button><a class="button secondary full" href="#home">保存してホームへ</a></div><p class="help">試合中の設定変更も、その場で保存されます。</p>`),
   'game-settings': () => { const g = game(); if (g) showSheet('試合設定', view.liveSettingsHTML(g)); },
+  'change-game-date': () => { const g = game(); if (g) showSheet('試合日を変更', view.gameDateHTML(g)); },
   'aggregate-selected': () => {
     const selected = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
     if (selected.length < 2) return toast('2試合以上を選択してください。', true);
@@ -1456,6 +1457,7 @@ document.addEventListener('submit', event => {
   if (form.id === 'live-settings-form') busy(async () => {
     const g = game(); if (!g || g.status !== 'live') throw new Error('記録中の試合を開いてください。');
     const values = new FormData(form);
+    const date = String(values.get('date') || '');
     const mode = values.get('mode') === 'pro' ? 'pro' : 'standard';
     const opponentTracking = values.get('opponentTracking') === 'player' ? 'player' : 'score';
     const opponentPlayerEvents = activeEvents(gameEvents(g)).filter(event => event.side === 'opponent');
@@ -1475,8 +1477,14 @@ document.addEventListener('submit', event => {
     const period = g.periods.find(candidate => candidate.id === g.currentPeriodId);
     const clockSeconds = clockEnabled ? Math.max(0, Math.round(currentSeconds ?? Number(period?.minutes || g.minutes) * 60)) : undefined;
     const clockRunning = clockEnabled && g.clockRunning && clockSeconds > 0;
-    await saveGameChange({ ...g, mode, clockEnabled, clockSeconds, clockRunning, clockStartedAt: clockRunning ? g.clockStartedAt : null, opponentTracking: mode === 'pro' ? opponentTracking : 'score', opponentRoster, opponentStarters: mode === 'pro' && opponentTracking === 'player' ? (opponentStarters.length ? opponentStarters : opponentRoster.slice(0, 5).map(player => player.id)) : [] });
+    await saveGameChange({ ...g, date, mode, clockEnabled, clockSeconds, clockRunning, clockStartedAt: clockRunning ? g.clockStartedAt : null, opponentTracking: mode === 'pro' ? opponentTracking : 'score', opponentRoster, opponentStarters: mode === 'pro' && opponentTracking === 'player' ? (opponentStarters.length ? opponentStarters : opponentRoster.slice(0, 5).map(player => player.id)) : [] });
     closeSheet(); toast('試合設定を保存しました。');
+  });
+  if (form.id === 'game-date-form') busy(async () => {
+    const g = game(); if (!g) throw new Error('試合が見つかりません。');
+    const date = String(new FormData(form).get('date') || '');
+    await saveGameChange({ ...g, date });
+    closeSheet(); toast('試合日を変更しました。');
   });
   if (form.id === 'event-form') busy(async () => {
     const values = new FormData(form); const old = gameEvents().find(e => e.id === form.dataset.id);

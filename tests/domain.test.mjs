@@ -5,7 +5,7 @@ import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod,
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
 import { buildImportedRecords } from '../js/shared-import.js';
-import { gameFormView, isIPhonePortrait, isIPhoneUserAgent, PRO_HALF_COURT_MARKINGS, liveSettingsHTML, proLiveView, settingsView, shotChartHTML, shotMarkerDetailFeedbackHTML, shotZonePicker, shotChartMapHTML, strategyBoardHTML } from '../js/views.js';
+import { boxView, gameFormView, isIPhonePortrait, isIPhoneUserAgent, PRO_HALF_COURT_MARKINGS, liveSettingsHTML, proLiveView, settingsView, shotChartHTML, shotMarkerDetailFeedbackHTML, shotZonePicker, shotChartMapHTML, strategyBoardHTML } from '../js/views.js';
 import { APP_VERSION } from '../js/version.js';
 
 const fixture = () => {
@@ -439,6 +439,14 @@ test('Pro roster display keeps on-court and bench players ordered by jersey numb
   const afterSubstitution = proLiveView({ proSelection: null, proOpponentSelection: null }, game, events);
   assert.deepEqual(ids(afterSubstitution, 'pro-select-player'), ['player-1', 'player-2', 'player-3', 'player-4', 'player-5', 'player-0']);
   assert.deepEqual(ids(afterSubstitution, 'pro-select-opponent'), ['opponent-0', 'opponent-1', 'opponent-2', 'opponent-3', 'opponent-4', 'opponent-5']);
+});
+test('game settings allow changing the date after starting a game', () => {
+  const { game } = fixture();
+  const html = liveSettingsHTML(game);
+  assert.match(html, /<input type="date" name="date" required value="2026-09-05">/);
+  assert.match(html, /試合中でも試合日・記録モード/);
+  game.status = 'finished';
+  assert.match(boxView({ page: 'box', preferences: { theme: 'system' } }, game, []), /data-action="change-game-date"/);
 });
 test('opponent roster uses one row with separate number and name boxes', () => {
   const { game } = fixture();
