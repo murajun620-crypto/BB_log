@@ -5,7 +5,7 @@ import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod,
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
 import { buildImportedRecords } from '../js/shared-import.js';
-import { boxView, gameFormView, isIPhonePortrait, isIPhoneUserAgent, PRO_HALF_COURT_MARKINGS, liveSettingsHTML, proLiveView, settingsView, shotChartHTML, shotMarkerDetailFeedbackHTML, shotZonePicker, shotChartMapHTML, strategyBoardHTML } from '../js/views.js';
+import { boxView, gameFormView, isIPhonePortrait, isIPhoneUserAgent, PRO_HALF_COURT_MARKINGS, liveSettingsHTML, proLiveView, settingsView, shotChartHTML, shotMarkerDetailFeedbackHTML, shotZonePicker, shotChartMapHTML, strategyBoardHTML, teamFormView } from '../js/views.js';
 import { APP_VERSION } from '../js/version.js';
 
 const fixture = () => {
@@ -480,6 +480,18 @@ test('opponent roster rows are also used in Pro game creation', () => {
   assert.match(html, /name="opponentRosterNumber"[^>]*value="12"/);
   assert.match(html, /name="opponentRosterName"[^>]*value="相手B"/);
   assert.match(html, /data-action="add-opponent-roster-player"/);
+});
+test('team editing and game participant selection sort players by numeric jersey number', () => {
+  const players = [
+    { id: 'player-10', number: '10', name: '十番' },
+    { id: 'player-2', number: '2', name: '二番' },
+    { id: 'player-21', number: '21', name: '二十一番' },
+  ];
+  const team = { id: 'sort-team', name: 'SORT HOOPS', revision: 0, players };
+  const teamHtml = teamFormView({ data: { teams: [team] }, preferences: {} }, { id: team.id, name: team.name, players: [...players] });
+  assert.deepEqual([...teamHtml.matchAll(/data-player-id="([^"]+)"/g)].map(match => match[1]), ['player-2', 'player-10', 'player-21']);
+  const gameHtml = gameFormView({ data: { teams: [team] }, preferences: { advancedMode: false } }, { teamId: team.id, date: '2026-09-05', opponentName: 'VISITORS', format: 'quarters', count: 4, minutes: 8, participants: players.map(player => player.id), starters: [], mode: 'standard', clockEnabled: false, opponentTracking: 'score', opponentRosterNumbersText: '', opponentRosterNamesText: '' });
+  assert.deepEqual([...gameHtml.matchAll(/name="participants" value="([^"]+)"/g)].map(match => match[1]), ['player-2', 'player-10', 'player-21']);
 });
 test('team and opponent rosters have no registration count cap and still reject full-width numbers', () => {
   const manyPlayers = Array.from({ length: 61 }, (_, i) => ({ id: `large-player-${i}`, number: String(i % 1000), name: `選手${i}` }));

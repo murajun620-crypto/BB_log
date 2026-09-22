@@ -563,7 +563,10 @@ function persistDraft(key, value) {
 function readTeamForm() {
   const form = document.querySelector('#team-form'); if (!form) return;
   teamDraft.name = form.elements.name.value;
-  teamDraft.players = [...form.querySelectorAll('.roster-edit-row')].map(row => ({ id: row.dataset.playerId, number: row.querySelector('[name=number]').value, name: row.querySelector('[name=playerName]').value }));
+  const rows = [...form.querySelectorAll('.roster-edit-row')].map(row => ({ id: row.dataset.playerId, number: row.querySelector('[name=number]').value, name: row.querySelector('[name=playerName]').value }));
+  const rowsById = new Map(rows.map(row => [row.id, row]));
+  const existingOrder = teamDraft.players.map(player => player.id);
+  teamDraft.players = [...existingOrder.map(id => rowsById.get(id)).filter(Boolean), ...rows.filter(row => !existingOrder.includes(row.id))];
 }
 function opponentRosterRowsFromForm(form) {
   const numbers = [...form.querySelectorAll('[name="opponentRosterNumber"]')].map(input => input.value);
