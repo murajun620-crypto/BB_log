@@ -1,9 +1,10 @@
 # Project Status
 
-バスケットボールの試合記録・共有を行うオフライン対応PWA。正規リポジトリは `Documents/Github/BB_log`、公開先は `https://murajun620-crypto.github.io/BB_log/`。現在のアプリ版は3.0.4。標準記録、Advanced（Bリーグ式12ゾーン）、iPad横向き中心のPro記録モードを実装済み。作戦ボードは実装を保持したまま、試合画面から一時的に外している。
+バスケットボールの試合記録・共有を行うオフライン対応PWA。正規リポジトリは `C:/Users/muraj/Github/BB_log`、公開先は `https://murajun620-crypto.github.io/BB_log/`。現在のアプリ版は3.0.5。標準記録、Advanced（Bリーグ式12ゾーン）、iPad横向き中心のPro記録モードを実装済み。作戦ボードは実装を保持したまま、試合画面から一時的に外している。
 
 # Recent Changes
 
+- 3.0.5で交代をOUT／INチェックボックスの複数選択へ変更。標準とProの自チーム、およびProの相手個人記録に共通適用した。同人数（1〜5人）だけ保存可能とし、番号順の列で対応付けたSUBイベントを1回のIndexedDBトランザクションで保存する。複数交代は同じグループIDを持ち、UNDOと履歴からの削除は一括で戻す。既存の単独SUB履歴と集計形式は維持。ローカル画面で自チーム2人の交代保存・UNDOを確認し、`npm test`の回帰テストを追加した。本体／Reader Service Worker、設定画面、package metadataを3.0.5へ揃えた。
 - 3.0.0をv3の区切りとして、記録データ形式・既存イベント処理・旧共有リンク互換を維持したままUI/UXを整理した。LIVE画面の入力手順を短くし、直近表示を2件へ整理、UNDOに対象イベント名を表示し、保存済み表示は必要時だけ出す。設定画面ではAdvancedモードとスリープ防止を初期HTMLへ移し、重複していた接続状態表示とiPhoneインストール手順の常時表示を整理した。共有リンク管理はReader起動・URLコピー・端末取り込みを主要操作として2列にまとめ、再共有・確認・削除を「その他の操作」へ収納し、取り込み済み共有は再取り込み不可と表示する。
 - 本体とReaderでBOX SCOREのスタッツキー、ラベル、シューティング平均表記を共通化。Readerの共有レポート末尾表示も短くし、共有リンク受け取り画面の文言を用途に合わせて整理した。UIバージョンは `js/version.js` を単一ソースとし、設定画面、`package.json`、本体／Reader Service Workerを3.0.0へ統一。`npm run check:version`を追加し、Pagesワークフローでバージョン整合と`npm test`（44件）をデプロイ前に自動検証する。
 - Pages Run 71でワークフローのNode 20が`tests/cloud-share.test.mjs`の`node:sqlite`を読み込めず失敗したため、Pagesワークフローの実行Nodeを24へ更新。ローカルで`npm run check:version`と`npm test`（44件）を再確認してから再プッシュする。

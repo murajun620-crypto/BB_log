@@ -109,7 +109,8 @@ export function liveView(s, g, events) {
   const recent = activeEvents(events).slice(-2).reverse();
   const lastEvent = activeEvents(events).at(-1);
   const hint = s.preferences.advancedMode ? 'スタッツ → 選手 → 位置' : 'スタッツ → 選手';
-  const undoTarget = lastEvent ? eventLabel(g, lastEvent) : '直前の記録';
+  const batchSize = lastEvent?.substitutionBatchId ? activeEvents(events).filter(event => event.substitutionBatchId === lastEvent.substitutionBatchId).length : 0;
+  const undoTarget = batchSize > 1 ? `${batchSize}人の交代` : lastEvent ? eventLabel(g, lastEvent) : '直前の記録';
   return `<main class="live-screen"><header class="live-header"><a href="#home" class="icon-button" aria-label="ホームに戻る">${icon('back')}</a><span class="live-title"><span class="live-dot"></span>LIVE GAME</span><span class="save-state" aria-live="polite"></span>${action('game-menu', icon('more'), 'icon-button', 'aria-label="試合メニュー"')}</header><section class="scoreboard" aria-label="スコア"><div class="score-team"><span class="team-label">MY TEAM</span><strong>${esc(g.teamName)}</strong></div><div class="score-numbers" aria-live="polite"><b>${a.team.PTS}</b><span>–</span><b>${a.opponent}</b></div><div class="score-team away"><span class="team-label">OPPONENT</span><strong>${esc(g.opponentName)}</strong></div></section><div class="period-row">${action('period-menu', `${esc(period.label)} <span>⌄</span>`, 'period-button', 'aria-label="ピリオド操作"')}<span>${esc(formatGame(g))}</span></div><div class="opponent-row"><span>相手得点</span>${[1, 2, 3].map(n => action('opponent', `+${n}`, 'opponent-button', `data-points="${n}" aria-label="相手に${n}点追加"`)).join('')}</div><div class="input-hint" aria-label="入力手順">${hint}</div><div class="stat-grid">${STAT_DEFS.map(d => action('stat', `<span>${d.label.split(' ')[0]}</span>${d.label.includes(' ') ? `<b class="shot-symbol">${d.tone === 'made' ? '○' : '×'}</b>` : `<small>${d.type === 'OREB' ? 'オフェンスREB' : d.type === 'DREB' ? 'ディフェンスREB' : d.name}</small>`}`, `stat-button ${d.tone}`, `data-type="${d.type}" aria-label="${d.name}"`)).join('')}${action('sub', `<span>SUB</span>${icon('sub')}`, 'stat-button sub', 'aria-label="選手交代"')}</div><section class="recent-events" aria-label="直近の記録"><div class="recent-heading"><span>直前の記録</span>${action('events', '履歴・編集', 'text-button')}</div><div class="recent-list">${recent.map(e => action('edit-event', `<span>${e.eventType === 'OPP' ? 'OPP' : e.eventType === 'SUB' ? 'SUB' : `${esc(g.roster.find(p => p.id === e.playerId)?.number)}`}</span><b>${e.eventType === 'OPP' ? `+${e.points}` : e.eventType === 'SUB' ? '交代' : esc(STATS[e.eventType]?.label)}</b>`, 'recent-chip', `data-id="${e.id}" aria-label="${esc(eventLabel(g, e))}を編集"`)).join('') || '<p class="recent-empty">ここに直近2件のプレーを表示</p>'}</div></section><footer class="live-footer">${action('undo', `${icon('undo')}<strong>UNDO</strong><small class="undo-target">${esc(undoTarget)}</small>`, 'undo-button', activeEvents(events).length ? `aria-label="${esc(undoTarget)}を取り消す"` : 'disabled aria-label="取り消せる記録はありません"')}<a href="#box/${g.id}" class="box-button">${icon('history')}<span>BOX SCORE</span></a></footer></main>`;
 }
 export function liveSettingsHTML(g) {
@@ -121,6 +122,14 @@ export function liveSettingsHTML(g) {
 }
 export function gameDateHTML(g) {
   return `<form id="game-date-form"><p class="help">試合の記録内容はそのままに、表示上の日付だけを変更します。</p><label>試合日<input type="date" name="date" required value="${esc(g.date || localDate())}"></label><button class="button primary full spaced" type="submit">日付を保存</button></form>`;
+}
+export function substitutionFormHTML(g, events, side = 'home') {
+  const opponent = side === 'opponent';
+  const roster = opponent ? g.opponentRoster || [] : g.roster;
+  const onCourt = new Set(opponent ? opponentLineup(g, events) : lineup(g, events));
+  const players = sortPlayersByNumber(roster);
+  const choices = (name, selected) => players.filter(player => onCourt.has(player.id) === selected).map(player => `<label class="substitution-choice"><input type="checkbox" name="${name}" value="${esc(player.id)}"><strong>${esc(player.number)}</strong><span>${esc(player.name || '')}</span></label>`).join('');
+  return `<form id="substitution-form" data-side="${opponent ? 'opponent' : 'home'}"><p class="help">OUTとINを同じ人数だけ選んでください。複数人をまとめて交代できます。履歴には各列の上から順に対応付けて記録します。</p><div class="substitution-columns"><fieldset class="substitution-list"><legend>OUT · コート上</legend>${choices('outPlayerId', true)}</fieldset><fieldset class="substitution-list"><legend>IN · ベンチ</legend>${choices('inPlayerId', false)}</fieldset></div><p class="substitution-count" aria-live="polite">OUT 0人 / IN 0人</p><button class="button primary full spaced" type="submit" disabled>交代を記録</button></form>`;
 }
 const average = (value, games) => (value / games).toFixed(1);
 function shooting(s, games = 1) {
@@ -174,13 +183,11 @@ export function digitalText(value) {
     : `<span class="digital-digit">${'abcdefg'.split('').map(segment => `<i class="digital-segment ${segment} ${DIGITAL_SEGMENTS[character]?.includes(segment) ? 'on' : ''}"></i>`).join('')}</span>`).join('');
   return `<span class="digital-display" aria-hidden="true">${digits}</span><span class="sr-only">${esc(text)}</span>`;
 }
-function proPlayerButton(player, selected, opponent = false, onCourt = false, stats = {}, substitutionLocked = false) {
+function proPlayerButton(player, selected, opponent = false, onCourt = false, stats = {}) {
   const status = onCourt ? 'on-court' : 'bench';
   const points = stats.PTS ?? 0;
   const fouls = stats.PF ?? 0;
-  const locked = substitutionLocked ? ' substitution-locked' : '';
-  const disabled = substitutionLocked ? ' disabled aria-disabled="true"' : '';
-  return `<button class="pro-player ${status}${selected ? ' selected' : ''}${locked}" data-action="${opponent ? 'pro-select-opponent' : 'pro-select-player'}" data-id="${esc(player.id)}" aria-pressed="${selected ? 'true' : 'false'}"${disabled}><span class="pro-player-name"><strong>${esc(player.number)}</strong>${player.name ? `<span>${esc(player.name)}</span>` : ''}</span><small class="pro-player-stats" aria-label="${points}点、ファウル${fouls}"><span class="pro-player-stat pro-player-stat-score" aria-hidden="true"><em>PTS</em><span class="pro-player-stat-value">${points}</span></span><span class="pro-player-stat pro-player-stat-foul" aria-hidden="true"><em>F</em><span class="pro-player-stat-value">${fouls}</span></span></small></button>`;
+  return `<button class="pro-player ${status}${selected ? ' selected' : ''}" data-action="${opponent ? 'pro-select-opponent' : 'pro-select-player'}" data-id="${esc(player.id)}" aria-pressed="${selected ? 'true' : 'false'}"><span class="pro-player-name"><strong>${esc(player.number)}</strong>${player.name ? `<span>${esc(player.name)}</span>` : ''}</span><small class="pro-player-stats" aria-label="${points}点、ファウル${fouls}"><span class="pro-player-stat pro-player-stat-score" aria-hidden="true"><em>PTS</em><span class="pro-player-stat-value">${points}</span></span><span class="pro-player-stat pro-player-stat-foul" aria-hidden="true"><em>F</em><span class="pro-player-stat-value">${fouls}</span></span></small></button>`;
 }
 const proJerseyNumber = player => {
   const number = Number(String(player?.number ?? '').trim());
@@ -275,25 +282,21 @@ export function proLiveView(s, g, events, clockSeconds = null) {
   const visibleOpponentSelection = !opponentShotPointAllowed && PRO_FIELD_SHOT_TYPES.has(opponentSelection.type) ? {} : opponentSelection;
   const onCourt = new Set(lineup(g, events));
   const opponentOnCourt = new Set(opponentLineup(g, events));
-  const ownSubOut = s.proSub?.outPlayerId || null;
-  const opponentSubOut = s.proOpponentSub?.outPlayerId || null;
   const ownPlayers = sortProRoster(g.roster, onCourt)
-    .map(player => proPlayerButton(player, selection.playerId === player.id || ownSubOut === player.id, false, onCourt.has(player.id), a.players[player.id], Boolean(ownSubOut && onCourt.has(player.id) && ownSubOut !== player.id)));
+    .map(player => proPlayerButton(player, selection.playerId === player.id, false, onCourt.has(player.id), a.players[player.id]));
   const opponentPlayers = sortProRoster(g.opponentRoster || [], opponentOnCourt)
-    .map(player => proPlayerButton(player, visibleOpponentSelection.playerId === player.id || opponentSubOut === player.id, true, opponentOnCourt.has(player.id), a.opponentPlayers[player.id], Boolean(opponentSubOut && opponentOnCourt.has(player.id) && opponentSubOut !== player.id)));
+    .map(player => proPlayerButton(player, visibleOpponentSelection.playerId === player.id, true, opponentOnCourt.has(player.id), a.opponentPlayers[player.id]));
   const selectedAction = selection.type ? PRO_SHOT_ACTIONS.find(actionData => actionData[0] === selection.type)?.[4] || STATS[selection.type]?.name || STATS[selection.type]?.label : '';
   const selectedPlayer = g.roster.find(player => player.id === selection.playerId);
   const selectedOpponentAction = visibleOpponentSelection.type ? PRO_SHOT_ACTIONS.find(actionData => actionData[0] === visibleOpponentSelection.type)?.[4] || STATS[visibleOpponentSelection.type]?.name || STATS[visibleOpponentSelection.type]?.label : '';
   const selectedOpponentPlayer = (g.opponentRoster || []).find(player => player.id === visibleOpponentSelection.playerId);
   const ownPointReady = PRO_FIELD_SHOT_TYPES.has(selection.type) && !!selection.playerId;
   const opponentPointReady = opponentShotPointAllowed && PRO_FIELD_SHOT_TYPES.has(visibleOpponentSelection.type) && !!visibleOpponentSelection.playerId;
-  const step = s.proSub ? 'pro-await-own-sub'
-    : s.proOpponentSub ? 'pro-await-opponent-sub'
-      : ownPointReady ? 'pro-await-own-court'
-        : opponentPointReady ? 'pro-await-opponent-court'
-          : selection.type ? 'pro-await-own-player'
-            : visibleOpponentSelection.type ? 'pro-await-opponent-player'
-              : 'pro-step-ready';
+  const step = ownPointReady ? 'pro-await-own-court'
+    : opponentPointReady ? 'pro-await-opponent-court'
+      : selection.type ? 'pro-await-own-player'
+        : visibleOpponentSelection.type ? 'pro-await-opponent-player'
+          : 'pro-step-ready';
   const actionButton = ([type, label, symbol, tone, name]) => action('pro-action', `<span>${label}</span><b>${symbol}</b>`, `pro-action-button ${tone} ${selection.type === type ? 'selected' : ''}`, `data-type="${type}" aria-label="${name}" aria-pressed="${selection.type === type ? 'true' : 'false'}"`);
   const otherButton = type => action('pro-action', `<span>${STATS[type].label}</span>`, `pro-action-button other ${selection.type === type ? 'selected' : ''}`, `data-type="${type}" aria-label="${STATS[type].name}" aria-pressed="${selection.type === type ? 'true' : 'false'}"`);
   const opponentAction = ([type, label, symbol, tone, name]) => action('pro-opponent-action', `<span>${label}</span><b>${symbol}</b>`, `pro-action-button ${tone} ${visibleOpponentSelection.type === type ? 'selected' : ''}`, `data-type="${type}" aria-label="相手 ${name}" aria-pressed="${visibleOpponentSelection.type === type ? 'true' : 'false'}"`);
@@ -304,9 +307,8 @@ export function proLiveView(s, g, events, clockSeconds = null) {
       : selectedOpponentPlayer
         ? `<b>OPPONENT · ${esc(selectedOpponentPlayer.number)}${selectedOpponentPlayer.name ? ` ${esc(selectedOpponentPlayer.name)}` : ''} · ${esc(selectedOpponentAction)}</b>`
       : '';
-  const hasPendingAction = Boolean(selection.type || visibleOpponentSelection.type || s.proSub || s.proOpponentSub);
-  const cancelLabel = s.proSub || s.proOpponentSub ? '交代操作をキャンセル' : '選択したプレーをキャンセル';
-  const cancelAction = hasPendingAction ? action('pro-cancel-selection', 'キャンセル', 'pro-selection-cancel', `type="button" aria-label="${cancelLabel}"`) : '';
+  const hasPendingAction = Boolean(selection.type || visibleOpponentSelection.type);
+  const cancelAction = hasPendingAction ? action('pro-cancel-selection', 'キャンセル', 'pro-selection-cancel', 'type="button" aria-label="選択したプレーをキャンセル"') : '';
   const ownRoster = `${ownPlayers.join('')}${action('add-member', `${icon('plus')}選手を追加`, 'pro-roster-add', 'type="button" aria-label="自チームの選手を追加"')}`;
   const opponentRoster = `${opponentPlayers.join('')}${action('add-opponent-player', `${icon('plus')}相手選手を追加`, 'pro-roster-add', 'type="button" aria-label="相手選手を追加"')}`;
   const opponentSide = g.opponentTracking === 'player'

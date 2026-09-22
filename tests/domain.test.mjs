@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, efficiency, eventLabel, fullCourtPointFromHalf, halfCourtPointFromFull, isBackcourtPoint, normalizeShotZone, opponentLineup, oppositeDirection, percent, lineup, validateGame, validateTeam, makePeriods, shotDirectionForEvent, shotPointsFromPoint, shotZoneForEvent, shotZoneFromPoint, uid } from '../js/domain.js';
+import { STATS, SHOT_ZONES, aggregate, aggregateGames, attackDirectionForPeriod, efficiency, eventLabel, fullCourtPointFromHalf, halfCourtPointFromFull, isBackcourtPoint, normalizeShotZone, opponentLineup, oppositeDirection, percent, lineup, substitutionPairs, validateGame, validateTeam, makePeriods, shotDirectionForEvent, shotPointsFromPoint, shotZoneForEvent, shotZoneFromPoint, uid } from '../js/domain.js';
 import { backupObject, parseBackup, gameCSV } from '../js/transfer.js';
 import { createSharedReport, createAggregateSharedReport, createSharePayload, createCompressedSharePayload, parseSharePayload, parseSharedReport } from '../js/shared-report.js';
 import { buildImportedRecords } from '../js/shared-import.js';
-import { aggregateViewUnified, boxView, gameFormView, isIPhonePortrait, isIPhoneUserAgent, PRO_HALF_COURT_MARKINGS, liveSettingsHTML, proLiveView, settingsView, sharedReportView, shotChartHTML, shotMarkerDetailFeedbackHTML, shotZonePicker, shotChartMapHTML, sortPlayersByNumber, strategyBoardHTML, teamFormView } from '../js/views.js';
+import { aggregateViewUnified, boxView, gameFormView, isIPhonePortrait, isIPhoneUserAgent, PRO_HALF_COURT_MARKINGS, liveSettingsHTML, liveView, proLiveView, settingsView, sharedReportView, shotChartHTML, shotMarkerDetailFeedbackHTML, shotZonePicker, shotChartMapHTML, sortPlayersByNumber, strategyBoardHTML, substitutionFormHTML, teamFormView } from '../js/views.js';
 import { APP_VERSION } from '../js/version.js';
 
 const fixture = () => {
@@ -372,30 +372,60 @@ test('Pro LIVE keeps substitution and play changes available while guiding the n
   assert.match(proLiveCss, /@keyframes pro-shot-area-feedback-fade/);
   assert.match(proLiveCss, /\.pro-shot-marker \{ pointer-events: auto; cursor: pointer; \}/);
 });
-test('Pro LIVE can cancel a play selection and focuses the bench after choosing OUT', () => {
+test('Pro LIVE can cancel a play selection and exposes both team substitution buttons', () => {
   const { game, events } = fixture();
-  game.mode = 'pro'; game.clockEnabled = false;
-  const selected = proLiveView({ proSelection: { type: 'FGM', playerId: null }, proOpponentSelection: null, proSub: null, proOpponentSub: null }, game, events);
-  assert.match(selected, /data-action="pro-cancel-selection"[^>]*aria-label="選択したプレーをキャンセル"/);
-  assert.match(selected, /class="pro-selection-cancel"/);
-  const idle = proLiveView({ proSelection: null, proOpponentSelection: null, proSub: null, proOpponentSub: null }, game, events);
-  assert.doesNotMatch(idle, /data-action="pro-cancel-selection"/);
-
-  const ownSub = proLiveView({ proSelection: null, proOpponentSelection: null, proSub: { outPlayerId: 'player-0' }, proOpponentSub: null }, game, events);
-  assert.match(ownSub, /class="pro-player on-court selected" data-action="pro-select-player" data-id="player-0"/);
-  assert.match(ownSub, /class="pro-player on-court substitution-locked"[^>]*disabled aria-disabled="true"/);
-  assert.match(ownSub, /class="pro-player bench" data-action="pro-select-player" data-id="player-5"/);
-  assert.match(ownSub, /data-action="pro-cancel-selection"[^>]*aria-label="交代操作をキャンセル"/);
-  assert.match(proLiveCss, /\.pro-player\.substitution-locked \{[^}]*opacity: \.28[^}]*pointer-events: none/);
-  assert.match(proLiveCss, /\.pro-live-screen\.pro-await-own-sub \.pro-player\.bench,[\s\S]*\.pro-live-screen\.pro-await-opponent-sub \.pro-player\.bench/);
-
-  game.opponentTracking = 'player';
+  game.mode = 'pro'; game.clockEnabled = false; game.opponentTracking = 'player';
   game.opponentRoster = Array.from({ length: 6 }, (_, i) => ({ id: `opponent-${i}`, number: `${i + 4}` }));
   game.opponentStarters = game.opponentRoster.slice(0, 5).map(player => player.id);
-  const opponentSub = proLiveView({ proSelection: null, proOpponentSelection: null, proSub: null, proOpponentSub: { outPlayerId: 'opponent-0' } }, game, events);
-  assert.match(opponentSub, /class="pro-player on-court selected" data-action="pro-select-opponent" data-id="opponent-0"/);
-  assert.match(opponentSub, /class="pro-player on-court substitution-locked"[^>]*disabled aria-disabled="true"/);
-  assert.match(opponentSub, /class="pro-player bench" data-action="pro-select-opponent" data-id="opponent-5"/);
+  const selected = proLiveView({ proSelection: { type: 'FGM', playerId: null }, proOpponentSelection: null }, game, events);
+  assert.match(selected, /data-action="pro-cancel-selection"[^>]*aria-label="選択したプレーをキャンセル"/);
+  const idle = proLiveView({ proSelection: null, proOpponentSelection: null }, game, events);
+  assert.doesNotMatch(idle, /data-action="pro-cancel-selection"/);
+  assert.match(idle, /data-action="pro-sub"/);
+  assert.match(idle, /data-action="pro-opponent-sub"/);
+  assert.doesNotMatch(idle, /substitution-locked|pro-await-own-sub|pro-await-opponent-sub/);
+});
+test('checkbox substitution forms separate on-court and bench players for both teams', () => {
+  const { game, events } = fixture();
+  game.roster.push({ id: 'player-6', number: '2', name: '追加選手' });
+  const own = substitutionFormHTML(game, events);
+  assert.match(own, /id="substitution-form" data-side="home"/);
+  assert.deepEqual([...own.matchAll(/name="outPlayerId" value="([^"]+)"/g)].map(match => match[1]), game.starters);
+  assert.deepEqual([...own.matchAll(/name="inPlayerId" value="([^"]+)"/g)].map(match => match[1]), ['player-6', 'player-5']);
+  assert.match(own, /type="submit" disabled/);
+  game.mode = 'pro'; game.clockEnabled = false; game.opponentTracking = 'player';
+  game.opponentRoster = Array.from({ length: 7 }, (_, i) => ({ id: `opponent-${i}`, number: String(10 - i) }));
+  game.opponentStarters = game.opponentRoster.slice(0, 5).map(player => player.id);
+  const opponent = substitutionFormHTML(game, events, 'opponent');
+  assert.match(opponent, /id="substitution-form" data-side="opponent"/);
+  assert.deepEqual([...opponent.matchAll(/name="outPlayerId" value="([^"]+)"/g)].map(match => match[1]), ['opponent-4', 'opponent-3', 'opponent-2', 'opponent-1', 'opponent-0']);
+  assert.deepEqual([...opponent.matchAll(/name="inPlayerId" value="([^"]+)"/g)].map(match => match[1]), ['opponent-6', 'opponent-5']);
+});
+test('multiple substitutions validate equal OUT and IN counts and preserve five on court', () => {
+  const { game, events } = fixture();
+  game.roster.push({ id: 'player-6', number: '10', name: '追加選手' });
+  const pairs = substitutionPairs(game, events, 'home', ['player-0', 'player-1'], ['player-5', 'player-6']);
+  assert.deepEqual(pairs, [{ outPlayerId: 'player-0', inPlayerId: 'player-5' }, { outPlayerId: 'player-1', inPlayerId: 'player-6' }]);
+  assert.throws(() => substitutionPairs(game, events, 'home', ['player-0'], ['player-5', 'player-6']), /同じ人数/);
+  assert.throws(() => substitutionPairs(game, events, 'home', ['player-0', 'player-0'], ['player-5', 'player-6']), /OUTは/);
+  assert.throws(() => substitutionPairs(game, events, 'home', ['player-0'], ['player-2']), /INは/);
+  const batchId = uid();
+  pairs.forEach((pair, index) => events.push({ id: uid(), gameId: game.id, periodId: game.currentPeriodId, eventType: 'SUB', playerId: null, points: 0, timestamp: new Date().toISOString(), seq: game.nextSeq++, substitutionBatchId: batchId, ...pair }));
+  validateGame(game, events);
+  assert.deepEqual(new Set(lineup(game, events)), new Set(['player-2', 'player-3', 'player-4', 'player-5', 'player-6']));
+  assert.match(liveView({ preferences: { advancedMode: false } }, game, events), /aria-label="2人の交代を取り消す"/);
+  const deletedAt = new Date().toISOString();
+  const undone = events.map(event => ({ ...event, deletedAt }));
+  assert.doesNotThrow(() => validateGame(game, undone));
+  assert.deepEqual(new Set(lineup(game, undone)), new Set(game.starters));
+  game.mode = 'pro'; game.clockEnabled = false; game.opponentTracking = 'player';
+  game.opponentRoster = Array.from({ length: 7 }, (_, index) => ({ id: `opponent-${index}`, number: String(index + 4) }));
+  game.opponentStarters = game.opponentRoster.slice(0, 5).map(player => player.id);
+  const opponentPairs = substitutionPairs(game, events, 'opponent', ['opponent-0', 'opponent-1'], ['opponent-5', 'opponent-6']);
+  const opponentBatchId = uid();
+  opponentPairs.forEach(pair => events.push({ id: uid(), gameId: game.id, periodId: game.currentPeriodId, eventType: 'SUB', side: 'opponent', playerId: null, points: 0, timestamp: new Date().toISOString(), seq: game.nextSeq++, substitutionBatchId: opponentBatchId, ...pair }));
+  assert.doesNotThrow(() => validateGame(game, events));
+  assert.deepEqual(new Set(opponentLineup(game, events)), new Set(['opponent-2', 'opponent-3', 'opponent-4', 'opponent-5', 'opponent-6']));
 });
 test('opponent players require a jersey number but can optionally include a name', () => {
   const { game } = fixture();

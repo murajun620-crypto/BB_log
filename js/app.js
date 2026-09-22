@@ -1,5 +1,5 @@
 import * as db from './db.js';
-import { uid, localDate, STATS, activeEvents, attackDirectionForPeriod, fullCourtPointFromHalf, halfCourtPointFromFull, isBackcourtPoint, makePeriods, opponentLineup, oppositeDirection, shotDirectionForEvent, shotPointsFromPoint, shotZoneFromPoint, shotZoneForEvent, shotZoneLabel, validateTeam, validateGame, lineup, eventLabel, aggregate, aggregateGames } from './domain.js';
+import { uid, localDate, STATS, activeEvents, attackDirectionForPeriod, fullCourtPointFromHalf, halfCourtPointFromFull, isBackcourtPoint, makePeriods, opponentLineup, oppositeDirection, shotDirectionForEvent, shotPointsFromPoint, shotZoneFromPoint, shotZoneForEvent, shotZoneLabel, substitutionPairs, validateTeam, validateGame, lineup, eventLabel, aggregate, aggregateGames } from './domain.js';
 import { backupObject, parseBackup, gameCSV, download, copyText, shareFile, shareUrl } from './transfer.js';
 import { boxScoreImage, playerStatsImage, safeFilename, shareImage } from './share-image.js';
 import { createSharedReport, createAggregateSharedReport, createCompressedSharePayload, parseSharePayload, parseSharedReport, sharedReportFile } from './shared-report.js';
@@ -12,7 +12,7 @@ import { APP_VERSION } from './version.js';
 const app = document.querySelector('#app');
 const sheet = document.querySelector('#sheet');
 const toastNode = document.querySelector('#toast');
-const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, advancedMode: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, historySelection: new Set(), aggregateMode: 'total', aggregateGameId: null, aggregatePlayerGameId: 'total', shotDisplayMode: 'points', strategyBoard: null, proSelection: null, proSub: null, proOpponentSelection: null, proOpponentSub: null, proShotFeedback: null, proShotEdit: null, page: 'home', gameId: null, busy: false, lastError: '' };
+const state = { data: { teams: [], games: [], events: [], settings: [] }, preferences: { continuous: false, keepAwake: false, advancedMode: false, theme: 'system' }, pwa: { ready: false, error: '', update: false }, historySelection: new Set(), aggregateMode: 'total', aggregateGameId: null, aggregatePlayerGameId: 'total', shotDisplayMode: 'points', strategyBoard: null, proSelection: null, proOpponentSelection: null, proShotFeedback: null, proShotEdit: null, page: 'home', gameId: null, busy: false, lastError: '' };
 let teamDraft, gameDraft, sharedReport, pending, confirmAction, toastTimer, draftVersion = 0, draftQueue = Promise.resolve(), wakeLock = null, proClockTimer = null, proClockSaving = false, proShotFeedbackTimer = null, activeShotMarkerFeedback = null, shotMarkerGesture = null, activeProShotGesture = null, suppressNextShotMarkerClick = false, suppressNextProShotClick = false, shotMarkerClickTimer = null, proShotClickTimer = null, activeShotEditSource = null, resolvedShareHash = '', sharePayloadPromise = null, pwaRegistration = null;
 const PRO_FIELD_SHOT_TYPES = new Set(['FGM', 'FGX']);
 const PRO_DIRECT_FIELD_SHOT_TYPES = new Set(['2PM', '2PX', '3PM', '3PX']);
@@ -633,6 +633,29 @@ async function saveGameChange(next, event = null) {
   if (event) state.data.events = state.data.events.filter(e => e.id !== event.id).concat(event);
   render(); return saved;
 }
+async function saveGameEvents(next, changedEvents) {
+  const changedIds = new Set(changedEvents.map(event => event.id));
+  const events = gameEvents(next).filter(event => !changedIds.has(event.id)).concat(changedEvents);
+  validateGame(next, events);
+  const saved = await db.commitGameBatch(next, changedEvents);
+  state.data.games = state.data.games.map(game => game.id === saved.id ? saved : game);
+  state.data.events = state.data.events.filter(event => !changedIds.has(event.id)).concat(changedEvents);
+  render();
+  return saved;
+}
+async function recordSubstitutions(side, outIds, inIds) {
+  const g = game();
+  if (!g || g.status !== 'live') throw new Error('記録中の試合で交代してください。');
+  if (side === 'opponent' && (g.mode !== 'pro' || g.opponentTracking !== 'player')) throw new Error('相手選手の交代はProの個人記録で利用できます。');
+  const pairs = substitutionPairs(g, gameEvents(g), side, outIds, inIds);
+  const timestamp = new Date().toISOString();
+  const batchId = uid();
+  const clockSeconds = g.mode === 'pro' && g.clockEnabled ? currentClockSeconds(g) : null;
+  const events = pairs.map((pair, index) => ({ id: uid(), gameId: g.id, periodId: g.currentPeriodId, eventType: 'SUB', playerId: null, points: 0, timestamp, seq: g.nextSeq + index, ...pair, ...(side === 'opponent' ? { side } : {}), ...(clockSeconds === null ? {} : { clockSeconds }), substitutionBatchId: batchId }));
+  await saveGameEvents({ ...g, nextSeq: g.nextSeq + events.length }, events);
+  closeSheet();
+  toast(`${side === 'opponent' ? '相手 ' : ''}${events.length}人を交代しました。`);
+}
 async function record(eventType, playerId = null, extra = {}) {
   const g = game();
   if (!g || g.status !== 'live') throw new Error('記録中の試合で入力してください。');
@@ -719,17 +742,24 @@ function addMemberMenu() {
   const players = available.length ? `<p class="picker-label">登録済み選手</p><div class="player-grid">${available.map(p => `<button class="player-button" data-action="prepare-member" data-id="${p.id}"><strong>${view.esc(p.number)}</strong><span>${view.esc(p.name)}</span></button>`).join('')}</div>` : '<p class="help">試合に未追加の登録済み選手はいません。</p>';
   showSheet('メンバーを追加', `${players}<button class="button primary full spaced" data-action="prepare-member">＋ 新しい選手を登録して追加</button><p class="help">登録済み選手は背番号を確認・変更してから追加できます。</p>`, 'player-sheet');
 }
-function subStart() {
+function subStart(side = 'home') {
   const g = game();
-  if (g.roster.length < 5) { showSheet('選手交代', '<p class="help">交代管理には5人以上の出場メンバーが必要です。試合メニューの「メンバーを追加」から選手を追加してください。</p>'); return; }
-  if (g.starters.length !== 5) {
-    const choices = g.roster.map(p => `<label class="member-choice"><input type="checkbox" name="lineup" value="${p.id}" ${g.roster.length === 5 ? 'checked' : ''}><strong>${view.esc(p.number)}</strong><span>${view.esc(p.name)}</span></label>`).join('');
+  if (!g || g.status !== 'live') return;
+  const opponent = side === 'opponent';
+  if (opponent && (g.mode !== 'pro' || g.opponentTracking !== 'player')) return;
+  const roster = opponent ? g.opponentRoster || [] : g.roster;
+  if (roster.length < 5) { showSheet('選手交代', '<p class="help">交代管理には5人以上の選手が必要です。試合メニューから選手を追加してください。</p>'); return; }
+  if (!opponent && g.starters.length !== 5) {
+    const choices = view.sortPlayersByNumber(g.roster).map(p => `<label class="member-choice"><input type="checkbox" name="lineup" value="${p.id}" ${g.roster.length === 5 ? 'checked' : ''}><strong>${view.esc(p.number)}</strong><span>${view.esc(p.name)}</span></label>`).join('');
     showSheet('コート上の5人を設定', `<form id="live-lineup-form"><p class="help">現在コートにいる5人を選んでください。これまでのスタッツには影響しません。</p><div class="panel roster-select">${choices}</div><button class="button primary full spaced" type="submit">5人を設定して交代へ</button></form>`);
     return;
   }
-  if (g.roster.length <= 5) { toast('交代できるベンチの選手がいません。'); return; }
-  pending = { kind: 'sub-out' };
-  showSheet('SUB · OUTを選択', view.pickerHTML(g, gameEvents(), null, { only: lineup(g, gameEvents()), instruction: 'コートを出る選手をタップ' }), 'player-sheet');
+  if (roster.length <= 5) { toast('交代できるベンチの選手がいません。'); return; }
+  const onCourt = opponent ? opponentLineup(g, gameEvents(g)) : lineup(g, gameEvents(g));
+  if (onCourt.length !== 5) { toast('コート上の5人を設定してから交代してください。', true); return; }
+  state.proSelection = null; state.proOpponentSelection = null;
+  render();
+  showSheet(opponent ? '相手選手の交代' : '選手交代', view.substitutionFormHTML(g, gameEvents(g), side), 'player-sheet');
 }
 function periodMenu() {
   const g = game(); const index = g.periods.findIndex(p => p.id === g.currentPeriodId);
@@ -1023,20 +1053,11 @@ const handlers = {
       state.proSelection = null; render(); return;
     }
     const playerId = state.proSelection?.playerId || null;
-    state.proSub = null; state.proOpponentSelection = null; state.proOpponentSub = null; state.proSelection = { type: button.dataset.type, playerId }; render();
+    state.proOpponentSelection = null; state.proSelection = { type: button.dataset.type, playerId }; render();
   },
   'pro-select-player': button => {
     const g = game(); if (g?.mode !== 'pro') return;
-    const id = button.dataset.id; const on = new Set(lineup(g, gameEvents(g)));
-    if (state.proSub) {
-      if (!state.proSub.outPlayerId) {
-        if (!on.has(id)) return toast('交代するコート上の選手を選んでください。', true);
-        state.proSub = { outPlayerId: id }; render(); return;
-      }
-      if (on.has(id)) return toast('コートに入るベンチの選手を選んでください。', true);
-      const outPlayerId = state.proSub.outPlayerId;
-      return busy(async () => { await record('SUB', null, { outPlayerId, inPlayerId: id }); state.proSub = null; state.proSelection = null; render(); });
-    }
+    const id = button.dataset.id;
     const selection = state.proSelection;
     if (!selection?.type) return toast('先に記録するプレーを選んでください。', true);
     if (PRO_FIELD_SHOT_TYPES.has(selection.type)) { state.proSelection = { ...selection, playerId: id }; render(); return; }
@@ -1051,9 +1072,9 @@ const handlers = {
   'pro-backcourt': () => toast('バックコートは選択できません。', true),
   'pro-cancel-selection': () => {
     if (game()?.mode !== 'pro') return;
-    state.proSelection = null; state.proOpponentSelection = null; state.proSub = null; state.proOpponentSub = null; render();
+    state.proSelection = null; state.proOpponentSelection = null; render();
   },
-  'pro-sub': () => { if (game()?.mode !== 'pro') return; state.proSelection = null; state.proSub = { outPlayerId: null }; state.proOpponentSelection = null; state.proOpponentSub = null; render(); },
+  'pro-sub': () => { if (game()?.mode === 'pro') subStart(); },
   'toggle-pro-attack': () => busy(async () => {
     const g = game(); if (g?.mode !== 'pro') return;
     const next = { ...g, attackDirection: g.attackDirection === 'left' ? 'right' : 'left' };
@@ -1066,28 +1087,15 @@ const handlers = {
       state.proOpponentSelection = null; render(); return;
     }
     const playerId = state.proOpponentSelection?.playerId || null;
-    state.proOpponentSelection = { type: button.dataset.type, playerId }; state.proSelection = null; state.proSub = null; state.proOpponentSub = null; render();
+    state.proOpponentSelection = { type: button.dataset.type, playerId }; state.proSelection = null; render();
   },
   'pro-opponent-sub': () => {
     const g = game();
     if (g?.mode !== 'pro' || g.opponentTracking !== 'player') return;
-    if ((g.opponentRoster || []).length < 5) return toast('相手選手は5人以上入力してください。', true);
-    if ((g.opponentRoster || []).length <= 5) return toast('交代できる相手ベンチ選手がいません。', true);
-    if (opponentLineup(g, gameEvents(g)).length !== 5) return toast('相手チームのコート上選手を5人に設定してから交代してください。', true);
-    state.proOpponentSelection = null; state.proSelection = null; state.proSub = null; state.proOpponentSub = { outPlayerId: null }; render();
+    subStart('opponent');
   },
   'pro-select-opponent': button => {
     const g = game(), selection = state.proOpponentSelection;
-    const on = new Set(opponentLineup(g, gameEvents(g)));
-    if (state.proOpponentSub) {
-      if (!state.proOpponentSub.outPlayerId) {
-        if (!on.has(button.dataset.id)) return toast('交代するコート上の相手選手を選んでください。', true);
-        state.proOpponentSub = { outPlayerId: button.dataset.id }; render(); return;
-      }
-      if (on.has(button.dataset.id)) return toast('コートに入る相手のベンチ選手を選んでください。', true);
-      const outPlayerId = state.proOpponentSub.outPlayerId;
-      return busy(async () => { await record('SUB', null, { side: 'opponent', outPlayerId, inPlayerId: button.dataset.id }); state.proOpponentSub = null; state.proOpponentSelection = null; render(); });
-    }
     if (g?.mode !== 'pro' || g.opponentTracking !== 'player' || !selection?.type) return toast('先に相手のプレーを選んでください。', true);
     if (PRO_DIRECT_FIELD_SHOT_TYPES.has(selection.type)) {
       return busy(async () => { await record(selection.type, button.dataset.id, { side: 'opponent' }); state.proOpponentSelection = null; render(); });
@@ -1117,17 +1125,9 @@ const handlers = {
   }),
   'pick-player': button => {
     if (!pending) return;
-    if (pending.kind === 'sub-out') {
-      const out = button.dataset.id; pending = { kind: 'sub-in', out };
-      showSheet('SUB · INを選択', view.pickerHTML(game(), gameEvents(), null, { only: game().roster.filter(p => !lineup(game(), gameEvents()).includes(p.id)).map(p => p.id), plain: true, instruction: 'コートに入る選手をタップ' }), 'player-sheet');
-    } else if (pending.kind === 'sub-in') {
-      const out = pending.out;
-      return busy(async () => { await record('SUB', null, { outPlayerId: out, inPlayerId: button.dataset.id }); closeSheet(); });
-    } else {
-      const selection = { ...pending };
-      if (state.preferences.advancedMode && ['2PM', '2PX', '3PM', '3PX'].includes(selection.type)) { startShotZone(selection.type, button.dataset.id); return; }
-      return busy(async () => { const event = await record(selection.type, button.dataset.id); closeSheet(); if (!selection.followup) offerFollowup(event); });
-    }
+    const selection = { ...pending };
+    if (state.preferences.advancedMode && ['2PM', '2PX', '3PM', '3PX'].includes(selection.type)) { startShotZone(selection.type, button.dataset.id); return; }
+    return busy(async () => { const event = await record(selection.type, button.dataset.id); closeSheet(); if (!selection.followup) offerFollowup(event); });
   },
   'shot-zone': button => {
     if (pending?.kind !== 'advanced-shot') return;
@@ -1141,16 +1141,27 @@ const handlers = {
     memberForm(player);
   },
   opponent: button => busy(() => record('OPP', null, { points: Number(button.dataset.points) })),
-  sub: subStart,
+  sub: () => subStart(),
   undo: () => busy(async () => {
     const e = activeEvents(gameEvents()).at(-1); if (!e) return;
-    await saveGameChange(game(), { ...e, deletedAt: new Date().toISOString() }); toast(`取消：${eventLabel(game(), e)}`);
+    const batch = e.substitutionBatchId ? activeEvents(gameEvents()).filter(event => event.substitutionBatchId === e.substitutionBatchId) : [e];
+    const deletedAt = new Date().toISOString();
+    if (batch.length > 1) await saveGameEvents(game(), batch.map(event => ({ ...event, deletedAt })));
+    else await saveGameChange(game(), { ...e, deletedAt });
+    toast(batch.length > 1 ? `取消：${batch.length}人の交代` : `取消：${eventLabel(game(), e)}`);
   }),
   events: () => showSheet('イベント履歴', view.eventsHTML(game(), gameEvents())),
   'edit-event': button => { const e = gameEvents().find(e => e.id === button.dataset.id && !e.deletedAt); if (e) showSheet('記録を編集', view.editEventHTML(game(), e)); },
   'delete-event': button => {
     const e = gameEvents().find(e => e.id === button.dataset.id);
-    confirm('この記録を削除しますか？', eventLabel(game(), e), '削除する', async () => { await saveGameChange(game(), { ...e, deletedAt: new Date().toISOString() }); closeSheet(); toast('記録を削除しました。'); }, true);
+    const batch = e.substitutionBatchId ? activeEvents(gameEvents()).filter(event => event.substitutionBatchId === e.substitutionBatchId) : [e];
+    const description = batch.length > 1 ? `${batch.length}人分の交代をまとめて削除します。` : eventLabel(game(), e);
+    confirm('この記録を削除しますか？', description, '削除する', async () => {
+      const deletedAt = new Date().toISOString();
+      if (batch.length > 1) await saveGameEvents(game(), batch.map(event => ({ ...event, deletedAt })));
+      else await saveGameChange(game(), { ...e, deletedAt });
+      closeSheet(); toast('記録を削除しました。');
+    }, true);
   },
   'delete-game': button => {
     const g = state.data.games.find(candidate => candidate.id === button.dataset.id);
@@ -1342,6 +1353,15 @@ document.addEventListener('input', event => {
 });
 document.addEventListener('change', event => {
   const el = event.target;
+  if (el.closest('#substitution-form')) {
+    const form = el.closest('form');
+    const values = new FormData(form);
+    const outCount = values.getAll('outPlayerId').length;
+    const inCount = values.getAll('inPlayerId').length;
+    form.querySelector('.substitution-count').textContent = `OUT ${outCount}人 / IN ${inCount}人`;
+    form.querySelector('button[type="submit"]').disabled = !outCount || outCount !== inCount;
+    return;
+  }
   if (el.matches('[data-action="select-aggregate-player-game"]')) {
     const games = state.data.games.filter(candidate => state.historySelection.has(candidate.id));
     const report = aggregateGames(games, state.data.events);
@@ -1456,6 +1476,10 @@ document.addEventListener('submit', event => {
     if (selected.length !== 5) throw new Error('コート上の選手を5人選択してください。');
     await saveGameChange({ ...game(), starters: selected });
     closeSheet(); toast('コート上の5人を設定しました。'); subStart();
+  });
+  if (form.id === 'substitution-form') busy(async () => {
+    const values = new FormData(form);
+    await recordSubstitutions(form.dataset.side, values.getAll('outPlayerId'), values.getAll('inPlayerId'));
   });
   if (form.id === 'live-settings-form') busy(async () => {
     const g = game(); if (!g || g.status !== 'live') throw new Error('記録中の試合を開いてください。');

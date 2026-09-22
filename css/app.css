@@ -165,6 +165,14 @@ input[type=checkbox] { width: 22px; height: 22px; accent-color: var(--accent); c
 .member-choice strong { min-width: 31px; font-variant-numeric: tabular-nums; }
 .member-choice span { font-size: 14px; overflow-wrap: anywhere; }
 .starter-choice { display: flex; align-items: center; justify-content: center; width: 44px; height: 52px; }
+.substitution-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.substitution-list { min-width: 0; margin: 0; padding: 8px 10px 4px; border: 1px solid var(--line); border-radius: 12px; }
+.substitution-list legend { padding: 0 5px; font-weight: 800; }
+.substitution-choice { display: flex; align-items: center; gap: 8px; min-height: 48px; border-top: 1px solid var(--line); cursor: pointer; }
+.substitution-choice strong { min-width: 28px; font-variant-numeric: tabular-nums; }
+.substitution-choice span { min-width: 0; overflow-wrap: anywhere; }
+.substitution-count { margin-top: 14px; text-align: center; font-weight: 700; }
+@media (max-width: 500px) { .substitution-columns { grid-template-columns: 1fr; } }
 .form-actions { display: flex; gap: 12px; margin-top: 24px; }
 .form-actions > * { flex: 1; }
 .form-footnote { text-align: center; margin: 15px 0; }
@@ -413,11 +421,6 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-player.bench .pro-player-name { opacity: .82; }
 .pro-player.bench strong { color: var(--accent); opacity: .78; }
 .pro-player.selected { border-color: var(--accent); background: var(--accent-soft); box-shadow: inset 0 0 0 1px var(--accent); }
-.pro-player.substitution-locked { opacity: .28; filter: grayscale(.85); pointer-events: none; cursor: default; }
-.pro-live-screen.pro-await-own-sub .pro-player.bench,
-.pro-live-screen.pro-await-opponent-sub .pro-player.bench { opacity: 1; filter: none; border-color: var(--accent); color: var(--text); box-shadow: 0 0 0 1px rgba(240, 178, 74, .24); }
-.pro-live-screen.pro-await-own-sub .pro-player.bench .pro-player-name,
-.pro-live-screen.pro-await-opponent-sub .pro-player.bench .pro-player-name { opacity: 1; }
 .pro-roster-add { display: inline-flex; grid-column: 1 / -1; align-items: center; justify-content: center; gap: 5px; min-height: 42px; padding: 6px 8px; border: 1px dashed var(--line); border-radius: 8px; background: transparent; color: var(--muted); font-size: 11px; font-weight: 700; }
 .pro-roster-add .icon { width: 15px; height: 15px; }
 .pro-sub-button { min-height: 39px; margin-top: 2px; border: 1px solid var(--line); border-radius: 8px; background: var(--surface-2); color: var(--muted); font-size: 11px; font-weight: 700; }
@@ -429,11 +432,7 @@ body.in-game { overscroll-behavior-y: none; }
 .pro-live-screen.pro-await-own-player .pro-away-side,
 .pro-live-screen.pro-await-opponent-player .pro-court,
 .pro-live-screen.pro-await-opponent-player .pro-direction-button,
-.pro-live-screen.pro-await-opponent-player .pro-home-side,
-.pro-live-screen.pro-await-own-sub .pro-center,
-.pro-live-screen.pro-await-own-sub .pro-away-side,
-.pro-live-screen.pro-await-opponent-sub .pro-center,
-.pro-live-screen.pro-await-opponent-sub .pro-home-side { opacity: .28; filter: grayscale(.85); pointer-events: none; }
+.pro-live-screen.pro-await-opponent-player .pro-home-side { opacity: .28; filter: grayscale(.85); pointer-events: none; }
 .pro-live-screen.pro-await-own-court .pro-home-side,
 .pro-live-screen.pro-await-own-court .pro-away-side,
 .pro-live-screen.pro-await-own-court .pro-court-status,

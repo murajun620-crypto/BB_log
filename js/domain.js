@@ -213,6 +213,18 @@ export function opponentLineup(game, events, strict = false) {
   }
   return [...on];
 }
+export function substitutionPairs(game, events, side, outIds, inIds) {
+  const opponent = side === 'opponent';
+  if (!opponent && side !== 'home') throw new Error('交代するチームが不正です。');
+  const roster = opponent ? game.opponentRoster || [] : game.roster;
+  const onCourt = new Set(opponent ? opponentLineup(game, events, true) : lineup(game, events, true));
+  const rosterIds = new Set(roster.map(player => player.id));
+  if (onCourt.size !== 5) throw new Error('コート上の5人を設定してから交代してください。');
+  if (!outIds.length || outIds.length !== inIds.length || outIds.length > 5) throw new Error('OUTとINを同じ人数（1〜5人）選択してください。');
+  if (new Set(outIds).size !== outIds.length || outIds.some(id => !onCourt.has(id))) throw new Error('OUTはコート上の選手から選択してください。');
+  if (new Set(inIds).size !== inIds.length || inIds.some(id => !rosterIds.has(id) || onCourt.has(id))) throw new Error('INはベンチの選手から選択してください。');
+  return outIds.map((outPlayerId, index) => ({ outPlayerId, inPlayerId: inIds[index] }));
+}
 export function eventLabel(game, event) {
   const player = (id, side = 'home') => { const p = (side === 'opponent' ? game.opponentRoster || [] : game.roster).find(p => p.id === id); return p ? side === 'opponent' ? [p.number, p.name].filter(Boolean).join(' ') : `${p.number} ${p.name}` : '不明'; };
   if (event.eventType === 'OPP') return `相手 +${event.points}`;
@@ -270,6 +282,7 @@ export function validateGame(g, events) {
   ensure(Array.isArray(events) && unique(events.map(e => e.id)) && unique(events.map(e => e.seq)), 'イベントが重複しています。');
   for (const e of events) {
     ensure(e && isId(e.id) && e.gameId === g.id && g.periods.some(p => p.id === e.periodId) && validTime(e.timestamp) && Number.isInteger(e.seq) && e.seq > 0 && e.seq < g.nextSeq && (!e.deletedAt || validTime(e.deletedAt)), 'イベント情報が不正です。');
+    if (e.substitutionBatchId !== undefined) ensure(e.eventType === 'SUB' && isId(e.substitutionBatchId), '交代グループが不正です。');
     if (e.side === 'opponent' && e.eventType === 'SUB') ensure(g.mode === 'pro' && g.opponentTracking === 'player' && opponentIds.has(e.outPlayerId) && opponentIds.has(e.inPlayerId) && e.outPlayerId !== e.inPlayerId && e.points === 0, '相手チームの交代選手が不正です。');
     else if (e.side === 'opponent') ensure(g.mode === 'pro' && g.opponentTracking === 'player' && Object.hasOwn(STATS, e.eventType) && opponentIds.has(e.playerId) && e.points === STATS[e.eventType].points, '相手選手スタッツが不正です。');
     else if (e.eventType === 'OPP') ensure([1, 2, 3].includes(e.points) && e.playerId == null, '相手得点が不正です。');

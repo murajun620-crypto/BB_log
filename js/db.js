@@ -100,6 +100,22 @@ export function commitGame(game, event = null) {
     };
   });
 }
+export function commitGameBatch(game, events) {
+  return checkedWrite(['games', 'events'], (tx, result, fail) => {
+    const store = tx.objectStore('games');
+    const request = store.get(game.id);
+    request.onsuccess = () => {
+      try {
+        if (!request.result || request.result.revision !== game.revision) return fail(new ConflictError());
+        const saved = { ...game, revision: game.revision + 1, updatedAt: new Date().toISOString() };
+        store.put(saved);
+        const eventStore = tx.objectStore('events');
+        for (const event of events) eventStore.put(event);
+        result(saved);
+      } catch (error) { fail(error); }
+    };
+  });
+}
 export function addPlayerToTeamAndGame(team, game, player) {
   return checkedWrite(['teams', 'games'], (tx, result, fail) => {
     const teams = tx.objectStore('teams');
